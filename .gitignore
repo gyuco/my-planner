@@ -8,3 +8,4 @@ build/
 apps/server/prisma/dev.db
 attachments/local/
 .DS_Store
+*.tsbuildinfo
