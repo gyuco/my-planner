@@ -4,7 +4,8 @@ You are initializing the development workflow for a software project — new, al
 
 **Tool agnosticism**
 - Stay fully agnostic to the specific AI CLI tool in use (Claude Code, Aider, Cursor CLI, Codex CLI, etc.). Never assume tool-specific mechanisms exist (e.g. "sub-agents", "skills folders", "MCP as a native concept") unless I confirm the tool and its actual capabilities.
-- Never create tool-specific context/config files (CLAUDE.md, .claude/, .cursorrules, .aider.conf, or equivalents).
+- Never create tool-specific **context** files (CLAUDE.md, .claude/, .cursorrules, .aider.conf, or equivalents). Project knowledge must not be locked to one tool.
+- **One exception: runtime wiring.** Connecting MCP servers, hooks, or CLI wrappers necessarily uses the chosen tool's own config format (`.mcp.json` or equivalent), and that is allowed — it is plumbing, not project context. The condition is that the wiring is also described in portable form in `docs/workflow.md`: which server or tool, what it is for, and what it needs to run (endpoints, env vars, required scopes), so the same setup can be reproduced under a different CLI. Secrets stay out of it and go through `.env`.
 - The canonical, portable home for project context is **AGENTS.md** at the repo root — the cross-tool convention read by most AI CLIs. All shared project context goes there or in plain `docs/` files, never in a vendor-specific location.
 
 **Question cadence**
@@ -151,7 +152,7 @@ When stopping, state what was attempted, what blocks it, and the options as you 
 - `rtk` or equivalent token-optimizing proxy — typically a CLI wrapper or shell hook, not an MCP server;
 - a code-indexing tool (codegraph, tgrep, or equivalent) — CLI and/or MCP depending on the tool;
 - any stack-specific MCP servers justified by Step 3.
-Ask before configuring any of them.
+Ask before configuring any of them. Writing the chosen tool's own MCP/hook config is the permitted exception to the no-tool-specific-files rule above; record each integration portably in `docs/workflow.md` at the same time, and never commit tokens or credentials — reference them via `.env`.
 
 **4e. Workflow states & Definition of Done** — agree an explicit status model mapped onto the chosen external tracker's real statuses (e.g. draft → in progress → done, or whatever that tool uses), with a written Definition of Done per status in `docs/roles/scrum-master.md` — the DoD for the review and done states includes the verification evidence required in 4b. Status changes in the external tracker are communicated to the scrum-master role — via that tool's webhook, notification, or MCP mechanism — so the workflow stays in sync.
 
@@ -162,6 +163,6 @@ Ask before configuring any of them.
 `AGENTS.md` links to it as the entry point for anyone — human or agent — opening the repo for the first time. Keep it generated from the decisions already confirmed in 4a–4e: if it says something those files do not, one of the two is wrong.
 
 ## STEP 5 — Final manifest and single go-ahead
-Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/workflow.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore` — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Mark each as created, modified, or left untouched, and never list an existing file as a full rewrite — existing files are amended in place. Then ask for one final explicit go-ahead.
+Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/workflow.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore`, plus the chosen tool's MCP/hook config if any integration was confirmed — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Mark each as created, modified, or left untouched, and never list an existing file as a full rewrite — existing files are amended in place. Then ask for one final explicit go-ahead.
 
 **Do not create any file or run any command until I have confirmed each step and given the final go-ahead in Step 5.**
