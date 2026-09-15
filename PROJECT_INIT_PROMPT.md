@@ -1,4 +1,4 @@
-You are initializing a new software project. Follow this process step by step, asking questions and waiting for my explicit confirmation before moving to the next step. Do not skip ahead.
+You are initializing the development workflow for a software project — new, already under way, or already partly initialized (Step 1 tells you which). Follow this process step by step, asking questions and waiting for my explicit confirmation before moving to the next step. Do not skip ahead.
 
 ## GLOBAL CONSTRAINTS (apply to every step)
 
@@ -55,13 +55,25 @@ A compressed path for small projects. It changes the *ceremony*, never the *guar
 
 **Escalation:** if during the merged round the answers reveal multiple integrations, more than one contributor, or non-trivial architectural contention, say so and ask whether to switch back to the full process before continuing.
 
-## STEP 1 — Check for existing documentation
-- Check whether `prd.md` (or `PRD.md`) exists.
-- If it exists: read it and summarize your understanding back to me for confirmation.
-- If not: tell me so, and proceed to Step 2 to gather what is needed to build one.
+## STEP 1 — Detect the situation (greenfield, brownfield, or already initialized)
+Inspect before asking. Determine which of three cases applies, tell me which one you concluded and on what evidence, and confirm with me before proceeding.
+
+**1a. Already initialized** — `AGENTS.md`, `docs/roles*`, or `docs/skills/` already exist.
+Do **not** overwrite anything. Read what is there, report what already exists and what is missing or stale, and propose an **incremental update as a diff** — additions and amendments only, each confirmed individually. Existing skill files are accumulated project knowledge: never regenerate or replace them wholesale, and preserve their `History` sections. This rule holds even if the existing structure differs from what this prompt would have produced; propose migrating it, never silently replacing it.
+
+**1b. Brownfield (code exists, workflow does not)** — infer instead of asking, then have me confirm your inferences. Cheaper and more accurate than interrogating me about facts the repo already states:
+- **Stack** — from manifests and lockfiles (package.json, pyproject.toml, go.mod, Cargo.toml, …), plus config for test runners, linters, and CI.
+- **Structure** — from the code index (never by reading whole files): entry points, modules, layering, integration points.
+- **Git & delivery conventions** — from the repository itself: default and long-lived branches, branch naming patterns and commit message style from `git log`, merge strategy from the history shape, required checks from CI config and branch protection.
+- **Product intent** — from README, existing docs, and issue/PR titles.
+Present the inferences as a list with, for each, its evidence and your confidence. Then ask me **only** about what could not be inferred or where evidence conflicts. Anything you could not establish is asked in Steps 2–3 as usual; nothing is invented, and a low-confidence inference is asked, not assumed.
+
+**1c. Greenfield (empty or near-empty repo)** — proceed with the full elicitation in Steps 2–3.
+
+In all cases, check whether `prd.md` (or `PRD.md`) exists; if it does, read it and summarize your understanding back to me for confirmation, and treat Steps 2–3 as validating and filling gaps in it rather than rewriting it.
 
 ## STEP 2 — Product clarification (one question at a time, confirm each)
-Ask until the project is clear, covering at least:
+On brownfield, skip whatever Step 1b already established and confirmed; ask only about the gaps. Ask until the project is clear, covering at least:
 - What problem does this solve, and for whom?
 - Core features / user stories for a first version?
 - What is explicitly out of scope (non-goals)?
@@ -73,7 +85,7 @@ For acceptance criteria: derive them **per feature**, each independently testabl
 Summarize into a draft `prd.md` and ask me to confirm before continuing.
 
 ## STEP 3 — Technical clarification (one question at a time, confirm each)
-Once the product side is confirmed, ask about:
+On brownfield, most of this was inferred in Step 1b — present those inferences for confirmation instead of re-asking, and question only what is missing, ambiguous, or about to change. Once the product side is confirmed, ask about:
 - Preferred language(s) and framework(s), or should you recommend one?
 - Architecture style (monolith, microservices, serverless, …)?
 - Database / storage requirements?
@@ -108,7 +120,14 @@ Ask me to confirm, adjust, or drop each baseline skill. On the fast lane, `dev-o
   - `History` — date + what changed and why
 - **Index**: `docs/skills/INDEX.md`, one line per skill (role, name, trigger), kept current — skills that are not indexed do not get loaded.
 - **Read rule**: before starting a task, a role consults the INDEX entries for its own area and loads the matching skills.
+- **Staleness check**: a skill describes a moving codebase. Before applying one, verify that the files, commands, flags, or conventions it names still exist. If they do not, the skill is stale — correct it (and log the correction in `History`) before relying on it. Never follow a skill whose preconditions no longer hold.
 - **Write rule (the trigger that closes the loop)**: at the end of every task or PR, the reviewer — or the scrum-master if no review occurred — decides whether a reusable pattern, a repeated mistake, or a non-obvious project constraint emerged, and creates or updates the corresponding skill file plus its INDEX line. If nothing emerged, that is stated explicitly rather than skipped silently.
+- **Hygiene rules** — an accumulating skill set degrades without maintenance, so these are part of the write rule, not optional tidying:
+  - *No duplicates*: before creating a skill, search the INDEX for one with an overlapping trigger. If one exists, **update it** rather than adding a near-twin.
+  - *Resolve contradictions*: if a new lesson contradicts an existing skill, do not leave both standing — amend the existing skill and record what changed and why in `History`.
+  - *Keep them short*: a skill is an operating procedure, not an essay. If one grows past roughly a page, split it by trigger or cut what has become obvious.
+  - *Deprecate explicitly*: a skill that no longer applies is marked deprecated with the reason and date, and removed from the INDEX — never deleted silently, so the reasoning survives.
+  - *Promote what generalizes*: a lesson that turns out to apply to every task belongs in the role's baseline skill (4b) or in `AGENTS.md`, not as a separate skill nobody thinks to load.
 
 **4d. Integrations** — propose based on the confirmed stack, and note that each integrates by *whatever mechanism it actually supports* (CLI wrapper, shell hook, or MCP server — do not assume MCP for all):
 - the external task-tracking system from Step 0 — MCP server (this replaces any internal board);
@@ -120,6 +139,6 @@ Ask before configuring any of them.
 **4e. Workflow states & Definition of Done** — agree an explicit status model mapped onto the chosen external tracker's real statuses (e.g. draft → in progress → done, or whatever that tool uses), with a written Definition of Done per status in `docs/roles/scrum-master.md`. Status changes in the external tracker are communicated to the scrum-master role — via that tool's webhook, notification, or MCP mechanism — so the workflow stays in sync.
 
 ## STEP 5 — Final manifest and single go-ahead
-Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore` — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Then ask for one final explicit go-ahead.
+Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore` — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Mark each as created, modified, or left untouched, and never list an existing file as a full rewrite — existing files are amended in place. Then ask for one final explicit go-ahead.
 
 **Do not create any file or run any command until I have confirmed each step and given the final go-ahead in Step 5.**
