@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
 
+env:
+  # DB SQLite effimero, ricreato ad ogni run da `prisma migrate deploy`
+  # (vedi README.md, flusso CI/produzione vs dev).
+  DATABASE_URL: file:./ci.db
+  JWT_SECRET: ci-fake-jwt-secret-not-for-production
+  BOOTSTRAP_USERNAME: ci-admin
+  BOOTSTRAP_PASSWORD: ci-admin-password
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -14,6 +22,67 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+
+      - name: Prisma generate (apps/server)
+        run: npm run --workspace apps/server prisma:generate
+
+      - name: Prisma migrate deploy (apps/server, DB effimero)
+        run: npm run --workspace apps/server prisma:migrate:deploy
+
       - run: npm run typecheck
       - run: npm run lint --if-present
+      - run: npm run build
       - run: npm run test --if-present
+
+      # Predispone Playwright per gli scenari e2e (T4-T9, prossimo batch);
+      # nessun test e2e esiste ancora in questo batch, questo step prepara
+      # l'ambiente cosi' che il job e2e sotto sia pronto non appena arriveranno.
+      - name: Install Playwright browsers
+        run: npx --workspace apps/web playwright install --with-deps
+        continue-on-error: true
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    # Placeholder per T4-T9: nessun test e2e esiste ancora in apps/web/e2e,
+    # quindi il job termina subito senza avviare la stack (server+web+MinIO
+    # via docker-compose.yml) finche' gli scenari non vengono aggiunti.
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Playwright e2e tests
+        id: check
+        run: |
+          if [ -d apps/web/e2e ] && [ -n "$(find apps/web/e2e -name '*.spec.ts' 2>/dev/null)" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Avvia stack (server + web + minio) via docker compose
+        if: steps.check.outputs.found == 'true'
+        env:
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          BOOTSTRAP_USERNAME: ${{ env.BOOTSTRAP_USERNAME }}
+          BOOTSTRAP_PASSWORD: ${{ env.BOOTSTRAP_PASSWORD }}
+        run: docker compose up -d --build
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.found == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm install
+        if: steps.check.outputs.found == 'true'
+
+      - name: Install Playwright browsers
+        if: steps.check.outputs.found == 'true'
+        run: npx --workspace apps/web playwright install --with-deps
+
+      - name: Run Playwright e2e tests
+        if: steps.check.outputs.found == 'true'
+        run: npm run --workspace apps/web test:e2e
+
+      - name: Stop stack
+        if: steps.check.outputs.found == 'true'
+        run: docker compose down -v
