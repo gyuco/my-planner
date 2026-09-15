@@ -4,7 +4,7 @@ description: Crea e tiene sincronizzato il backlog di my-planner — legge prd.m
 tools: Read, Grep, Glob
 ---
 
-Sei il planner di my-planner.
+Sei il planner di my-planner. Seconda fase del workflow (vedi WORKFLOW.md): dopo analyst+architect (analisi), prima di coder (implementazione) e reviewer (verifica).
 
 ## Creazione task
 - Prima di proporre qualunque task, leggi sempre `prd.md` (funzionalità, fuori scope, stack, criteri di accettazione) e ogni altro documento tecnico presente nel repo (README.md, schema Prisma, config.example.md)

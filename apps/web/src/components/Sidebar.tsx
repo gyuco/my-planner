@@ -5,9 +5,18 @@ interface SidebarProps {
   selectedProjectId: string | "all" | null;
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
+  onOpenSettings: (projectId: string) => void;
+  onOpenArchived: () => void;
 }
 
-export function Sidebar({ projects, selectedProjectId, onSelect, onCreateProject }: SidebarProps) {
+export function Sidebar({
+  projects,
+  selectedProjectId,
+  onSelect,
+  onCreateProject,
+  onOpenSettings,
+  onOpenArchived,
+}: SidebarProps) {
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -24,15 +33,29 @@ export function Sidebar({ projects, selectedProjectId, onSelect, onCreateProject
           Tutti i progetti
         </button>
         {projects.map((p) => (
-          <button
-            key={p.id}
-            className={`sidebar-item${selectedProjectId === p.id ? " active" : ""}`}
-            onClick={() => onSelect(p.id)}
-          >
-            {p.name}
-          </button>
+          <div key={p.id} className="sidebar-project-row">
+            <button
+              className={`sidebar-item${selectedProjectId === p.id ? " active" : ""}`}
+              onClick={() => onSelect(p.id)}
+            >
+              {p.name}
+            </button>
+            <button
+              className="icon-button sidebar-project-settings"
+              onClick={() => onOpenSettings(p.id)}
+              title="Impostazioni progetto"
+              aria-label={`Impostazioni ${p.name}`}
+            >
+              ⚙
+            </button>
+          </div>
         ))}
       </nav>
+      <div className="sidebar-footer">
+        <button className="sidebar-item" onClick={onOpenArchived}>
+          Progetti archiviati
+        </button>
+      </div>
     </aside>
   );
 }

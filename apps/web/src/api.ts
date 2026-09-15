@@ -1,6 +1,7 @@
 import type {
   Board,
   Project,
+  ProjectToken,
   Task,
   TaskPriority,
   TaskComplexity,
@@ -85,6 +86,45 @@ export function listProjects(includeArchived = false): Promise<Project[]> {
 
 export function createProject(name: string): Promise<Project> {
   return apiFetch(`/projects`, { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export function renameProject(projectId: string, name: string): Promise<Project> {
+  return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
+export function archiveProject(projectId: string): Promise<Project> {
+  return apiFetch(`/projects/${projectId}/archive`, { method: "POST" });
+}
+
+export function unarchiveProject(projectId: string): Promise<Project> {
+  return apiFetch(`/projects/${projectId}/unarchive`, { method: "POST" });
+}
+
+// --- Token MCP -------------------------------------------------------------
+
+export interface ProjectTokenWithSecret extends ProjectToken {
+  token: string;
+}
+
+export function listProjectTokens(projectId: string): Promise<ProjectToken[]> {
+  return apiFetch(`/projects/${projectId}/tokens`);
+}
+
+export function createProjectToken(
+  projectId: string,
+  label?: string,
+): Promise<ProjectTokenWithSecret> {
+  return apiFetch(`/projects/${projectId}/tokens`, {
+    method: "POST",
+    body: JSON.stringify({ label }),
+  });
+}
+
+export function revokeProjectToken(
+  projectId: string,
+  tokenId: string,
+): Promise<{ id: string; revokedAt: string }> {
+  return apiFetch(`/projects/${projectId}/tokens/${tokenId}`, { method: "DELETE" });
 }
 
 // --- Board -------------------------------------------------------------

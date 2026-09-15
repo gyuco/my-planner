@@ -4,6 +4,8 @@ import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
 import { CreateTaskModal } from "./components/CreateTaskModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
+import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
+import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
 import type { BoardTask } from "./components/TaskCard";
@@ -37,9 +39,12 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = useCallback(() => {
     clearToken();
@@ -112,16 +117,32 @@ export function App() {
     setOpenTaskProjectId(task.projectId);
   }
 
+  const settingsProject = projects.find((p) => p.id === settingsProjectId) ?? null;
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
+      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
         selectedProjectId={selectedProjectId}
-        onSelect={setSelectedProjectId}
+        onSelect={(id) => {
+          setSelectedProjectId(id);
+          setSidebarOpen(false);
+        }}
         onCreateProject={() => setShowCreateProject(true)}
+        onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
+        onOpenArchived={() => setShowArchived(true)}
       />
       <div className="app-main">
         <header className="topbar">
+          <button
+            className="icon-button sidebar-toggle"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label="Menu progetti"
+            title="Menu progetti"
+          >
+            ☰
+          </button>
           <h1>{selectedProjectId === "all" ? "Tutti i progetti" : currentProject?.name ?? "my-planner"}</h1>
           <div className="topbar-actions">
             {currentProject && (
@@ -168,6 +189,18 @@ export function App() {
           }}
           onChanged={loadBoard}
         />
+      )}
+
+      {settingsProject && (
+        <ProjectSettingsModal
+          project={settingsProject}
+          onClose={() => setSettingsProjectId(null)}
+          onChanged={loadProjects}
+        />
+      )}
+
+      {showArchived && (
+        <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} />
       )}
     </div>
   );
