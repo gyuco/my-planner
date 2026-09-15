@@ -8,6 +8,7 @@ import {
   renameProject,
   revokeProjectToken,
 } from "../api";
+import { useI18n } from "../i18n";
 
 interface ProjectSettingsModalProps {
   project: Project;
@@ -16,6 +17,7 @@ interface ProjectSettingsModalProps {
 }
 
 export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSettingsModalProps) {
+  const { t, formatDate } = useI18n();
   const [name, setName] = useState(project.name);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
@@ -26,6 +28,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
   const [creatingToken, setCreatingToken] = useState(false);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  const [copyConfigFeedback, setCopyConfigFeedback] = useState(false);
 
   const [archiving, setArchiving] = useState(false);
   const [archiveError, setArchiveError] = useState<string | null>(null);
@@ -37,7 +40,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
       setTokens(list);
       setTokensError(null);
     } catch (err) {
-      setTokensError(err instanceof ApiRequestError ? err.message : "Impossibile caricare i token");
+      setTokensError(err instanceof ApiRequestError ? err.message : t.projectSettings.loadTokensError);
     }
   }
 
@@ -55,7 +58,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
       await renameProject(project.id, name.trim());
       onChanged();
     } catch (err) {
-      setRenameError(err instanceof ApiRequestError ? err.message : "Errore durante la rinomina");
+      setRenameError(err instanceof ApiRequestError ? err.message : t.projectSettings.renameError);
     } finally {
       setRenaming(false);
     }
@@ -71,19 +74,19 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
       setNewLabel("");
       await loadTokens();
     } catch (err) {
-      setTokensError(err instanceof ApiRequestError ? err.message : "Errore durante la creazione del token");
+      setTokensError(err instanceof ApiRequestError ? err.message : t.projectSettings.createTokenError);
     } finally {
       setCreatingToken(false);
     }
   }
 
   async function handleRevoke(tokenId: string) {
-    if (!window.confirm("Revocare questo token? Non potrà più essere usato via MCP.")) return;
+    if (!window.confirm(t.projectSettings.revokeConfirm)) return;
     try {
       await revokeProjectToken(project.id, tokenId);
       await loadTokens();
     } catch (err) {
-      setTokensError(err instanceof ApiRequestError ? err.message : "Errore durante la revoca del token");
+      setTokensError(err instanceof ApiRequestError ? err.message : t.projectSettings.revokeError);
     }
   }
 
@@ -95,7 +98,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
       onChanged();
       onClose();
     } catch (err) {
-      setArchiveError(err instanceof ApiRequestError ? err.message : "Errore durante l'archiviazione");
+      setArchiveError(err instanceof ApiRequestError ? err.message : t.projectSettings.archiveError);
     } finally {
       setArchiving(false);
     }
@@ -114,55 +117,93 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
     );
   }
 
+  function buildMcpConfig(token: string): string {
+    // Default: MCP HTTP sulla stessa host della UI, porta 3100 (vedi
+    // MCP_HTTP_PORT/MCP_HTTP_BASE_URL in config.example.md e README.md §MCP).
+    const mcpUrl = `${window.location.protocol}//${window.location.hostname}:3100/mcp`;
+    const config = {
+      mcpServers: {
+        [`my-planner-${project.name}`]: {
+          url: mcpUrl,
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      },
+    };
+    return JSON.stringify(config, null, 2);
+  }
+
+  function handleCopyConfig() {
+    if (!revealedToken) return;
+    navigator.clipboard?.writeText(buildMcpConfig(revealedToken)).then(
+      () => {
+        setCopyConfigFeedback(true);
+        setTimeout(() => setCopyConfigFeedback(false), 1500);
+      },
+      () => {
+        /* ignore clipboard errors */
+      },
+    );
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal settings-modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Impostazioni progetto</h2>
+        <h2>{t.projectSettings.title}</h2>
 
         <section className="drawer-section">
-          <h3>Generali</h3>
+          <h3>{t.projectSettings.general}</h3>
           <form className="drawer-inline-form" onSubmit={handleRename}>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               maxLength={200}
               required
-              aria-label="Nome progetto"
+              aria-label={t.projectSettings.projectNameAria}
             />
             <button type="submit" disabled={renaming || !name.trim() || name === project.name}>
-              {renaming ? "Salvataggio..." : "Rinomina"}
+              {renaming ? t.projectSettings.saving : t.projectSettings.rename}
             </button>
           </form>
           {renameError && <p className="login-error">{renameError}</p>}
         </section>
 
         <section className="drawer-section">
-          <h3>Token MCP</h3>
+          <h3>{t.projectSettings.mcpTokens}</h3>
           <form className="drawer-inline-form" onSubmit={handleCreateToken}>
             <input
               value={newLabel}
               onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="Etichetta (opzionale)"
+              placeholder={t.projectSettings.labelPlaceholder}
               maxLength={100}
             />
             <button type="submit" disabled={creatingToken}>
-              {creatingToken ? "Creazione..." : "Nuovo token"}
+              {creatingToken ? t.projectSettings.creating : t.projectSettings.newToken}
             </button>
           </form>
 
           {revealedToken && (
             <div className="token-reveal">
               <p>
-                Copia questo token ora: <strong>non verrà mostrato di nuovo.</strong>
+                {t.projectSettings.copyTokenWarning} <strong>{t.projectSettings.notShownAgain}</strong>
               </p>
               <div className="token-reveal-row">
                 <code>{revealedToken}</code>
                 <button type="button" onClick={handleCopyToken}>
-                  {copyFeedback ? "Copiato!" : "Copia"}
+                  {copyFeedback ? t.common.copied : t.common.copy}
                 </button>
               </div>
+              <div className="mcp-config-block">
+                <p>{t.projectSettings.mcpConfigTitle}</p>
+                <pre className="mcp-config-json">
+                  <code>{buildMcpConfig(revealedToken)}</code>
+                </pre>
+                <button type="button" onClick={handleCopyConfig}>
+                  {copyConfigFeedback ? t.common.copied : t.projectSettings.copyConfig}
+                </button>
+              </div>
+
               <button type="button" className="token-reveal-dismiss" onClick={() => setRevealedToken(null)}>
-                Ho copiato il token, chiudi
+                {t.projectSettings.copiedDismiss}
               </button>
             </div>
           )}
@@ -170,23 +211,24 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
           {tokensError && <p className="login-error">{tokensError}</p>}
 
           {tokens.length === 0 ? (
-            <p className="drawer-empty">Nessun token creato per questo progetto.</p>
+            <p className="drawer-empty">{t.projectSettings.noTokens}</p>
           ) : (
             <ul className="drawer-list">
-              {tokens.map((t) => (
-                <li key={t.id}>
+              {tokens.map((tok) => (
+                <li key={tok.id}>
                   <span>
-                    {t.label || "(senza etichetta)"} — creato il {new Date(t.createdAt).toLocaleDateString()}{" "}
-                    {t.revokedAt ? (
-                      <span className="token-status token-revoked">revocato</span>
+                    {tok.label || t.projectSettings.noLabel} — {t.projectSettings.createdOn}{" "}
+                    {formatDate(tok.createdAt)}{" "}
+                    {tok.revokedAt ? (
+                      <span className="token-status token-revoked">{t.projectSettings.revoked}</span>
                     ) : (
-                      <span className="token-status token-active">attivo</span>
+                      <span className="token-status token-active">{t.projectSettings.active}</span>
                     )}
                   </span>
-                  {!t.revokedAt && (
+                  {!tok.revokedAt && (
                     <div className="drawer-list-actions">
-                      <button type="button" onClick={() => handleRevoke(t.id)}>
-                        Revoca
+                      <button type="button" onClick={() => handleRevoke(tok.id)}>
+                        {t.projectSettings.revoke}
                       </button>
                     </div>
                   )}
@@ -197,20 +239,20 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
         </section>
 
         <section className="drawer-section">
-          <h3>Zona pericolosa</h3>
+          <h3>{t.projectSettings.dangerZone}</h3>
           {!confirmArchive ? (
             <button type="button" className="danger-button" onClick={() => setConfirmArchive(true)}>
-              Archivia progetto
+              {t.projectSettings.archiveProject}
             </button>
           ) : (
             <div className="confirm-row">
-              <span>Confermi l'archiviazione? Il progetto sparirà dalla vista principale (reversibile).</span>
+              <span>{t.projectSettings.confirmArchiveText}</span>
               <div className="drawer-list-actions">
                 <button type="button" onClick={() => setConfirmArchive(false)} disabled={archiving}>
-                  Annulla
+                  {t.common.cancel}
                 </button>
                 <button type="button" className="danger-button" onClick={handleArchive} disabled={archiving}>
-                  {archiving ? "Archiviazione..." : "Conferma archiviazione"}
+                  {archiving ? t.projectSettings.archiving : t.projectSettings.confirmArchive}
                 </button>
               </div>
             </div>
@@ -220,7 +262,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
 
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
-            Chiudi
+            {t.projectSettings.close}
           </button>
         </div>
       </div>

@@ -266,6 +266,24 @@ Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il 
 
 ---
 
+## 6bis. REST — Impostazioni storage globali
+
+Config persistita in `StorageSettings` (singleton, id `"singleton"`), sostituisce/ha priorità sulle variabili d'ambiente `ATTACHMENTS_BACKEND`/`S3_*` una volta impostata da UI. Vedi `apps/server/src/lib/attachmentStorage/index.ts`.
+
+### `GET /settings/storage`
+- Auth: JWT (qualsiasi utente autenticato)
+- 200: `StorageSettings` — `{ backend: "local"|"s3", localDir, s3Endpoint, s3Bucket, s3Region, s3AccessKeyId, s3SecretAccessKeySet, updatedAt }`. Il secret S3 non è mai restituito in chiaro, solo il flag `s3SecretAccessKeySet`.
+
+### `PUT /settings/storage`
+- Auth: JWT
+- Body: `{ backend: "local"|"s3", localDir?, s3Endpoint?, s3Bucket?, s3Region?, s3AccessKeyId?, s3SecretAccessKey? }`
+- `s3SecretAccessKey` omesso/vuoto → mantiene il secret già salvato (evita di dover ripresentare il secret ad ogni save dal form).
+- `backend: "s3"` richiede `s3Bucket` non vuoto, altrimenti 400 `VALIDATION_ERROR`.
+- 200: `StorageSettings` aggiornato.
+- Unica opzione "S3-compatibile" in UI: copre sia MinIO self-hosted (valorizzando `s3Endpoint`) sia servizi online come AWS S3 (endpoint vuoto).
+
+---
+
 ## 7. Tool MCP (B14/B15)
 
 Tutti i tool sono registrati da `createProjectMcpServer(projectId)` e operano **esclusivamente** sul `projectId` risolto dal token. Nessun parametro `projectId` in input (implicito). Ogni tool richiama le stesse funzioni di `apps/server/src/services/*` usate da REST.
@@ -376,6 +394,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 2. Nessun campo per il token in chiaro va persistito: **confermato** design esistente (`tokenHash` unico, mai il raw token salvato — corretto, nessuna modifica necessaria oltre `label`).
 3. `Task.position` già presente — sufficiente per drag&drop manuale (nessuna modifica).
 4. Indice esplicito per la ricerca full-text case-insensitive titolo+descrizione: SQLite + Prisma non hanno FTS nativo abilitato di default in questo schema; v1 userà `contains` case-insensitive lato Prisma (SQLite `LIKE` è case-insensitive per ASCII by default, sufficiente per v1). Nessuna modifica di schema necessaria; annotato qui per `coder`/`dev-ops` come nota implementativa, non un gap di schema.
+
+5. `StorageSettings` (nuovo modello, singleton) — persiste la configurazione del servizio di storage allegati scelta da UI (filesystem locale o S3-compatibile/MinIO), vedi §6bis.
 
 Vedi diff applicato in coda al file schema.
 

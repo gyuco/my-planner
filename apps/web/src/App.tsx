@@ -6,12 +6,15 @@ import { CreateTaskModal } from "./components/CreateTaskModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
+import { StorageSettingsModal } from "./components/StorageSettingsModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { clearToken, hasValidToken } from "./auth";
 import { getAggregatedBoard, getProjectBoard, listProjects, setUnauthorizedHandler } from "./api";
+import { useI18n } from "./i18n";
 
 const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
 const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "", tag: null };
@@ -43,6 +46,7 @@ function collectTags(board: Board): string[] {
 }
 
 export function App() {
+  const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | "all" | null>(null);
@@ -52,6 +56,7 @@ export function App() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [showStorageSettings, setShowStorageSettings] = useState(false);
   const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
@@ -82,9 +87,9 @@ export function App() {
         return list[0]?.id ?? "all";
       });
     } catch {
-      setLoadError("Impossibile caricare i progetti");
+      setLoadError(t.app.loadProjectsError);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (loggedIn) loadProjects();
@@ -104,9 +109,9 @@ export function App() {
       setBoard(data);
       setLoadError(null);
     } catch {
-      setLoadError("Impossibile caricare la board");
+      setLoadError(t.app.loadBoardError);
     }
-  }, [selectedProjectId, filters.search, filters.tag, aggregatedProjectIds]);
+  }, [selectedProjectId, filters.search, filters.tag, aggregatedProjectIds, t]);
 
   useEffect(() => {
     loadBoard();
@@ -147,22 +152,24 @@ export function App() {
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
         onOpenArchived={() => setShowArchived(true)}
+        onOpenStorageSettings={() => setShowStorageSettings(true)}
       />
       <div className="app-main">
         <header className="topbar">
           <button
             className="icon-button sidebar-toggle"
             onClick={() => setSidebarOpen((v) => !v)}
-            aria-label="Menu progetti"
-            title="Menu progetti"
+            aria-label={t.app.projectsMenu}
+            title={t.app.projectsMenu}
           >
             ☰
           </button>
-          <h1>{selectedProjectId === "all" ? "Tutti i progetti" : currentProject?.name ?? "my-planner"}</h1>
+          <h1>{selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           <div className="topbar-actions">
             {currentProject && (
-              <button onClick={() => setShowCreateTask(true)}>+ Nuovo task</button>
+              <button onClick={() => setShowCreateTask(true)}>{t.app.newTask}</button>
             )}
+            <LanguageSwitcher />
             <button onClick={handleLogout}>Logout</button>
           </div>
         </header>
@@ -225,6 +232,10 @@ export function App() {
 
       {showArchived && (
         <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} />
+      )}
+
+      {showStorageSettings && (
+        <StorageSettingsModal onClose={() => setShowStorageSettings(false)} />
       )}
     </div>
   );

@@ -11,11 +11,16 @@ JWT_SECRET="change-me-in-production"
 PORT=3000
 MCP_HTTP_PORT=3100
 
-# Storage allegati: "local" oppure "s3"
+# Storage allegati: "local" oppure "s3". Queste variabili sono usate solo
+# come seed/fallback finche' non esiste ancora una riga in StorageSettings
+# (tabella popolata al primo salvataggio dalla UI "Impostazioni storage",
+# vedi API_CONTRACT.md §8) — dopo il primo salvataggio la config in DB ha
+# priorita' su queste variabili.
 ATTACHMENTS_BACKEND=local
 ATTACHMENTS_LOCAL_DIR=./attachments/local
 
-# Solo se ATTACHMENTS_BACKEND=s3
+# Solo se ATTACHMENTS_BACKEND=s3. Compatibile sia con MinIO (self-hosted,
+# richiede S3_ENDPOINT) sia con servizi online S3-compatibili.
 S3_ENDPOINT=
 S3_BUCKET=
 S3_ACCESS_KEY_ID=

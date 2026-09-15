@@ -75,6 +75,21 @@ model Comment {
   createdAt DateTime @default(now())
 }
 
+// Singleton (id sempre "singleton"): configurazione globale del backend di
+// storage per gli allegati, modificabile da UI invece che solo via .env
+// (vedi apps/server/src/lib/attachmentStorage/index.ts).
+model StorageSettings {
+  id               String   @id @default("singleton")
+  backend          String   @default("local") // local | s3
+  localDir         String   @default("./attachments/local")
+  s3Endpoint       String?
+  s3Bucket         String?
+  s3Region         String?
+  s3AccessKeyId    String?
+  s3SecretAccessKey String?
+  updatedAt        DateTime @updatedAt
+}
+
 model Attachment {
   id              String @id @default(cuid())
   taskId          String

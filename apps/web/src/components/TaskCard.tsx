@@ -1,4 +1,5 @@
 import type { Task, TaskPriority } from "@my-planner/core";
+import { useI18n } from "../i18n";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
 export interface BoardTask extends Task {
@@ -6,13 +7,6 @@ export interface BoardTask extends Task {
   projectId: string;
   projectName?: string;
 }
-
-const PRIORITY_LABEL: Record<TaskPriority, string> = {
-  low: "Bassa",
-  medium: "Media",
-  high: "Alta",
-  urgent: "Urgente",
-};
 
 const PROJECT_COLOR_PALETTE = [
   "#2563eb",
@@ -56,6 +50,13 @@ export function TaskCard({
   style,
   isDragging,
 }: TaskCardProps) {
+  const { t, dateLocale } = useI18n();
+  const PRIORITY_LABEL: Record<TaskPriority, string> = {
+    low: t.taskCard.priorityLow,
+    medium: t.taskCard.priorityMedium,
+    high: t.taskCard.priorityHigh,
+    urgent: t.taskCard.priorityUrgent,
+  };
   const blocked = (task.blockedByOpenCount ?? 0) > 0;
 
   return (
@@ -98,12 +99,12 @@ export function TaskCard({
 
       <div className="task-card-footer">
         {blocked && (
-          <span className="task-card-blocked" title="Task bloccato da dipendenze non risolte">
+          <span className="task-card-blocked" title={t.taskCard.blockedTitle}>
             🔒 {task.blockedByOpenCount}
           </span>
         )}
         {task.dueDate && (
-          <span className="task-card-due">{new Date(task.dueDate).toLocaleDateString()}</span>
+          <span className="task-card-due">{new Date(task.dueDate).toLocaleDateString(dateLocale)}</span>
         )}
       </div>
     </div>

@@ -17,7 +17,7 @@ export async function loginViaUi(page: Page) {
   await page.goto("/");
   await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
   await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
-  await page.getByRole("button", { name: "Accedi" }).click();
+  await page.getByRole("button", { name: "Sign in" }).click();
   // Attende lo shell applicativo post-login (header sidebar "Progetti"),
   // presente sia su desktop che su mobile (la sidebar e' solo nascosta via
   // CSS su mobile, non smontata dal DOM).

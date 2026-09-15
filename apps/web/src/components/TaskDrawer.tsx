@@ -17,14 +17,10 @@ import {
   updateTask,
   uploadAttachment,
 } from "../api";
+import { useI18n } from "../i18n";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const STATUSES: TaskStatus[] = ["draft", "in_progress", "done"];
-const STATUS_LABEL: Record<TaskStatus, string> = {
-  draft: "Draft",
-  in_progress: "In progress",
-  done: "Done",
-};
 
 interface TaskDrawerProps {
   taskId: string;
@@ -40,6 +36,12 @@ function toDateInputValue(iso: string | null): string {
 }
 
 export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawerProps) {
+  const { t, formatDateTime } = useI18n();
+  const STATUS_LABEL: Record<TaskStatus, string> = {
+    draft: t.board.draft,
+    in_progress: t.board.inProgress,
+    done: t.board.done,
+  };
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       setAttachments(a);
       setProjectTasks(tasks.filter((pt) => pt.id !== taskId));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Impossibile caricare il task");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.loadError);
     } finally {
       setLoading(false);
     }
@@ -112,7 +114,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante il salvataggio");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
     }
   }
 
@@ -129,7 +131,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
         setStatusError(err.message);
       } else {
         setStatusError(
-          err instanceof ApiRequestError ? err.message : "Errore durante il cambio di stato",
+          err instanceof ApiRequestError ? err.message : t.taskDrawer.statusChangeError,
         );
       }
     } finally {
@@ -145,7 +147,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante l'aggiunta della dipendenza");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.addDependencyError);
     }
   }
 
@@ -155,7 +157,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante la rimozione della dipendenza");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.removeDependencyError);
     }
   }
 
@@ -167,7 +169,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       setComments((prev) => [...prev, c]);
       setNewComment("");
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante l'aggiunta del commento");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.commentError);
     }
   }
 
@@ -179,7 +181,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       const attachment = await uploadAttachment(taskId, file);
       setAttachments((prev) => [...prev, attachment]);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante l'upload dell'allegato");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.uploadError);
     } finally {
       setUploading(false);
       e.target.value = "";
@@ -190,7 +192,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
     try {
       await downloadAttachment(attachment.id, attachment.fileName);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante il download");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.downloadError);
     }
   }
 
@@ -199,7 +201,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       await deleteAttachment(attachmentId);
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante l'eliminazione dell'allegato");
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.deleteAttachmentError);
     }
   }
 
@@ -210,20 +212,20 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
   }
 
   const availableBlockers = projectTasks.filter(
-    (t) => !(task?.blockedBy ?? []).some((d) => d.blockedByTaskId === t.id)
+    (pt) => !(task?.blockedBy ?? []).some((d) => d.blockedByTaskId === pt.id)
   );
 
   return (
     <div className="drawer-overlay" onClick={onClose}>
       <aside className="drawer" onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
-          <h2>Dettaglio task</h2>
-          <button className="icon-button" onClick={onClose} title="Chiudi">
+          <h2>{t.taskDrawer.details}</h2>
+          <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
             &times;
           </button>
         </div>
 
-        {loading && <p>Caricamento...</p>}
+        {loading && <p>{t.taskDrawer.loading}</p>}
         {error && (
           <div className="board-error" role="alert">
             {error}
@@ -235,12 +237,12 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
           <div className="drawer-body">
             <section className="drawer-section">
               <label>
-                Stato
+                {t.taskDrawer.statusLabel}
                 <select
                   value={task.status}
                   disabled={changingStatus}
                   onChange={(e) => handleChangeStatus(e.target.value as TaskStatus)}
-                  aria-label="Cambia stato del task"
+                  aria-label={t.taskDrawer.changeStatusAria}
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
@@ -256,12 +258,12 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                 </div>
               )}
               <label>
-                Titolo
+                {t.taskDrawer.titleLabel}
                 <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveFields} maxLength={300} />
               </label>
               <div className="drawer-description">
                 <div className="drawer-description-head">
-                  <span className="field-label">Descrizione (markdown)</span>
+                  <span className="field-label">{t.taskDrawer.descriptionLabel}</span>
                   <button
                     type="button"
                     className="link-button"
@@ -270,7 +272,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                       setEditingDescription((v) => !v);
                     }}
                   >
-                    {editingDescription ? "Anteprima" : "Modifica"}
+                    {editingDescription ? t.taskDrawer.preview : t.taskDrawer.edit}
                   </button>
                 </div>
                 {editingDescription ? (
@@ -280,7 +282,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                     onChange={(e) => setDescription(e.target.value)}
                     onBlur={saveFields}
                     rows={10}
-                    placeholder="Scrivi in markdown…"
+                    placeholder={t.taskDrawer.descriptionPlaceholder}
                     autoFocus
                   />
                 ) : description.trim() ? (
@@ -291,13 +293,13 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                   />
                 ) : (
                   <div className="drawer-description-preview drawer-description-empty" onClick={() => setEditingDescription(true)}>
-                    Nessuna descrizione — clicca per aggiungerne una
+                    {t.taskDrawer.noDescription}
                   </div>
                 )}
               </div>
               <div className="modal-row">
                 <label>
-                  Priorità
+                  {t.taskDrawer.priorityLabel}
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as TaskPriority)}
@@ -311,7 +313,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                   </select>
                 </label>
                 <label>
-                  Complessità
+                  {t.taskDrawer.complexityLabel}
                   <select
                     value={complexity}
                     onChange={(e) =>
@@ -330,22 +332,22 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
               </div>
               <div className="modal-row">
                 <label>
-                  Tag (separati da virgola)
+                  {t.taskDrawer.tagsLabel}
                   <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} onBlur={saveFields} />
                 </label>
                 <label>
-                  Scadenza
+                  {t.taskDrawer.dueDateLabel}
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={saveFields} />
                 </label>
               </div>
               <button type="button" className="drawer-save-button" onClick={saveFields}>
-                Salva
+                {t.taskDrawer.save}
               </button>
             </section>
 
             <section className="drawer-section">
-              <h3>Dipendenze</h3>
-              <h4>Bloccata da</h4>
+              <h3>{t.taskDrawer.dependencies}</h3>
+              <h4>{t.taskDrawer.blockedBy}</h4>
               <ul className="drawer-list">
                 {(task.blockedBy ?? []).map((d) => {
                   const blockerTask = projectTasks.find((t) => t.id === d.blockedByTaskId);
@@ -356,59 +358,59 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                         {resolved ? "✓" : "●"} {blockerTask?.title ?? d.blockedByTaskId}
                       </span>
                       <button type="button" onClick={() => handleRemoveDependency(d.blockedByTaskId)}>
-                        Rimuovi
+                        {t.taskDrawer.remove}
                       </button>
                     </li>
                   );
                 })}
-                {(task.blockedBy ?? []).length === 0 && <li className="drawer-empty">Nessun bloccante</li>}
+                {(task.blockedBy ?? []).length === 0 && <li className="drawer-empty">{t.taskDrawer.noBlockers}</li>}
               </ul>
               <div className="drawer-inline-form">
                 <select value={selectedBlocker} onChange={(e) => setSelectedBlocker(e.target.value)}>
-                  <option value="">Seleziona task bloccante...</option>
-                  {availableBlockers.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
+                  <option value="">{t.taskDrawer.selectBlockerPlaceholder}</option>
+                  {availableBlockers.map((bt) => (
+                    <option key={bt.id} value={bt.id}>
+                      {bt.title}
                     </option>
                   ))}
                 </select>
                 <button type="button" onClick={handleAddDependency} disabled={!selectedBlocker}>
-                  Aggiungi
+                  {t.taskDrawer.add}
                 </button>
               </div>
 
-              <h4>Blocca</h4>
+              <h4>{t.taskDrawer.blocking}</h4>
               <ul className="drawer-list">
                 {(task.blocking ?? []).map((d) => (
                   <li key={d.taskId}>{projectTasks.find((t) => t.id === d.taskId)?.title ?? d.taskId}</li>
                 ))}
-                {(task.blocking ?? []).length === 0 && <li className="drawer-empty">Non blocca nessun task</li>}
+                {(task.blocking ?? []).length === 0 && <li className="drawer-empty">{t.taskDrawer.notBlocking}</li>}
               </ul>
             </section>
 
             <section className="drawer-section">
-              <h3>Commenti</h3>
+              <h3>{t.taskDrawer.comments}</h3>
               <ul className="drawer-list drawer-comments">
                 {comments.map((c) => (
                   <li key={c.id}>
-                    <div className="comment-date">{new Date(c.createdAt).toLocaleString()}</div>
+                    <div className="comment-date">{formatDateTime(c.createdAt)}</div>
                     <div>{c.body}</div>
                   </li>
                 ))}
-                {comments.length === 0 && <li className="drawer-empty">Nessun commento</li>}
+                {comments.length === 0 && <li className="drawer-empty">{t.taskDrawer.noComments}</li>}
               </ul>
               <form onSubmit={handleAddComment} className="drawer-inline-form">
                 <input
-                  placeholder="Aggiungi un commento"
+                  placeholder={t.taskDrawer.commentPlaceholder}
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                 />
-                <button type="submit">Invia</button>
+                <button type="submit">{t.taskDrawer.send}</button>
               </form>
             </section>
 
             <section className="drawer-section">
-              <h3>Allegati</h3>
+              <h3>{t.taskDrawer.attachments}</h3>
               <ul className="drawer-list">
                 {attachments.map((a) => (
                   <li key={a.id}>
@@ -417,15 +419,15 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                     </span>
                     <span className="drawer-list-actions">
                       <button type="button" onClick={() => handleDownload(a)}>
-                        Scarica
+                        {t.taskDrawer.download}
                       </button>
                       <button type="button" onClick={() => handleDeleteAttachment(a.id)}>
-                        Elimina
+                        {t.taskDrawer.delete}
                       </button>
                     </span>
                   </li>
                 ))}
-                {attachments.length === 0 && <li className="drawer-empty">Nessun allegato</li>}
+                {attachments.length === 0 && <li className="drawer-empty">{t.taskDrawer.noAttachments}</li>}
               </ul>
               <input type="file" onChange={handleUpload} disabled={uploading} />
             </section>

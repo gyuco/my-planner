@@ -8,8 +8,10 @@ import type {
   TaskDependency,
   Comment,
   Attachment,
+  StorageSettings,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
+import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
 
 /**
  * Errore thrown da apiFetch quando la risposta non è ok. Contiene il code
@@ -51,7 +53,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) {
     clearToken();
     onUnauthorized?.();
-    let message = "Sessione scaduta, effettua di nuovo il login";
+    let message = apiSessionExpiredMessage();
     try {
       const data = await res.json();
       message = data?.error?.message ?? message;
@@ -62,7 +64,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    let message = `Errore ${res.status}`;
+    let message = apiErrorMessage(res.status);
     let code: string | undefined;
     try {
       const data = await res.json();
@@ -259,6 +261,26 @@ export function deleteAttachment(attachmentId: string): Promise<{ deleted: true 
   return apiFetch(`/attachments/${attachmentId}`, { method: "DELETE" });
 }
 
+// --- Impostazioni storage ----------------------------------------------------
+
+export interface StorageSettingsInput {
+  backend: "local" | "s3";
+  localDir?: string;
+  s3Endpoint?: string | null;
+  s3Bucket?: string | null;
+  s3Region?: string | null;
+  s3AccessKeyId?: string | null;
+  s3SecretAccessKey?: string | null;
+}
+
+export function getStorageSettings(): Promise<StorageSettings> {
+  return apiFetch(`/settings/storage`);
+}
+
+export function updateStorageSettings(input: StorageSettingsInput): Promise<StorageSettings> {
+  return apiFetch(`/settings/storage`, { method: "PUT", body: JSON.stringify(input) });
+}
+
 /**
  * Il download richiede l'header Authorization JWT, quindi non si può usare
  * un semplice link <a href>: si scarica come blob autenticato e si innesca
@@ -270,7 +292,7 @@ export async function downloadAttachment(attachmentId: string, fileName: string)
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!res.ok) {
-    throw new ApiRequestError(`Errore ${res.status} durante il download`, res.status);
+    throw new ApiRequestError(apiDownloadErrorMessage(res.status), res.status);
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

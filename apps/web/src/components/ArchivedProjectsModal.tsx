@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Project } from "@my-planner/core";
 import { ApiRequestError, listProjects, unarchiveProject } from "../api";
+import { useI18n } from "../i18n";
 
 interface ArchivedProjectsModalProps {
   onClose: () => void;
@@ -8,6 +9,7 @@ interface ArchivedProjectsModalProps {
 }
 
 export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsModalProps) {
+  const { t } = useI18n();
   const [archived, setArchived] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -18,7 +20,7 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
       setArchived(all.filter((p) => p.archived));
       setError(null);
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Impossibile caricare i progetti archiviati");
+      setError(err instanceof ApiRequestError ? err.message : t.archived.loadError);
     }
   }
 
@@ -33,7 +35,7 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
       await load();
       onChanged();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante il ripristino");
+      setError(err instanceof ApiRequestError ? err.message : t.archived.restoreError);
     } finally {
       setRestoringId(null);
     }
@@ -42,10 +44,10 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Progetti archiviati</h2>
+        <h2>{t.archived.title}</h2>
         {error && <p className="login-error">{error}</p>}
         {archived.length === 0 ? (
-          <p className="drawer-empty">Nessun progetto archiviato.</p>
+          <p className="drawer-empty">{t.archived.empty}</p>
         ) : (
           <ul className="drawer-list">
             {archived.map((p) => (
@@ -53,7 +55,7 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
                 <span>{p.name}</span>
                 <div className="drawer-list-actions">
                   <button type="button" onClick={() => handleRestore(p.id)} disabled={restoringId === p.id}>
-                    {restoringId === p.id ? "Ripristino..." : "Ripristina"}
+                    {restoringId === p.id ? t.archived.restoring : t.archived.restore}
                   </button>
                 </div>
               </li>
@@ -62,7 +64,7 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
         )}
         <div className="modal-actions">
           <button type="button" onClick={onClose}>
-            Chiudi
+            {t.archived.close}
           </button>
         </div>
       </div>

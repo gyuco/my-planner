@@ -1,22 +1,18 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { localAttachmentStorage } from "./local.js";
+import { createLocalAttachmentStorage } from "./local.js";
 
 /**
  * Test su filesystem reale, in una directory temporanea dedicata (non la
  * directory attachments/local usata dall'app), ripulita dopo ogni test.
  */
 const testDir = path.resolve(process.cwd(), "test-tmp", `local-storage-${randomUUID()}`);
-
-beforeEach(() => {
-  process.env.ATTACHMENTS_LOCAL_DIR = testDir;
-});
+const localAttachmentStorage = createLocalAttachmentStorage({ baseDir: testDir });
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
-  delete process.env.ATTACHMENTS_LOCAL_DIR;
 });
 
 describe("localAttachmentStorage", () => {

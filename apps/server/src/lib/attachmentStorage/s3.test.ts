@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const sendMock = vi.fn();
 
@@ -33,19 +33,20 @@ vi.mock("@aws-sdk/s3-request-presigner", () => ({
 }));
 
 // Import dopo i mock, cosi' s3.ts riceve i moduli mockati.
-const { s3AttachmentStorage } = await import("./s3.js");
+const { createS3AttachmentStorage } = await import("./s3.js");
+
+const s3AttachmentStorage = createS3AttachmentStorage({
+  bucket: "test-bucket",
+  endpoint: "http://localhost:9000",
+  region: "us-east-1",
+  accessKeyId: "test",
+  secretAccessKey: "test",
+});
 
 describe("s3AttachmentStorage", () => {
   beforeEach(() => {
     sendMock.mockReset();
     getSignedUrlMock.mockReset();
-    process.env.S3_BUCKET = "test-bucket";
-    process.env.S3_ENDPOINT = "http://localhost:9000";
-  });
-
-  afterEach(() => {
-    delete process.env.S3_BUCKET;
-    delete process.env.S3_ENDPOINT;
   });
 
   it("upload chiama PutObjectCommand con Bucket/Key/Body/ContentType corretti", async () => {

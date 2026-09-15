@@ -49,7 +49,7 @@ async function uploadAndDownload(
   });
 
   const downloadPromise = page.waitForEvent("download");
-  await drawer.locator(".drawer-list li", { hasText: "e2e-attachment.txt" }).getByRole("button", { name: "Scarica" }).click();
+  await drawer.locator(".drawer-list li", { hasText: "e2e-attachment.txt" }).getByRole("button", { name: "Download" }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("e2e-attachment.txt");
 
@@ -77,7 +77,7 @@ test.describe("T6 - allegati locale e S3", () => {
     await page.goto(S3_BASE_URL);
     await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
     await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
-    await page.getByRole("button", { name: "Accedi" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.locator(".sidebar-header")).toBeVisible();
 
     await uploadAndDownload(page, project, API_BASE_S3);

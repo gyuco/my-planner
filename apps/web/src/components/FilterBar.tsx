@@ -1,13 +1,7 @@
 import type { Project, TaskPriority } from "@my-planner/core";
+import { useI18n } from "../i18n";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
-
-const PRIORITY_LABEL: Record<TaskPriority, string> = {
-  low: "Bassa",
-  medium: "Media",
-  high: "Alta",
-  urgent: "Urgente",
-};
 
 export interface BoardFiltersState {
   priorities: TaskPriority[];
@@ -35,6 +29,13 @@ export function FilterBar({
   selectedProjectIds,
   onSelectedProjectIdsChange,
 }: FilterBarProps) {
+  const { t } = useI18n();
+  const PRIORITY_LABEL: Record<TaskPriority, string> = {
+    low: t.filters.priorityLow,
+    medium: t.filters.priorityMedium,
+    high: t.filters.priorityHigh,
+    urgent: t.filters.priorityUrgent,
+  };
   function togglePriority(p: TaskPriority) {
     const has = filters.priorities.includes(p);
     onChange({
@@ -73,7 +74,7 @@ export function FilterBar({
           className={`filter-chip filter-chip-blocked${filters.blockedOnly ? " active" : ""}`}
           onClick={() => onChange({ ...filters, blockedOnly: !filters.blockedOnly })}
         >
-          Solo bloccati
+          {t.filters.blockedOnly}
         </button>
       </div>
 
@@ -84,7 +85,7 @@ export function FilterBar({
             className={`filter-chip filter-chip-tag${filters.tag === null ? " active" : ""}`}
             onClick={() => onChange({ ...filters, tag: null })}
           >
-            Tutti i tag
+            {t.filters.allTags}
           </button>
           {availableTags.map((tag) => (
             <button
@@ -102,14 +103,14 @@ export function FilterBar({
       <input
         type="search"
         className="filter-search"
-        placeholder="Cerca per titolo o descrizione..."
+        placeholder={t.filters.searchPlaceholder}
         value={filters.search}
         onChange={(e) => onChange({ ...filters, search: e.target.value })}
       />
 
       {projects && onSelectedProjectIdsChange && (
         <div className="filter-projects">
-          <span className="filter-projects-label">Progetti inclusi:</span>
+          <span className="filter-projects-label">{t.filters.includedProjects}</span>
           <div className="filter-chips">
             {projects.map((p) => {
               const active = !selectedProjectIds || selectedProjectIds.includes(p.id);

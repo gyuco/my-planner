@@ -231,7 +231,7 @@ export async function deleteTask(taskId: string) {
   // Elimina prima i file fisici/oggetti S3 (best-effort, vedi
   // AttachmentStorage.delete), poi i record DB in cascade.
   const attachments = await prisma.attachment.findMany({ where: { taskId } });
-  const storage = getAttachmentStorage();
+  const storage = await getAttachmentStorage();
   await Promise.all(attachments.map((a) => storage.delete(a.storageRef).catch(() => {})));
 
   await prisma.$transaction([

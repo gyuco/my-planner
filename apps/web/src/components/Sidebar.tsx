@@ -1,4 +1,5 @@
 import type { Project } from "@my-planner/core";
+import { useI18n } from "../i18n";
 
 interface SidebarProps {
   projects: Project[];
@@ -7,6 +8,7 @@ interface SidebarProps {
   onCreateProject: () => void;
   onOpenSettings: (projectId: string) => void;
   onOpenArchived: () => void;
+  onOpenStorageSettings: () => void;
 }
 
 export function Sidebar({
@@ -16,12 +18,14 @@ export function Sidebar({
   onCreateProject,
   onOpenSettings,
   onOpenArchived,
+  onOpenStorageSettings,
 }: SidebarProps) {
+  const { t } = useI18n();
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
-        <span>Progetti</span>
-        <button className="icon-button" onClick={onCreateProject} title="Nuovo progetto">
+        <span>{t.sidebar.projects}</span>
+        <button className="icon-button" onClick={onCreateProject} title={t.sidebar.newProjectTitle}>
           +
         </button>
       </div>
@@ -30,7 +34,7 @@ export function Sidebar({
           className={`sidebar-item${selectedProjectId === "all" ? " active" : ""}`}
           onClick={() => onSelect("all")}
         >
-          Tutti i progetti
+          {t.sidebar.allProjects}
         </button>
         {projects.map((p) => (
           <div key={p.id} className="sidebar-project-row">
@@ -43,8 +47,8 @@ export function Sidebar({
             <button
               className="icon-button sidebar-project-settings"
               onClick={() => onOpenSettings(p.id)}
-              title="Impostazioni progetto"
-              aria-label={`Impostazioni ${p.name}`}
+              title={t.sidebar.projectSettingsTitle}
+              aria-label={`${t.sidebar.projectSettingsTitle} ${p.name}`}
             >
               ⚙
             </button>
@@ -53,7 +57,10 @@ export function Sidebar({
       </nav>
       <div className="sidebar-footer">
         <button className="sidebar-item" onClick={onOpenArchived}>
-          Progetti archiviati
+          {t.sidebar.archivedProjects}
+        </button>
+        <button className="sidebar-item" onClick={onOpenStorageSettings}>
+          {t.sidebar.storageSettings}
         </button>
       </div>
     </aside>

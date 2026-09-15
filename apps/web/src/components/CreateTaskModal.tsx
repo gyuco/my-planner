@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
 import type { TaskPriority, TaskComplexity } from "@my-planner/core";
 import { ApiRequestError, createTask } from "../api";
+import { useI18n } from "../i18n";
 
 interface CreateTaskModalProps {
   projectId: string;
@@ -12,6 +13,7 @@ interface CreateTaskModalProps {
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
 export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskModalProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
@@ -41,7 +43,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante la creazione del task");
+      setError(err instanceof ApiRequestError ? err.message : t.createTask.createError);
     } finally {
       setSaving(false);
     }
@@ -50,21 +52,21 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h2>Nuovo task</h2>
+        <h2>{t.createTask.title}</h2>
 
         <label>
-          Titolo
+          {t.createTask.titleLabel}
           <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus maxLength={300} />
         </label>
 
         <label>
-          Descrizione (markdown)
+          {t.createTask.descriptionLabel}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
         </label>
 
         <div className="modal-row">
           <label>
-            Priorità
+            {t.createTask.priorityLabel}
             <select value={priority} onChange={(e) => setPriority(e.target.value as TaskPriority)}>
               {PRIORITIES.map((p) => (
                 <option key={p} value={p}>
@@ -75,7 +77,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
           </label>
 
           <label>
-            Complessità
+            {t.createTask.complexityLabel}
             <select
               value={complexity}
               onChange={(e) => setComplexity(e.target.value === "" ? "" : (Number(e.target.value) as TaskComplexity))}
@@ -92,12 +94,12 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
 
         <div className="modal-row">
           <label>
-            Tag (separati da virgola)
+            {t.createTask.tagsLabel}
             <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} />
           </label>
 
           <label>
-            Scadenza
+            {t.createTask.dueDateLabel}
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </label>
         </div>
@@ -106,10 +108,10 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
 
         <div className="modal-actions">
           <button type="button" onClick={onClose} disabled={saving}>
-            Annulla
+            {t.createTask.cancel}
           </button>
           <button type="submit" disabled={saving || !title.trim()}>
-            {saving ? "Creazione..." : "Crea task"}
+            {saving ? t.createTask.creating : t.createTask.create}
           </button>
         </div>
       </form>

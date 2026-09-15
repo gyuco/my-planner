@@ -69,3 +69,15 @@ export const projectNameInputSchema = z.object({
 export const projectTokenInputSchema = z.object({
   label: z.string().optional(),
 });
+
+export const storageSettingsInputSchema = z.object({
+  backend: z.enum(["local", "s3"]),
+  localDir: z.string().min(1).optional(),
+  s3Endpoint: z.string().optional().nullable(),
+  s3Bucket: z.string().optional().nullable(),
+  s3Region: z.string().optional().nullable(),
+  s3AccessKeyId: z.string().optional().nullable(),
+  // Vuota/omessa = non cambiare il secret gia' salvato (evita di dover
+  // ripresentare il secret ad ogni salvataggio dal form frontend).
+  s3SecretAccessKey: z.string().optional().nullable(),
+});

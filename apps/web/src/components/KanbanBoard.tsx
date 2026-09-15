@@ -16,12 +16,9 @@ import type { Board, TaskStatus } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
 import { ApiRequestError, moveTask } from "../api";
+import { useI18n } from "../i18n";
 
-const COLUMNS: { status: TaskStatus; label: string }[] = [
-  { status: "draft", label: "Draft" },
-  { status: "in_progress", label: "In progress" },
-  { status: "done", label: "Done" },
-];
+const COLUMN_STATUSES: TaskStatus[] = ["draft", "in_progress", "done"];
 
 function columnDroppableId(status: TaskStatus): string {
   return `column-${status}`;
@@ -103,7 +100,7 @@ function Column({ status, label, tasks, showProject, onTaskClick }: ColumnProps)
 }
 
 function findTaskById(board: Board, id: string): BoardTask | undefined {
-  for (const status of COLUMNS.map((c) => c.status)) {
+  for (const status of COLUMN_STATUSES) {
     const found = (board[status] as BoardTask[]).find((t) => t.id === id);
     if (found) return found;
   }
@@ -118,7 +115,7 @@ function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, ta
     done: [...(board.done as BoardTask[])],
   };
   let moved: BoardTask | undefined;
-  for (const status of COLUMNS.map((c) => c.status)) {
+  for (const status of COLUMN_STATUSES) {
     const list = next[status] as BoardTask[];
     const idx = list.findIndex((t) => t.id === taskId);
     if (idx !== -1) {
@@ -133,6 +130,12 @@ function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, ta
 }
 
 export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
+  const { t } = useI18n();
+  const COLUMNS: { status: TaskStatus; label: string }[] = [
+    { status: "draft", label: t.board.draft },
+    { status: "in_progress", label: t.board.inProgress },
+    { status: "done", label: t.board.done },
+  ];
   const [dragError, setDragError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null);
   // Copia locale per l'update ottimistico: senza questa, la card torna alla

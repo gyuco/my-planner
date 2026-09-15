@@ -10,7 +10,7 @@ test.describe("T8 - vista aggregata e token MCP UI", () => {
     await createTaskViaApi(projectB.id, { title: `Task B-${stamp}` });
 
     await loginViaUi(page);
-    await page.locator(".sidebar-nav").getByRole("button", { name: "Tutti i progetti", exact: true }).click();
+    await page.locator(".sidebar-nav").getByRole("button", { name: "All projects", exact: true }).click();
 
     const cardA = page.locator(".task-card", { hasText: `Task A-${stamp}` });
     const cardB = page.locator(".task-card", { hasText: `Task B-${stamp}` });
@@ -25,13 +25,13 @@ test.describe("T8 - vista aggregata e token MCP UI", () => {
 
     await loginViaUi(page);
     await selectProjectInSidebar(page, project.name);
-    await page.getByRole("button", { name: `Impostazioni ${project.name}`, exact: true }).click();
+    await page.getByRole("button", { name: `Project settings ${project.name}`, exact: true }).click();
 
     const modal = page.locator(".settings-modal");
     await expect(modal).toBeVisible();
 
-    await modal.getByPlaceholder("Etichetta (opzionale)").fill("token-ui-e2e");
-    await modal.getByRole("button", { name: "Nuovo token" }).click();
+    await modal.getByPlaceholder("Label (optional)").fill("token-ui-e2e");
+    await modal.getByRole("button", { name: "New token" }).click();
 
     const revealedCode = modal.locator(".token-reveal code");
     await expect(revealedCode).toBeVisible();
@@ -42,11 +42,11 @@ test.describe("T8 - vista aggregata e token MCP UI", () => {
     const beforeRevoke = await callMcpTool(token!.trim(), "get_board", {});
     expect(beforeRevoke.status).toBe(200);
 
-    await modal.getByRole("button", { name: "Ho copiato il token, chiudi" }).click();
+    await modal.getByRole("button", { name: "I've copied the token, close" }).click();
 
     await expect(modal.locator(".drawer-list li", { hasText: "token-ui-e2e" })).toBeVisible();
     page.once("dialog", (dialog) => dialog.accept());
-    await modal.locator(".drawer-list li", { hasText: "token-ui-e2e" }).getByRole("button", { name: "Revoca" }).click();
+    await modal.locator(".drawer-list li", { hasText: "token-ui-e2e" }).getByRole("button", { name: "Revoke" }).click();
     await expect(modal.locator(".drawer-list li", { hasText: "token-ui-e2e" }).locator(".token-revoked")).toBeVisible({
       timeout: 10_000,
     });

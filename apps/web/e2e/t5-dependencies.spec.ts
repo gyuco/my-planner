@@ -25,7 +25,7 @@ test.describe("T5 - dipendenze, blocco stato", () => {
     await drawer.locator("select").first().waitFor(); // select stato
     const blockerSelect = drawer.locator(".drawer-inline-form select");
     await blockerSelect.selectOption({ label: "Task B (blocker)" });
-    await drawer.getByRole("button", { name: "Aggiungi" }).first().click();
+    await drawer.getByRole("button", { name: "Add" }).first().click();
     await expect(drawer.locator(".drawer-list li", { hasText: "Task B (blocker)" })).toBeVisible();
 
     await page.locator(".drawer-header .icon-button").click();
@@ -35,7 +35,7 @@ test.describe("T5 - dipendenze, blocco stato", () => {
     // Tentativo di spostare A in in_progress via select nel drawer -> DEPENDENCY_BLOCKED
     await cardA.click();
     await expect(drawer).toBeVisible();
-    const statusSelect = drawer.getByLabel("Cambia stato del task");
+    const statusSelect = drawer.getByLabel("Change task status");
     await statusSelect.selectOption("in_progress");
     await expect(page.locator(".board-error", { hasText: /DEPENDENCY_BLOCKED|bloccat/i })).toBeVisible();
     await expect(statusSelect).toHaveValue("draft");
@@ -69,14 +69,14 @@ test.describe("T5 - dipendenze, blocco stato", () => {
       await cardB.click();
       await expect(drawer).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: 15_000 });
-    await drawer.getByLabel("Cambia stato del task").selectOption("done");
+    await drawer.getByLabel("Change task status").selectOption("done");
     await page.locator(".drawer-header .icon-button").click();
     await expect(drawer).toBeHidden();
 
     await expect(cardA.locator(".task-card-blocked")).toHaveCount(0);
 
     await cardA.click();
-    await drawer.getByLabel("Cambia stato del task").selectOption("in_progress");
-    await expect(drawer.getByLabel("Cambia stato del task")).toHaveValue("in_progress");
+    await drawer.getByLabel("Change task status").selectOption("in_progress");
+    await expect(drawer.getByLabel("Change task status")).toHaveValue("in_progress");
   });
 });

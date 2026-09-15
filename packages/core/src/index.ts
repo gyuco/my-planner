@@ -56,6 +56,24 @@ export interface Attachment {
   createdAt: string;
 }
 
+export type StorageBackendType = "local" | "s3";
+
+/**
+ * Config globale del backend di storage allegati (vedi
+ * apps/server/src/lib/attachmentStorage). Le credenziali S3 non vengono mai
+ * restituite in chiaro dalla GET, solo un flag `s3SecretAccessKeySet`.
+ */
+export interface StorageSettings {
+  backend: StorageBackendType;
+  localDir: string;
+  s3Endpoint: string | null;
+  s3Bucket: string | null;
+  s3Region: string | null;
+  s3AccessKeyId: string | null;
+  s3SecretAccessKeySet: boolean;
+  updatedAt: string;
+}
+
 export interface ProjectToken {
   id: string;
   projectId: string;

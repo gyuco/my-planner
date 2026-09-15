@@ -9,6 +9,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { boardRoutes } from "./routes/board.js";
 import { attachmentRoutes } from "./routes/attachments.js";
+import { settingsRoutes } from "./routes/settings.js";
 import { MAX_ATTACHMENT_SIZE_BYTES } from "./services/attachmentService.js";
 
 declare module "fastify" {
@@ -72,6 +73,7 @@ app.register(projectRoutes);
 app.register(taskRoutes);
 app.register(boardRoutes);
 app.register(attachmentRoutes);
+app.register(settingsRoutes);
 
 const port = Number(process.env.PORT ?? 3000);
 

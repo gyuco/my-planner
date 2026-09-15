@@ -120,7 +120,7 @@ export async function createAttachment(taskId: string, input: CreateAttachmentIn
   await getTaskOrThrow(taskId);
   validateAttachment(input.fileName, input.buffer.length, input.buffer);
 
-  const storage = getAttachmentStorage();
+  const storage = await getAttachmentStorage();
   const { storageBackend, storageRef } = await storage.upload({
     taskId,
     fileName: input.fileName,
@@ -155,20 +155,20 @@ export async function getAttachmentOrThrow(attachmentId: string) {
 
 export async function getAttachmentForDownload(attachmentId: string) {
   const attachment = await getAttachmentOrThrow(attachmentId);
-  const storage = getAttachmentStorage();
+  const storage = await getAttachmentStorage();
   const stream = await storage.download(attachment.storageRef);
   return { attachment: serializeAttachment(attachment), stream };
 }
 
 export async function getAttachmentUrl(attachmentId: string) {
   const attachment = await getAttachmentOrThrow(attachmentId);
-  const storage = getAttachmentStorage();
+  const storage = await getAttachmentStorage();
   return storage.getUrl(attachment.storageRef, attachment);
 }
 
 export async function deleteAttachment(attachmentId: string) {
   const attachment = await getAttachmentOrThrow(attachmentId);
-  const storage = getAttachmentStorage();
+  const storage = await getAttachmentStorage();
   await storage.delete(attachment.storageRef).catch(() => {});
   await prisma.attachment.delete({ where: { id: attachmentId } });
   return { deleted: true as const };

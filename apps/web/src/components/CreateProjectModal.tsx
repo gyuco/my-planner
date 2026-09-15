@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ApiRequestError, createProject } from "../api";
+import { useI18n } from "../i18n";
 
 interface CreateProjectModalProps {
   onClose: () => void;
@@ -7,6 +8,7 @@ interface CreateProjectModalProps {
 }
 
 export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalProps) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -20,7 +22,7 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
       onCreated();
       onClose();
     } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante la creazione del progetto");
+      setError(err instanceof ApiRequestError ? err.message : t.createProject.createError);
     } finally {
       setSaving(false);
     }
@@ -29,18 +31,18 @@ export function CreateProjectModal({ onClose, onCreated }: CreateProjectModalPro
   return (
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
-        <h2>Nuovo progetto</h2>
+        <h2>{t.createProject.title}</h2>
         <label>
-          Nome
+          {t.createProject.nameLabel}
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus maxLength={200} />
         </label>
         {error && <p className="login-error">{error}</p>}
         <div className="modal-actions">
           <button type="button" onClick={onClose} disabled={saving}>
-            Annulla
+            {t.createProject.cancel}
           </button>
           <button type="submit" disabled={saving || !name.trim()}>
-            {saving ? "Creazione..." : "Crea progetto"}
+            {saving ? t.createProject.creating : t.createProject.create}
           </button>
         </div>
       </form>

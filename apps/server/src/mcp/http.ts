@@ -72,7 +72,7 @@ app.get("/mcp/attachments/:attachmentId/download", async (req, reply) => {
     return reply.code(403).send(apiError("FORBIDDEN", "L'allegato non appartiene al progetto del token"));
   }
 
-  const stream = await getAttachmentStorage().download(attachment.storageRef);
+  const stream = await (await getAttachmentStorage()).download(attachment.storageRef);
   reply.header("Content-Disposition", `attachment; filename="${attachment.fileName}"`);
   reply.header("Content-Type", attachment.mimeType);
   return reply.send(stream);

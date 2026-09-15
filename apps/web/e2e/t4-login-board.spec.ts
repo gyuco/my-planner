@@ -9,7 +9,7 @@ test.describe("T4 - login e board base", () => {
 
     await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
     await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
-    await page.getByRole("button", { name: "Accedi" }).click();
+    await page.getByRole("button", { name: "Sign in" }).click();
 
     const newProjectButton = page.locator(".sidebar-header").getByRole("button", { name: "+", exact: true });
     await expect(newProjectButton).toBeVisible();
@@ -17,8 +17,8 @@ test.describe("T4 - login e board base", () => {
     // Creazione progetto
     const projectName = `Progetto E2E ${Date.now()}`;
     await newProjectButton.click();
-    await page.getByLabel("Nome").fill(projectName);
-    await page.getByRole("button", { name: "Crea progetto" }).click();
+    await page.getByLabel("Name").fill(projectName);
+    await page.getByRole("button", { name: "Create project" }).click();
 
     await expect(page.locator(".sidebar-nav").getByRole("button", { name: projectName, exact: true })).toBeVisible();
     await selectProjectInSidebar(page, projectName);
@@ -29,9 +29,9 @@ test.describe("T4 - login e board base", () => {
 
     // Creazione task via modale
     const taskTitle = `Task E2E ${Date.now()}`;
-    await page.getByRole("button", { name: "+ Nuovo task" }).click();
-    await page.getByLabel("Titolo").fill(taskTitle);
-    await page.getByRole("button", { name: "Crea task" }).click();
+    await page.getByRole("button", { name: "+ New task" }).click();
+    await page.getByLabel("Title").fill(taskTitle);
+    await page.getByRole("button", { name: "Create task" }).click();
 
     const draftColumn = page.locator(".column", { hasText: "Draft" });
     const inProgressColumn = page.locator(".column", { hasText: "In progress" });
