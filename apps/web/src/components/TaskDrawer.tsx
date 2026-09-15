@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
 import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus } from "@my-planner/core";
+import { renderMarkdown } from "../lib/markdown";
 import {
   ApiRequestError,
   addComment,
@@ -61,6 +62,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
   const [selectedBlocker, setSelectedBlocker] = useState("");
   const [statusError, setStatusError] = useState<string | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [editingDescription, setEditingDescription] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,6 +81,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       setComplexity(t.complexity ?? "");
       setTagsInput(t.tags.join(", "));
       setDueDate(toDateInputValue(t.dueDate));
+      setEditingDescription(!t.description.trim());
       setComments(c);
       setAttachments(a);
       setProjectTasks(tasks.filter((pt) => pt.id !== taskId));
@@ -281,15 +284,42 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                 Titolo
                 <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveFields} maxLength={300} />
               </label>
-              <label>
-                Descrizione (markdown)
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  onBlur={saveFields}
-                  rows={4}
-                />
-              </label>
+              <div className="drawer-description">
+                <div className="drawer-description-head">
+                  <span className="field-label">Descrizione (markdown)</span>
+                  <button
+                    type="button"
+                    className="link-button"
+                    onClick={() => {
+                      if (editingDescription) saveFields();
+                      setEditingDescription((v) => !v);
+                    }}
+                  >
+                    {editingDescription ? "Anteprima" : "Modifica"}
+                  </button>
+                </div>
+                {editingDescription ? (
+                  <textarea
+                    className="drawer-description-editor"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onBlur={saveFields}
+                    rows={10}
+                    placeholder="Scrivi in markdown…"
+                    autoFocus
+                  />
+                ) : description.trim() ? (
+                  <div
+                    className="drawer-description-preview"
+                    onClick={() => setEditingDescription(true)}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(description) }}
+                  />
+                ) : (
+                  <div className="drawer-description-preview drawer-description-empty" onClick={() => setEditingDescription(true)}>
+                    Nessuna descrizione — clicca per aggiungerne una
+                  </div>
+                )}
+              </div>
               <div className="modal-row">
                 <label>
                   Priorità
@@ -333,7 +363,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={saveFields} />
                 </label>
               </div>
-              <button type="button" onClick={saveFields}>
+              <button type="button" className="drawer-save-button" onClick={saveFields}>
                 Salva
               </button>
             </section>

@@ -494,11 +494,17 @@ body.dnd-dragging * {
 
   .drawer-overlay {
     justify-content: stretch;
+    align-items: stretch;
+    padding: 0;
   }
 
   .drawer {
     max-width: none;
     width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    min-height: 0;
+    border-radius: 0;
   }
 
   .modal {
@@ -641,19 +647,26 @@ body.dnd-dragging * {
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: flex-start;
   z-index: 20;
+  padding: 3vh 1.5rem;
+  overflow-y: auto;
 }
 
 .drawer {
   background: #fff;
   width: 100%;
-  max-width: 480px;
-  height: 100%;
+  max-width: 860px;
+  height: auto;
+  min-height: 60vh;
+  max-height: 94vh;
+  border-radius: 10px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
   overflow-y: auto;
-  padding: 1.25rem;
+  padding: 1.75rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -692,6 +705,126 @@ body.dnd-dragging * {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.drawer-save-button {
+  align-self: flex-start;
+  padding: 0.55rem 1.25rem;
+  border-radius: 4px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.drawer-save-button:hover {
+  background: #1d4ed8;
+}
+
+.field-label {
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.drawer-description {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.drawer-description-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.link-button {
+  border: none;
+  background: none;
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.drawer-description-editor {
+  width: 100%;
+  min-height: 260px;
+  padding: 0.9rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.5;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.drawer-description-preview {
+  min-height: 120px;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  background: #fafafa;
+  cursor: text;
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.drawer-description-preview:hover {
+  border-color: #cbd5e1;
+}
+
+.drawer-description-empty {
+  color: #999;
+  font-style: italic;
+}
+
+.drawer-description-preview :first-child { margin-top: 0; }
+.drawer-description-preview :last-child { margin-bottom: 0; }
+.drawer-description-preview pre {
+  background: #f1f1f1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.drawer-description-preview code {
+  background: #f1f1f1;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.drawer-description-preview pre code {
+  background: none;
+  padding: 0;
+}
+.drawer-description-preview blockquote {
+  margin: 0;
+  padding-left: 0.9rem;
+  border-left: 3px solid #ddd;
+  color: #555;
+}
+.drawer-description-preview ul,
+.drawer-description-preview ol {
+  padding-left: 1.4rem;
+}
+.drawer-description-preview a {
+  color: #2563eb;
+}
+.drawer-description-preview table {
+  border-collapse: collapse;
+}
+.drawer-description-preview th,
+.drawer-description-preview td {
+  border: 1px solid #ddd;
+  padding: 0.3rem 0.6rem;
 }
 
 .drawer-header h2 {
