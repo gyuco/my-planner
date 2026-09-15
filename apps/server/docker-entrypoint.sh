@@ -1,6 +1,20 @@
 #!/bin/sh
 set -e
 
+# Hardening (fix reviewer, non-root runtime): il container si avvia come
+# root solo per poter sistemare la ownership dei volumi montati a runtime
+# (./data, ./attachments), la cui ownership sull'host non e' nota a build
+# time. Una volta sistemati i permessi, i processi applicativi vengono
+# avviati come utente non privilegiato "node" via su-exec.
+if [ "$(id -u)" = "0" ]; then
+  for dir in /data /attachments; do
+    if [ -d "$dir" ]; then
+      chown -R node:node "$dir" 2>/dev/null || true
+    fi
+  done
+  exec su-exec node "$0" "$@"
+fi
+
 # Migrazioni non interattive (I3): usate in CI/produzione/docker, a differenza
 # di `prisma migrate dev` usato in sviluppo locale (vedi README.md).
 npm run prisma:migrate:deploy

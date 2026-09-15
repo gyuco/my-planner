@@ -30,7 +30,11 @@ RUN npm run build --workspace apps/server
 
 # --- Stage 2: runtime ---
 FROM node:20-alpine AS runtime
-RUN apk add --no-cache openssl
+# su-exec: usato dall'entrypoint per droppare i privilegi da root all'utente
+# non privilegiato "node" (gia' presente nell'immagine node:alpine) dopo aver
+# sistemato i permessi dei volumi montati a runtime (./data, ./attachments),
+# la cui ownership sull'host non e' nota a build time.
+RUN apk add --no-cache openssl su-exec
 WORKDIR /repo
 
 ENV NODE_ENV=production
@@ -60,6 +64,14 @@ COPY --from=build /repo/node_modules/@prisma node_modules/@prisma
 
 COPY apps/server/docker-entrypoint.sh apps/server/docker-entrypoint.sh
 RUN chmod +x apps/server/docker-entrypoint.sh
+
+# Hardening: il processo applicativo gira come utente non privilegiato
+# "node" (vedi docker-entrypoint.sh, che droppa i privilegi con su-exec dopo
+# aver sistemato i permessi di /data e /attachments). L'immagine resta
+# avviata come root solo per permettere quel fixup dei volumi montati a
+# runtime, la cui ownership sull'host puo' differire da quella dell'utente
+# "node" nell'immagine.
+RUN chown -R node:node /repo
 
 WORKDIR /repo/apps/server
 

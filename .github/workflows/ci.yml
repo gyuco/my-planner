@@ -47,6 +47,11 @@ jobs:
     # Placeholder per T4-T9: nessun test e2e esiste ancora in apps/web/e2e,
     # quindi il job termina subito senza avviare la stack (server+web+MinIO
     # via docker-compose.yml) finche' gli scenari non vengono aggiunti.
+    env:
+      # Fa girare anche lo scenario T6/S3 (playwright.config.ts avvia un
+      # backend/frontend dedicati con backend "s3" quando E2E_S3=1), usando
+      # il MinIO di docker-compose.yml avviato sotto.
+      E2E_S3: "1"
     steps:
       - uses: actions/checkout@v4
       - name: Check for Playwright e2e tests
@@ -58,13 +63,13 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Avvia stack (server + web + minio) via docker compose
+      - name: Avvia MinIO (per lo scenario T6/S3) via docker compose
+        # I test Playwright avviano backend/frontend in locale via `webServer`
+        # (porte dedicate, vedi playwright.config.ts): non serve buildare/
+        # avviare le immagini server/web di docker-compose.yml, solo MinIO
+        # (+ minio-init per creare il bucket) e' realmente utilizzato qui.
         if: steps.check.outputs.found == 'true'
-        env:
-          JWT_SECRET: ${{ env.JWT_SECRET }}
-          BOOTSTRAP_USERNAME: ${{ env.BOOTSTRAP_USERNAME }}
-          BOOTSTRAP_PASSWORD: ${{ env.BOOTSTRAP_PASSWORD }}
-        run: docker compose up -d --build
+        run: docker compose up -d minio minio-init
 
       - uses: actions/setup-node@v4
         if: steps.check.outputs.found == 'true'
