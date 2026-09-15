@@ -45,6 +45,46 @@ export interface ProjectToken {
   id: string;
   projectId: string;
   tokenHash: string;
+  label: string | null;
   createdAt: string;
   revokedAt: string | null;
+}
+
+export interface Comment {
+  id: string;
+  taskId: string;
+  body: string;
+  createdAt: string;
+}
+
+/** Envelope condiviso per tutti gli errori REST e MCP (vedi API_CONTRACT.md §1). */
+export type ErrorCode =
+  | "UNAUTHORIZED"
+  | "MCP_TOKEN_INVALID"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "VALIDATION_ERROR"
+  | "DEPENDENCY_BLOCKED"
+  | "CIRCULAR_DEPENDENCY"
+  | "INVALID_STATUS_TRANSITION"
+  | "ATTACHMENT_TOO_LARGE"
+  | "ATTACHMENT_TYPE_NOT_ALLOWED"
+  | "CONFLICT"
+  | "INTERNAL_ERROR";
+
+export interface ApiError {
+  error: {
+    code: ErrorCode;
+    message: string;
+  };
+}
+
+export function apiError(code: ErrorCode, message: string): ApiError {
+  return { error: { code, message } };
+}
+
+export interface Board {
+  draft: Task[];
+  in_progress: Task[];
+  done: Task[];
 }

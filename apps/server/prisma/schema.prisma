@@ -29,6 +29,7 @@ model ProjectToken {
   projectId String
   project   Project   @relation(fields: [projectId], references: [id])
   tokenHash String    @unique
+  label     String?
   createdAt DateTime  @default(now())
   revokedAt DateTime?
 }

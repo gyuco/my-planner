@@ -16,11 +16,15 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
   - **Scadenza JWT:** token a lunga scadenza (es. 30 giorni), senza refresh token né blacklist — coerente con utente singolo locale a basso rischio.
 - **MCP:** autenticazione separata tramite **token per progetto**. Un token dà accesso a un solo progetto. I token si creano/revocano dalla UI (Impostazioni progetto → Token MCP).
   - `get_aggregated_board` **non è esposto via MCP** (incompatibile con lo scope a singolo progetto del token): resta una funzionalità solo UI/JWT. Via MCP resta `get_board`, scoped al progetto del token.
+  - Per lo stesso motivo, anche la **gestione progetti** (creare/rinominare/archiviare/ripristinare) resta solo UI/JWT: non è esposta via MCP.
+  - **Transizioni di stato:** libere in entrambe le direzioni (`draft ↔ in_progress ↔ done`); l'unico vincolo è il blocco per dipendenze non risolte all'ingresso in `in_progress`.
+  - **Download allegati via MCP:** stesso token MCP del progetto, nessuna autenticazione aggiuntiva.
+  - **Archiviazione progetto:** reversibile (azione di ripristino disponibile).
 
 ## 4. Funzionalità v1
 
 ### Progetti
-- Creare, rinominare, archiviare progetti
+- Creare, rinominare, archiviare/ripristinare progetti
 - Ogni progetto ha la propria board Kanban
 - Ogni progetto ha uno o più token MCP associati
 
@@ -50,7 +54,6 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 Transport: **stdio** (Claude Code/Desktop locali) e **HTTP** (uso remoto). Autenticazione via token di progetto.
 
 Tool esposti, con parità funzionale rispetto alla UI:
-- Progetti: `list_projects`, `create_project`, `update_project`, `archive_project`
 - Task: `list_tasks`, `get_task`, `create_task`, `update_task`, `delete_task`, `move_task`
 - Subtask: `add_subtask`, `list_subtasks`, `update_subtask`
 - Dipendenze: `add_dependency`, `remove_dependency`, `list_blockers`

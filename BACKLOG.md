@@ -38,7 +38,7 @@ CRUD progetti/task/subtask/commenti/dipendenze, calcolo avanzamento subtask, val
 - Subtask: service Progetti · service Task · service Subtask · service Dipendenze (cicli + blocco transizione) · service Commenti
 
 ### B6 — REST API Progetti
-`/projects`: list, create, update/rename, archive.
+`/projects`: list, create, update/rename, archive, unarchive.
 - Priorità: high · Complessità: 3 · Dipendenze: B4, B5
 
 ### B7 — REST API Task, Subtask, Dipendenze, Commenti
@@ -70,9 +70,9 @@ Create/list/revoke token per progetto, hashing token salvato, token in chiaro mo
 Validazione token contro `ProjectToken`, risoluzione progetto, gestione token revocato.
 - Priorità: high · Complessità: 3 · Dipendenze: B12
 
-### B14 — Server MCP: tool Progetti e Task
-`list_projects, create_project, update_project, archive_project, list_tasks, get_task, create_task, update_task, delete_task, move_task`.
-- Priorità: high · Complessità: 8 · Dipendenze: B5, B13
+### B14 — Server MCP: tool Task
+`list_tasks, get_task, create_task, update_task, delete_task, move_task` (transizioni di stato libere in entrambe le direzioni, unico vincolo il blocco dipendenze per `in_progress`). **Nessun tool di gestione progetti via MCP** (resta solo REST/UI, come `get_aggregated_board`).
+- Priorità: high · Complessità: 5 · Dipendenze: B5, B13
 
 ### B15 — Server MCP: tool Subtask, Dipendenze, Commenti, Allegati, Board
 `add_subtask, list_subtasks, update_subtask, add_dependency, remove_dependency, list_blockers, add_comment, list_comments, list_attachments, attach_file, get_attachment_url, get_board`. **Nessun `get_aggregated_board` via MCP.**
