@@ -210,3 +210,11 @@ Segnalato da `reviewer`, non bloccante per la v1, da rivedere in un secondo mome
 - Calcolo `position` di un nuovo task/subtask non è scoped per `parentTaskId` (concettualmente sporco, nessun bug visibile)
 - Nessun rate limiting su `/auth/login` (accettabile per utente singolo locale)
 - Magic-byte check sugli allegati è minimale (non rileva script testuali/macro Office/eseguibili in zip)
+
+## Debito tecnico noto (da review frontend F1-F12)
+
+Segnalato da `reviewer`, non bloccante, da rivedere in un secondo momento:
+- `downloadAttachment` in `api.ts` non centralizza la gestione 401 come `apiFetch` (l'utente vede un errore invece del redirect a login su token scaduto)
+- Branch ridondante in `KanbanBoard.handleDrop`; errore di rete generico non mostrato in caso di fetch fallita
+- Modale creazione task non permette di scegliere lo stato/colonna iniziale (nasce sempre in `draft`)
+- `PRIORITY_LABEL` duplicato tra `TaskCard.tsx` e `FilterBar.tsx`; `buildQuery` non riusato in `getAggregatedBoard`
