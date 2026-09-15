@@ -38,21 +38,37 @@ function colorForProject(projectId: string): string {
 interface TaskCardProps {
   task: BoardTask;
   showProject?: boolean;
-  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onClick?: () => void;
+  /** Ref/attributi/listener dnd-kit, iniettati dal wrapper sortable in KanbanBoard. */
+  dragRef?: (element: HTMLElement | null) => void;
+  dragAttributes?: React.HTMLAttributes<HTMLDivElement>;
+  dragListeners?: Record<string, unknown>;
+  style?: React.CSSProperties;
+  isDragging?: boolean;
 }
 
-export function TaskCard({ task, showProject, onDragStart, onClick }: TaskCardProps) {
+export function TaskCard({
+  task,
+  showProject,
+  onClick,
+  dragRef,
+  dragAttributes,
+  dragListeners,
+  style,
+  isDragging,
+}: TaskCardProps) {
   const blocked = (task.blockedByOpenCount ?? 0) > 0;
 
   return (
     <div
-      className="task-card"
-      draggable
-      onDragStart={onDragStart}
+      className={`task-card${isDragging ? " task-card-dragging" : ""}`}
+      ref={dragRef}
+      style={style}
       onClick={onClick}
       role="button"
       tabIndex={0}
+      {...dragAttributes}
+      {...dragListeners}
     >
       <div className="task-card-badges">
         <span className={`badge badge-priority badge-priority-${task.priority}`}>

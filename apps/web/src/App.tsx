@@ -14,13 +14,14 @@ import { clearToken, hasValidToken } from "./auth";
 import { getAggregatedBoard, getProjectBoard, listProjects, setUnauthorizedHandler } from "./api";
 
 const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
-const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "" };
+const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "", tag: null };
 
 function filterBoard(board: Board, filters: BoardFiltersState): Board {
   function applyFilters(tasks: BoardTask[]): BoardTask[] {
     return tasks.filter((t) => {
       if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
       if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
+      if (filters.tag && !t.tags.includes(filters.tag)) return false;
       return true;
     });
   }
@@ -29,6 +30,16 @@ function filterBoard(board: Board, filters: BoardFiltersState): Board {
     in_progress: applyFilters(board.in_progress as BoardTask[]),
     done: applyFilters(board.done as BoardTask[]),
   };
+}
+
+function collectTags(board: Board): string[] {
+  const set = new Set<string>();
+  for (const status of ["draft", "in_progress", "done"] as const) {
+    for (const t of board[status] as BoardTask[]) {
+      for (const tag of t.tags) set.add(tag);
+    }
+  }
+  return Array.from(set).sort();
 }
 
 export function App() {
@@ -45,6 +56,8 @@ export function App() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
+  const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
   const handleLogout = useCallback(() => {
     clearToken();
@@ -83,22 +96,24 @@ export function App() {
       // Priorità multi-chip e "solo bloccati" filtrati lato client (il
       // contratto REST supporta un solo `priority` alla volta); la ricerca
       // testuale invece è delegata al server (`search`, vedi API_CONTRACT.md §5).
+      const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
       const data =
         selectedProjectId === "all"
-          ? await getAggregatedBoard(undefined, { search: filters.search || undefined })
-          : await getProjectBoard(selectedProjectId, { search: filters.search || undefined });
+          ? await getAggregatedBoard(aggregatedProjectIds ?? undefined, boardFilters)
+          : await getProjectBoard(selectedProjectId, boardFilters);
       setBoard(data);
       setLoadError(null);
     } catch {
       setLoadError("Impossibile caricare la board");
     }
-  }, [selectedProjectId, filters.search]);
+  }, [selectedProjectId, filters.search, filters.tag, aggregatedProjectIds]);
 
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
 
   const filteredBoard = useMemo(() => filterBoard(board, filters), [board, filters]);
+  const availableTags = useMemo(() => collectTags(board), [board]);
 
   if (!loggedIn) {
     return (
@@ -152,7 +167,16 @@ export function App() {
           </div>
         </header>
 
-        <FilterBar filters={filters} onChange={setFilters} />
+        <FilterBar
+          filters={filters}
+          onChange={setFilters}
+          availableTags={availableTags}
+          projects={selectedProjectId === "all" ? projects : undefined}
+          selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
+          onSelectedProjectIdsChange={
+            selectedProjectId === "all" ? setAggregatedProjectIds : undefined
+          }
+        />
 
         {loadError && <div className="board-error">{loadError}</div>}
 

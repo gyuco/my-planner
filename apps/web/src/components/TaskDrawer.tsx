@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
-import type { Attachment, Comment, Task, TaskComplexity, TaskPriority } from "@my-planner/core";
+import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus } from "@my-planner/core";
 import {
   ApiRequestError,
   addComment,
@@ -19,6 +19,12 @@ import {
 } from "../api";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
+const STATUSES: TaskStatus[] = ["draft", "in_progress", "done"];
+const STATUS_LABEL: Record<TaskStatus, string> = {
+  draft: "Draft",
+  in_progress: "In progress",
+  done: "Done",
+};
 
 interface TaskDrawerProps {
   taskId: string;
@@ -53,6 +59,8 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
   const [uploading, setUploading] = useState(false);
   const [projectTasks, setProjectTasks] = useState<Task[]>([]);
   const [selectedBlocker, setSelectedBlocker] = useState("");
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [changingStatus, setChangingStatus] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +112,27 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       onChanged();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : "Errore durante il salvataggio");
+    }
+  }
+
+  async function handleChangeStatus(status: TaskStatus) {
+    if (!task || status === task.status) return;
+    setStatusError(null);
+    setChangingStatus(true);
+    try {
+      const updated = await moveTask(taskId, status);
+      setTask((prev) => (prev ? { ...prev, ...updated } : updated));
+      onChanged();
+    } catch (err) {
+      if (err instanceof ApiRequestError && err.code === "DEPENDENCY_BLOCKED") {
+        setStatusError(err.message);
+      } else {
+        setStatusError(
+          err instanceof ApiRequestError ? err.message : "Errore durante il cambio di stato",
+        );
+      }
+    } finally {
+      setChangingStatus(false);
     }
   }
 
@@ -227,6 +256,27 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
         {!loading && task && (
           <div className="drawer-body">
             <section className="drawer-section">
+              <label>
+                Stato
+                <select
+                  value={task.status}
+                  disabled={changingStatus}
+                  onChange={(e) => handleChangeStatus(e.target.value as TaskStatus)}
+                  aria-label="Cambia stato del task"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {statusError && (
+                <div className="board-error" role="alert">
+                  {statusError}
+                  <button onClick={() => setStatusError(null)}>&times;</button>
+                </div>
+              )}
               <label>
                 Titolo
                 <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveFields} maxLength={300} />
