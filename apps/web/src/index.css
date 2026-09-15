@@ -643,6 +643,35 @@ body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f7; }
   gap: 1rem;
 }
 
+.drawer label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.drawer input,
+.drawer select,
+.drawer textarea {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.drawer .modal-row {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.drawer .modal-row label {
+  flex: 1;
+}
+
 .drawer-header {
   display: flex;
   align-items: center;
