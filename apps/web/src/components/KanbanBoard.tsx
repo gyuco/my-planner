@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -110,9 +110,40 @@ function findTaskById(board: Board, id: string): BoardTask | undefined {
   return undefined;
 }
 
+/** Sposta `taskId` in `targetStatus`/`targetIndex` in una copia del board, per l'update ottimistico. */
+function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, targetIndex: number): Board {
+  const next: Board = {
+    draft: [...(board.draft as BoardTask[])],
+    in_progress: [...(board.in_progress as BoardTask[])],
+    done: [...(board.done as BoardTask[])],
+  };
+  let moved: BoardTask | undefined;
+  for (const status of COLUMNS.map((c) => c.status)) {
+    const list = next[status] as BoardTask[];
+    const idx = list.findIndex((t) => t.id === taskId);
+    if (idx !== -1) {
+      moved = { ...list[idx], status: targetStatus };
+      list.splice(idx, 1);
+      break;
+    }
+  }
+  if (!moved) return board;
+  (next[targetStatus] as BoardTask[]).splice(targetIndex, 0, moved);
+  return next;
+}
+
 export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
   const [dragError, setDragError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null);
+  // Copia locale per l'update ottimistico: senza questa, la card torna alla
+  // posizione originale non appena dnd-kit rilascia (perché `board` non è
+  // ancora cambiato) e poi salta in avanti quando arriva la risposta del
+  // server — l'effetto "va e torna indietro" segnalato.
+  const [localBoard, setLocalBoard] = useState<Board>(board);
+
+  useEffect(() => {
+    setLocalBoard(board);
+  }, [board]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -120,7 +151,7 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
 
   function handleDragStart(event: DragStartEvent) {
     document.body.classList.add("dnd-dragging");
-    setActiveTask(findTaskById(board, String(event.active.id)) ?? null);
+    setActiveTask(findTaskById(localBoard, String(event.active.id)) ?? null);
   }
 
   function handleDragCancel() {
@@ -144,16 +175,17 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
 
     if (overIdStr.startsWith("column-")) {
       targetStatus = overIdStr.slice("column-".length) as TaskStatus;
-      targetIndex = (board[targetStatus] as BoardTask[]).length;
+      targetIndex = (localBoard[targetStatus] as BoardTask[]).length;
     } else {
       targetStatus = (over.data.current?.status as TaskStatus | undefined) ?? activeStatus;
-      const targetTasks = board[targetStatus] as BoardTask[];
+      const targetTasks = localBoard[targetStatus] as BoardTask[];
       const idx = targetTasks.findIndex((t) => t.id === overIdStr);
       targetIndex = idx === -1 ? targetTasks.length : idx;
     }
 
+    const previousBoard = localBoard;
     if (activeStatus === targetStatus) {
-      const tasks = board[targetStatus] as BoardTask[];
+      const tasks = localBoard[targetStatus] as BoardTask[];
       const activeIndex = tasks.findIndex((t) => t.id === activeId);
       if (activeIndex !== -1 && activeIndex < targetIndex) {
         targetIndex -= 1;
@@ -161,11 +193,16 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
       if (activeIndex === targetIndex) return;
     }
 
+    // Applica subito lo spostamento in locale, prima della risposta server.
+    setLocalBoard(reorderBoard(localBoard, activeId, targetStatus, targetIndex));
     setDragError(null);
     try {
       await moveTask(activeId, targetStatus, targetIndex);
       onBoardChange();
     } catch (err) {
+      // Il server ha rifiutato la mossa (es. DEPENDENCY_BLOCKED): torna allo
+      // stato precedente invece di lasciare la UI disallineata dal server.
+      setLocalBoard(previousBoard);
       if (err instanceof ApiRequestError) {
         setDragError(err.message);
       }
@@ -193,7 +230,7 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
               key={col.status}
               status={col.status}
               label={col.label}
-              tasks={board[col.status] as BoardTask[]}
+              tasks={localBoard[col.status] as BoardTask[]}
               showProject={showProject}
               onTaskClick={onTaskClick}
             />
