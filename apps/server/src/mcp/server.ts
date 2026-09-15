@@ -10,8 +10,6 @@ import {
   updateTask,
   deleteTask,
   moveTask,
-  createSubtask,
-  listSubtasks,
   addDependency,
   removeDependency,
   listBlockers,
@@ -81,7 +79,6 @@ export function createProjectMcpServer(projectId: string) {
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
-      includeSubtasks: z.boolean().optional().default(false),
     },
     async (input) => withErrors(() => listTasks(projectId, input))
   );
@@ -103,13 +100,8 @@ export function createProjectMcpServer(projectId: string) {
       complexity: complexitySchema,
       tags: z.array(z.string()).default([]),
       dueDate: z.string().datetime().nullable().optional(),
-      parentTaskId: z.string().nullable().optional(),
     },
-    async (input) =>
-      withErrors(async () => {
-        if (input.parentTaskId) await assertTaskInProject(input.parentTaskId);
-        return createTask(projectId, input);
-      })
+    async (input) => withErrors(() => createTask(projectId, input))
   );
 
   server.tool(
@@ -146,53 +138,6 @@ export function createProjectMcpServer(projectId: string) {
       withErrors(async () => {
         await assertTaskInProject(taskId);
         return moveTask(taskId, status, position);
-      })
-  );
-
-  // --- Subtask ---------------------------------------------------------------
-
-  server.tool(
-    "add_subtask",
-    "Crea un subtask sotto parentTaskId, nel progetto associato al token",
-    {
-      parentTaskId: z.string(),
-      title: z.string().min(1).max(300),
-      description: z.string().optional(),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-      complexity: complexitySchema,
-      tags: z.array(z.string()).optional(),
-      dueDate: z.string().datetime().nullable().optional(),
-    },
-    async ({ parentTaskId, ...rest }) =>
-      withErrors(async () => {
-        await assertTaskInProject(parentTaskId);
-        return createSubtask(parentTaskId, rest);
-      })
-  );
-
-  server.tool("list_subtasks", "Elenca i subtask diretti di parentTaskId", { parentTaskId: z.string() }, async ({ parentTaskId }) =>
-    withErrors(async () => {
-      await assertTaskInProject(parentTaskId);
-      return listSubtasks(parentTaskId);
-    })
-  );
-
-  server.tool(
-    "update_subtask",
-    "Aggiorna un subtask del progetto associato al token",
-    {
-      subtaskId: z.string(),
-      title: z.string().min(1).max(300).optional(),
-      description: z.string().optional(),
-      priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
-      complexity: complexitySchema,
-      tags: z.array(z.string()).optional(),
-      dueDate: z.string().datetime().nullable().optional(),
-    },
-    async ({ subtaskId, ...rest }) =>
-      withErrors(async () => {
-        await assertTaskInProject(subtaskId);
-        return updateTask(subtaskId, rest);
       })
   );
 

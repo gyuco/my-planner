@@ -1,8 +1,8 @@
 import { test, expect } from "@playwright/test";
 import { loginViaUi, createProjectViaApi, createTaskViaApi, selectProjectInSidebar } from "./helpers";
 
-test.describe("T5 - subtask, dipendenze, blocco stato", () => {
-  test("subtask con avanzamento, dipendenza A bloccato da B, blocco/sblocco via drag e via select", async ({
+test.describe("T5 - dipendenze, blocco stato", () => {
+  test("dipendenza A bloccato da B, blocco/sblocco via drag e via select", async ({
     page,
   }) => {
     const project = await createProjectViaApi(`T5 Deps ${Date.now()}`);
@@ -21,22 +21,11 @@ test.describe("T5 - subtask, dipendenze, blocco stato", () => {
     const drawer = page.locator(".drawer");
     await expect(drawer).toBeVisible();
 
-    // Subtask con avanzamento visibile nella card
-    await drawer.getByPlaceholder("Nuovo subtask").fill("Subtask 1");
-    await drawer.locator(".drawer-inline-form button", { hasText: "Aggiungi" }).first().click();
-    await expect(drawer.locator(".drawer-list li", { hasText: "Subtask 1" })).toBeVisible();
-
-    await page.locator(".drawer-header .icon-button").click(); // chiudi drawer, forza refresh board
-    await expect(drawer).toBeHidden();
-    await expect(cardA.locator(".task-card-subtasks")).toHaveText("0/1");
-
-    // Riapri A e aggiunge dipendenza verso B
-    await cardA.click();
-    await expect(drawer).toBeVisible();
+    // Aggiunge dipendenza verso B
     await drawer.locator("select").first().waitFor(); // select stato
     const blockerSelect = drawer.locator(".drawer-inline-form select");
     await blockerSelect.selectOption({ label: "Task B (blocker)" });
-    await drawer.getByRole("button", { name: "Aggiungi" }).nth(1).click();
+    await drawer.getByRole("button", { name: "Aggiungi" }).first().click();
     await expect(drawer.locator(".drawer-list li", { hasText: "Task B (blocker)" })).toBeVisible();
 
     await page.locator(".drawer-header .icon-button").click();

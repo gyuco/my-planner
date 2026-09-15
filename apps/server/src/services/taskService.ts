@@ -31,37 +31,12 @@ function serializeTask(task: any): any {
   if (task.dueDate) out.dueDate = new Date(task.dueDate).toISOString();
   if (task.createdAt) out.createdAt = new Date(task.createdAt).toISOString();
   if (task.updatedAt) out.updatedAt = new Date(task.updatedAt).toISOString();
-  if (task.subtasks) {
-    out.subtasks = task.subtasks.map(serializeTask);
-    const total = task.subtasks.length;
-    if (total > 0) {
-      const done = task.subtasks.filter((s: any) => s.status === "done").length;
-      out.subtaskProgress = { done, total };
-    }
-  }
   if (task.project) {
     out.projectId = task.project.id;
     out.projectName = task.project.name;
     delete out.project;
   }
   return out;
-}
-
-async function computeSubtaskProgress(taskIds: string[]) {
-  if (taskIds.length === 0) return new Map<string, { done: number; total: number }>();
-  const subtasks = await prisma.task.findMany({
-    where: { parentTaskId: { in: taskIds } },
-    select: { parentTaskId: true, status: true },
-  });
-  const map = new Map<string, { done: number; total: number }>();
-  for (const s of subtasks) {
-    const key = s.parentTaskId as string;
-    const entry = map.get(key) ?? { done: 0, total: 0 };
-    entry.total += 1;
-    if (s.status === "done") entry.done += 1;
-    map.set(key, entry);
-  }
-  return map;
 }
 
 async function computeBlockedByOpenCount(taskIds: string[]) {
@@ -132,7 +107,6 @@ export interface TaskInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
-  parentTaskId?: string | null;
 }
 
 function validateComplexity(complexity: unknown) {
@@ -159,16 +133,6 @@ export async function createTask(projectId: string, input: TaskInput) {
   }
   validateComplexity(input.complexity);
 
-  if (input.parentTaskId) {
-    const parent = await prisma.task.findUnique({ where: { id: input.parentTaskId } });
-    if (!parent || parent.projectId !== projectId) {
-      throw new ApiErrorException(
-        "VALIDATION_ERROR",
-        "parentTaskId riferisce un task inesistente o di un altro progetto"
-      );
-    }
-  }
-
   const maxPosition = await prisma.task.aggregate({
     where: { projectId, status: "draft" },
     _max: { position: true },
@@ -183,7 +147,6 @@ export async function createTask(projectId: string, input: TaskInput) {
       complexity: input.complexity ?? null,
       tags: tagsToCsv(input.tags) ?? "",
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
-      parentTaskId: input.parentTaskId ?? null,
       position: (maxPosition._max.position ?? -1) + 1,
     },
   });
@@ -192,11 +155,10 @@ export async function createTask(projectId: string, input: TaskInput) {
 
 export async function listTasks(
   projectId: string,
-  filters: { status?: TaskStatus; priority?: TaskPriority; tag?: string; search?: string; includeSubtasks?: boolean }
+  filters: { status?: TaskStatus; priority?: TaskPriority; tag?: string; search?: string }
 ) {
   await getProjectOrThrow(projectId);
   const where: any = { projectId };
-  if (!filters.includeSubtasks) where.parentTaskId = null;
   if (filters.status) where.status = filters.status;
   if (filters.priority) where.priority = filters.priority;
   if (filters.search) {
@@ -212,20 +174,11 @@ export async function listTasks(
     tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
   }
 
-  const progressMap = await computeSubtaskProgress(tasks.map((t) => t.id));
-  return tasks.map((t) => {
-    const serialized = serializeTask(t);
-    const progress = progressMap.get(t.id);
-    if (progress) serialized.subtaskProgress = progress;
-    return serialized;
-  });
+  return tasks.map(serializeTask);
 }
 
 export async function getTask(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    include: { subtasks: true },
-  });
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
 
   const [blockedBy, blocking, commentsCount, attachmentsCount] = await Promise.all([
@@ -275,51 +228,20 @@ export async function updateTask(taskId: string, input: TaskUpdateInput) {
 export async function deleteTask(taskId: string) {
   await getTaskOrThrow(taskId);
 
-  // Raccoglie il task e tutti i discendenti (subtask) per il cascade.
-  const toDelete = new Set<string>([taskId]);
-  let frontier = [taskId];
-  while (frontier.length > 0) {
-    const children = await prisma.task.findMany({
-      where: { parentTaskId: { in: frontier } },
-      select: { id: true },
-    });
-    frontier = children.map((c) => c.id).filter((id) => !toDelete.has(id));
-    frontier.forEach((id) => toDelete.add(id));
-  }
-  const ids = Array.from(toDelete);
-
   // Elimina prima i file fisici/oggetti S3 (best-effort, vedi
   // AttachmentStorage.delete), poi i record DB in cascade.
-  const attachments = await prisma.attachment.findMany({ where: { taskId: { in: ids } } });
+  const attachments = await prisma.attachment.findMany({ where: { taskId } });
   const storage = getAttachmentStorage();
   await Promise.all(attachments.map((a) => storage.delete(a.storageRef).catch(() => {})));
 
   await prisma.$transaction([
-    prisma.comment.deleteMany({ where: { taskId: { in: ids } } }),
-    prisma.attachment.deleteMany({ where: { taskId: { in: ids } } }),
-    prisma.taskDependency.deleteMany({ where: { OR: [{ taskId: { in: ids } }, { blockedByTaskId: { in: ids } }] } }),
-    prisma.task.deleteMany({ where: { id: { in: ids } } }),
+    prisma.comment.deleteMany({ where: { taskId } }),
+    prisma.attachment.deleteMany({ where: { taskId } }),
+    prisma.taskDependency.deleteMany({ where: { OR: [{ taskId }, { blockedByTaskId: taskId }] } }),
+    prisma.task.deleteMany({ where: { id: taskId } }),
   ]);
 
   return { id: taskId, deleted: true as const };
-}
-
-// ---------------------------------------------------------------------------
-// Subtask (Task con parentTaskId valorizzato)
-// ---------------------------------------------------------------------------
-
-export async function createSubtask(parentTaskId: string, input: TaskInput) {
-  const parent = await getTaskOrThrow(parentTaskId);
-  return createTask(parent.projectId, { ...input, parentTaskId });
-}
-
-export async function listSubtasks(parentTaskId: string) {
-  await getTaskOrThrow(parentTaskId);
-  const subtasks = await prisma.task.findMany({
-    where: { parentTaskId },
-    orderBy: [{ status: "asc" }, { position: "asc" }],
-  });
-  return subtasks.map(serializeTask);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +286,7 @@ export async function getBoard(
   filters: { priority?: TaskPriority; tag?: string; search?: string } = {}
 ) {
   await getProjectOrThrow(projectId);
-  const where: any = { projectId, parentTaskId: null };
+  const where: any = { projectId };
   if (filters.priority) where.priority = filters.priority;
   if (filters.search) {
     where.OR = [
@@ -376,16 +298,11 @@ export async function getBoard(
   let tasks = await prisma.task.findMany({ where, orderBy: [{ status: "asc" }, { position: "asc" }] });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
-  const [progressMap, blockedMap] = await Promise.all([
-    computeSubtaskProgress(tasks.map((t) => t.id)),
-    computeBlockedByOpenCount(tasks.map((t) => t.id)),
-  ]);
+  const blockedMap = await computeBlockedByOpenCount(tasks.map((t) => t.id));
 
   const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
   for (const t of tasks) {
     const serialized = serializeTask(t);
-    const progress = progressMap.get(t.id);
-    if (progress) serialized.subtaskProgress = progress;
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     board[t.status as TaskStatus].push(serialized);
   }
@@ -397,7 +314,6 @@ export async function getAggregatedBoard(
   filters: { priority?: TaskPriority; tag?: string; search?: string } = {}
 ) {
   const where: any = {
-    parentTaskId: null,
     project: projectIds ? { id: { in: projectIds } } : { archived: false },
   };
   if (filters.priority) where.priority = filters.priority;
@@ -415,16 +331,11 @@ export async function getAggregatedBoard(
   });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
-  const [progressMap, blockedMap] = await Promise.all([
-    computeSubtaskProgress(tasks.map((t) => t.id)),
-    computeBlockedByOpenCount(tasks.map((t) => t.id)),
-  ]);
+  const blockedMap = await computeBlockedByOpenCount(tasks.map((t) => t.id));
 
   const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
   for (const t of tasks) {
     const serialized = serializeTask(t);
-    const progress = progressMap.get(t.id);
-    if (progress) serialized.subtaskProgress = progress;
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     board[t.status as TaskStatus].push(serialized);
   }

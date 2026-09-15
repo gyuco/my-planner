@@ -38,9 +38,6 @@ model Task {
   id           String    @id @default(cuid())
   projectId    String
   project      Project   @relation(fields: [projectId], references: [id])
-  parentTaskId String?
-  parent       Task?     @relation("Subtasks", fields: [parentTaskId], references: [id])
-  subtasks     Task[]    @relation("Subtasks")
 
   title       String
   description String   @default("")

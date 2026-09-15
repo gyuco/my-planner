@@ -171,7 +171,6 @@ export interface CreateTaskInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
-  parentTaskId?: string | null;
 }
 
 export function createTask(projectId: string, input: CreateTaskInput): Promise<Task> {
@@ -192,14 +191,8 @@ export function moveTask(
   });
 }
 
-export function listTasks(
-  projectId: string,
-  filters?: { includeSubtasks?: boolean },
-): Promise<Task[]> {
-  const params = new URLSearchParams();
-  if (filters?.includeSubtasks) params.set("includeSubtasks", "true");
-  const qs = params.toString();
-  return apiFetch(`/projects/${projectId}/tasks${qs ? `?${qs}` : ""}`);
+export function listTasks(projectId: string): Promise<Task[]> {
+  return apiFetch(`/projects/${projectId}/tasks`);
 }
 
 export function getTask(taskId: string): Promise<Task> {
@@ -221,23 +214,6 @@ export function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task
 
 export function deleteTask(taskId: string): Promise<{ id: string; deleted: true }> {
   return apiFetch(`/tasks/${taskId}`, { method: "DELETE" });
-}
-
-// --- Subtask ---------------------------------------------------------------
-
-export function createSubtask(parentTaskId: string, input: CreateTaskInput): Promise<Task> {
-  return apiFetch(`/tasks/${parentTaskId}/subtasks`, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-}
-
-export function listSubtasks(parentTaskId: string): Promise<Task[]> {
-  return apiFetch(`/tasks/${parentTaskId}/subtasks`);
-}
-
-export function updateSubtask(subtaskId: string, input: UpdateTaskInput): Promise<Task> {
-  return apiFetch(`/subtasks/${subtaskId}`, { method: "PATCH", body: JSON.stringify(input) });
 }
 
 // --- Dipendenze --------------------------------------------------------------

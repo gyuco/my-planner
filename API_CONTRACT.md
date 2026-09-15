@@ -13,7 +13,7 @@ Principio cardine: REST e MCP condividono lo stesso service layer (`apps/server/
 - **Tag**: rappresentati in `packages/core` come `string[]`; persistiti in Prisma come CSV (`tags: String`, campo già esistente). Il service layer fa la conversione; REST/MCP vedono sempre array.
 - **ID**: stringhe `cuid()`.
 - **Content-Type**: `application/json` per tutte le request/response REST tranne upload/download allegati (`multipart/form-data` upload, stream binario download).
-- **Paginazione**: **nessuna paginazione in v1**. Utente singolo, scala personale (decine/centinaia di task per progetto). Tutti gli endpoint di lista (`list_tasks`, `GET /projects/:id/board`, `GET /board`, `list_comments`, `list_attachments`, `list_subtasks`) restituiscono l'intero result set. Se in futuro la scala cresce, si introdurrà `?cursor=&limit=` senza rompere la forma della risposta (i risultati resteranno sotto una chiave `items`/array diretto — vedi nota per singolo endpoint).
+- **Paginazione**: **nessuna paginazione in v1**. Utente singolo, scala personale (decine/centinaia di task per progetto). Tutti gli endpoint di lista (`list_tasks`, `GET /projects/:id/board`, `GET /board`, `list_comments`, `list_attachments`) restituiscono l'intero result set. Se in futuro la scala cresce, si introdurrà `?cursor=&limit=` senza rompere la forma della risposta (i risultati resteranno sotto una chiave `items`/array diretto — vedi nota per singolo endpoint).
 
 ---
 
@@ -81,7 +81,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 - Token invalido o revocato → stesso errore per entrambi i transport: `MCP_TOKEN_INVALID`.
   - REST HTTP transport (`POST /mcp`): risposta `401 { "error": { "code": "MCP_TOKEN_INVALID", "message": "Token MCP non valido o revocato" } }`.
   - stdio transport: processo termina con `console.error` + `process.exit(1)` riportando lo stesso messaggio (nessuna risposta JSON-RPC possibile prima della connessione).
-- Ogni tool verifica che le entità coinvolte (task, subtask, commento, allegato) appartengano al `projectId` risolto dal token; in caso contrario → `FORBIDDEN` ("... non appartiene al progetto del token").
+- Ogni tool verifica che le entità coinvolte (task, commento, allegato) appartengano al `projectId` risolto dal token; in caso contrario → `FORBIDDEN` ("... non appartiene al progetto del token").
 
 ---
 
@@ -143,16 +143,16 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ---
 
-## 4. REST — Task, Subtask, Dipendenze, Commenti (B7)
+## 4. REST — Task, Dipendenze, Commenti (B7)
 
 ### `GET /projects/:projectId/tasks`
 - Auth: JWT
-- Query: `status?`, `priority?`, `tag?` (singolo tag), `search?` (case-insensitive su titolo+descrizione), `includeSubtasks?=true|false` (default `false`, cioè solo task top-level)
-- 200: `Task[]` (con `subtaskProgress: { done: number, total: number }` calcolato dal service se il task ha figli)
+- Query: `status?`, `priority?`, `tag?` (singolo tag), `search?` (case-insensitive su titolo+descrizione)
+- 200: `Task[]`
 
 ### `GET /tasks/:taskId`
 - Auth: JWT
-- 200: `Task` esteso con `subtasks: Task[]`, `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`
+- 200: `Task` esteso con `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`
 - 404 `NOT_FOUND`
 
 ### `POST /projects/:projectId/tasks`
@@ -164,15 +164,14 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
   "priority": "low|medium|high|urgent (default medium)",
   "complexity": "1|2|3|5|8|13|21|null",
   "tags": ["string"],
-  "dueDate": "ISO8601|null",
-  "parentTaskId": "string|null"
+  "dueDate": "ISO8601|null"
 }
 ```
 - 201: `Task`
-- 400 `VALIDATION_ERROR` se `complexity` non è un valore Fibonacci ammesso, o `parentTaskId` riferisce un task di altro progetto/inesistente
+- 400 `VALIDATION_ERROR` se `complexity` non è un valore Fibonacci ammesso
 
 ### `PATCH /tasks/:taskId`
-- Body: qualunque sottoinsieme dei campi di create eccetto `status` (che passa da `move`, vedi sotto) e `parentTaskId` (immutabile dopo la creazione — v1)
+- Body: qualunque sottoinsieme dei campi di create eccetto `status` (che passa da `move`, vedi sotto)
 - 200: `Task`
 - 404 `NOT_FOUND`
 
@@ -190,17 +189,8 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 
 ### `DELETE /tasks/:taskId`
 - 200: `{ "id": "...", "deleted": true }`
-- Cascade: elimina subtask, commenti, allegati (incl. file fisico/oggetto S3 tramite `AttachmentStorage.delete`), e tutte le `TaskDependency` che coinvolgono il task (come `taskId` o `blockedByTaskId`).
+- Cascade: elimina commenti, allegati (incl. file fisico/oggetto S3 tramite `AttachmentStorage.delete`), e tutte le `TaskDependency` che coinvolgono il task (come `taskId` o `blockedByTaskId`).
 - 404 `NOT_FOUND`
-
-### Subtask
-Un subtask è un `Task` con `parentTaskId` valorizzato: nessuna entità Prisma separata. Endpoint dedicati per comodità semantica REST/MCP:
-
-`POST /tasks/:taskId/subtasks` → crea un task con quel `parentTaskId`. Stesso body di create task (senza `parentTaskId`, forzato dal path). 201: `Task`.
-
-`GET /tasks/:taskId/subtasks` → 200: `Task[]` (solo figli diretti).
-
-`PATCH /subtasks/:subtaskId` → alias di `PATCH /tasks/:taskId` sullo stesso ID (stesso service). 200: `Task`.
 
 ### Dipendenze
 
@@ -241,7 +231,7 @@ Un subtask è un `Task` con `parentTaskId` valorizzato: nessuna entità Prisma s
   "done": [Task]
 }
 ```
-Ogni `Task` include `subtaskProgress` e `blockedByOpenCount` (numero di dipendenze non-done, per il badge di blocco in UI).
+Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il badge di blocco in UI).
 
 ### `GET /board` (aggregata, solo REST/UI — mai MCP)
 - Auth: JWT
@@ -283,17 +273,17 @@ Tutti i tool sono registrati da `createProjectMcpServer(projectId)` e operano **
 Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON.stringify(risultato) }] }` in caso di successo; in caso di errore `{ isError: true, content: [{ type: "text", text: JSON.stringify({ error: { code, message } }) }] }` (vedi §1).
 
 ### Progetti
-**Decisione confermata:** `list_projects`, `create_project`, `update_project`, `archive_project`/`unarchive_project` **non sono esposti via MCP**. Il token è scoped a un solo progetto già esistente: creare/elencare/archiviare progetti non ha una semantica sensata in quello scope ed è comunque un'operazione di gestione, non di lavoro quotidiano sui task — resta **solo UI/JWT** (REST, §5-6), come già deciso per `get_aggregated_board`. Il set MCP v1 copre solo Task/Subtask/Dipendenze/Commenti/Allegati/Board (sotto).
+**Decisione confermata:** `list_projects`, `create_project`, `update_project`, `archive_project`/`unarchive_project` **non sono esposti via MCP**. Il token è scoped a un solo progetto già esistente: creare/elencare/archiviare progetti non ha una semantica sensata in quello scope ed è comunque un'operazione di gestione, non di lavoro quotidiano sui task — resta **solo UI/JWT** (REST, §5-6), come già deciso per `get_aggregated_board`. Il set MCP v1 copre solo Task/Dipendenze/Commenti/Allegati/Board (sotto).
 
 ### Task
 
 **`list_tasks`**
-- Input: `{ status: z.enum(["draft","in_progress","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional(), includeSubtasks: z.boolean().optional().default(false) }`
+- Input: `{ status: z.enum(["draft","in_progress","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional() }`
 - Output: `Task[]`
 
 **`get_task`**
 - Input: `{ taskId: z.string() }`
-- Output: `Task` esteso (subtasks, blockedBy, blocking, commentsCount, attachmentsCount)
+- Output: `Task` esteso (blockedBy, blocking, commentsCount, attachmentsCount)
 - Errori: `NOT_FOUND`, `FORBIDDEN` (task di altro progetto)
 
 **`create_task`**
@@ -306,14 +296,13 @@ z.object({
   complexity: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(5),z.literal(8),z.literal(13),z.literal(21)]).nullable().optional(),
   tags: z.array(z.string()).default([]),
   dueDate: z.string().datetime().nullable().optional(),
-  parentTaskId: z.string().nullable().optional(),
 })
 ```
 - Output: `Task`
-- Errori: `VALIDATION_ERROR`, `FORBIDDEN` (se `parentTaskId` è di altro progetto)
+- Errori: `VALIDATION_ERROR`
 
 **`update_task`**
-- Input: come `create_task` ma tutti i campi `.optional()` (no default) + `taskId: z.string()` obbligatorio; niente `status`/`parentTaskId`
+- Input: come `create_task` ma tutti i campi `.optional()` (no default) + `taskId: z.string()` obbligatorio; niente `status`
 - Output: `Task`
 - Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR`
 
@@ -326,20 +315,6 @@ z.object({
 - Input: `{ taskId: z.string(), status: z.enum(["draft","in_progress","done"]), position: z.number().int().nonnegative().optional() }`
 - Output: `Task`
 - Errori: `DEPENDENCY_BLOCKED` (con `message` che elenca i blocker non risolti, identico a REST), `NOT_FOUND`, `FORBIDDEN`
-
-### Subtask
-
-**`add_subtask`**
-- Input: `{ parentTaskId: z.string(), title: z.string().min(1).max(300), description: z.string().optional(), priority: ..., complexity: ..., tags: ..., dueDate: ... }` (stessi vincoli di create_task)
-- Output: `Task`
-
-**`list_subtasks`**
-- Input: `{ parentTaskId: z.string() }`
-- Output: `Task[]`
-
-**`update_subtask`**
-- Input: `{ subtaskId: z.string(), ...campi opzionali come update_task }`
-- Output: `Task`
 
 ### Dipendenze
 

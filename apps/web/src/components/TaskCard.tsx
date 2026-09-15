@@ -2,7 +2,6 @@ import type { Task, TaskPriority } from "@my-planner/core";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
 export interface BoardTask extends Task {
-  subtaskProgress?: { done: number; total: number };
   blockedByOpenCount?: number;
   projectId: string;
   projectName?: string;
@@ -98,11 +97,6 @@ export function TaskCard({
       )}
 
       <div className="task-card-footer">
-        {task.subtaskProgress && task.subtaskProgress.total > 0 && (
-          <span className="task-card-subtasks">
-            {task.subtaskProgress.done}/{task.subtaskProgress.total}
-          </span>
-        )}
         {blocked && (
           <span className="task-card-blocked" title="Task bloccato da dipendenze non risolte">
             🔒 {task.blockedByOpenCount}

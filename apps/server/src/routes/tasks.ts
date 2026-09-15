@@ -5,8 +5,6 @@ import {
   createTask,
   updateTask,
   deleteTask,
-  createSubtask,
-  listSubtasks,
   moveTask,
   addDependency,
   removeDependency,
@@ -26,14 +24,8 @@ import {
 export async function taskRoutes(app: FastifyInstance) {
   app.get("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
-    const { status, priority, tag, search, includeSubtasks } = taskFiltersQuerySchema.parse(req.query ?? {});
-    return listTasks(projectId, {
-      status,
-      priority,
-      tag,
-      search,
-      includeSubtasks: includeSubtasks === "true",
-    });
+    const { status, priority, tag, search } = taskFiltersQuerySchema.parse(req.query ?? {});
+    return listTasks(projectId, { status, priority, tag, search });
   });
 
   app.post("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -63,26 +55,6 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     const { status, position } = moveTaskInputSchema.parse(req.body ?? {});
     return moveTask(taskId, status, position);
-  });
-
-  // --- Subtask -------------------------------------------------------------
-
-  app.post("/tasks/:taskId/subtasks", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const { taskId } = req.params as { taskId: string };
-    const body = taskInputSchema.parse(req.body ?? {});
-    const subtask = await createSubtask(taskId, body);
-    return reply.code(201).send(subtask);
-  });
-
-  app.get("/tasks/:taskId/subtasks", { onRequest: [app.authenticate] }, async (req) => {
-    const { taskId } = req.params as { taskId: string };
-    return listSubtasks(taskId);
-  });
-
-  app.patch("/subtasks/:subtaskId", { onRequest: [app.authenticate] }, async (req) => {
-    const { subtaskId } = req.params as { subtaskId: string };
-    const body = taskUpdateInputSchema.parse(req.body ?? {});
-    return updateTask(subtaskId, body);
   });
 
   // --- Dipendenze ------------------------------------------------------------

@@ -4,7 +4,7 @@
 Gestore di progetti e task personale, classico, con board Kanban, utilizzabile in modo equivalente da **UI web** e da **server MCP** (agenti AI come Claude Code). Utente singolo con login semplice.
 
 ## 2. Problema e utenti
-**Problema:** serve un sistema di gestione task comodo da usare a mano e pienamente pilotabile da un agente AI, con priorità, complessità, subtask e dipendenze bloccanti.
+**Problema:** serve un sistema di gestione task comodo da usare a mano e pienamente pilotabile da un agente AI, con priorità, complessità e dipendenze bloccanti.
 
 **Utente:** un singolo utente (il proprietario), autenticato via login. Nessun multi-utente, nessun assegnatario, nessun ruolo.
 
@@ -33,13 +33,12 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 - **Stati:** `draft` → `in progress` → `done`
 - **Priorità:** `low` / `medium` / `high` / `urgent`
 - **Complessità:** Fibonacci — `1, 2, 3, 5, 8, 13, 21`
-- **Subtask:** gerarchia padre/figlio con indicatore di avanzamento (es. `2/5`)
 - **Dipendenze:** relazioni "bloccata da" / "blocca" tra task
   - Un task con bloccanti non ancora `done` non può passare a `in progress`; il blocco è visibile in UI e l'MCP restituisce un errore esplicito
   - Le dipendenze circolari sono rifiutate
 - **Commenti/note** cronologici sul task
 - **Allegati:** upload e download di file per task
-- **Eliminazione:** cancellare un task elimina in cascata subtask, commenti, allegati e le dipendenze che lo coinvolgono
+- **Eliminazione:** cancellare un task elimina in cascata commenti, allegati e le dipendenze che lo coinvolgono
 
 ### Board Kanban
 - Board per singolo progetto: tre colonne (`draft`/`in progress`/`done`), drag & drop, ordinamento manuale
@@ -55,7 +54,6 @@ Transport: **stdio** (Claude Code/Desktop locali) e **HTTP** (uso remoto). Auten
 
 Tool esposti, con parità funzionale rispetto alla UI:
 - Task: `list_tasks`, `get_task`, `create_task`, `update_task`, `delete_task`, `move_task`
-- Subtask: `add_subtask`, `list_subtasks`, `update_subtask`
 - Dipendenze: `add_dependency`, `remove_dependency`, `list_blockers`
 - Commenti: `add_comment`, `list_comments`
 - Allegati: `list_attachments`, `attach_file`, `get_attachment_url`
@@ -87,7 +85,7 @@ Tool esposti, con parità funzionale rispetto alla UI:
 - **Repo:** pubblicato su GitHub
 
 ## 7. Workflow / agenti
-- **analyst** — raffina requisiti, scompone feature in task/subtask con priorità e complessità
+- **analyst** — raffina requisiti, scompone feature in task con priorità e complessità
 - **architect** — decisioni di design tecnico, schema DB, contratti API/MCP
 - **planner** — riceve ogni cambio di stato (`draft → in progress → done`), verifica dipendenze/blocchi e mantiene coerente il workflow
 - **coder** — implementa feature/fix
@@ -97,12 +95,11 @@ Tool esposti, con parità funzionale rispetto alla UI:
 ## 8. Criteri di accettazione
 1. Creo un progetto e vedo la board con le colonne `draft / in progress / done`
 2. Creo un task con titolo, descrizione, priorità, complessità Fibonacci, tag e scadenza
-3. Aggiungo subtask a un task e ne vedo l'avanzamento (es. `2/5`)
-4. Dichiaro che A è bloccato da B; l'app impedisce/segnala chiaramente lo spostamento di A in `in progress` finché B non è `done`
-5. Sposto i task tra colonne in drag & drop e lo stato persiste dopo un reload
-6. Allego un file a un task e lo riscarico, sia con storage locale sia cloud, cambiando solo la configurazione
-7. Da Claude Code, via MCP (stdio o HTTP) con token di progetto, eseguo tutte le stesse operazioni e le modifiche compaiono nella UI
-8. Login funziona, JWT protegge le route REST, ogni progetto ha token MCP dedicati e revocabili
-9. Vedo una board aggregata con i task di tutti i progetti
-10. La UI è usabile da smartphone (board scrollabile, form leggibili)
-11. Il progetto parte in locale con un solo comando e i dati sopravvivono al riavvio
+3. Dichiaro che A è bloccato da B; l'app impedisce/segnala chiaramente lo spostamento di A in `in progress` finché B non è `done`
+4. Sposto i task tra colonne in drag & drop e lo stato persiste dopo un reload
+5. Allego un file a un task e lo riscarico, sia con storage locale sia cloud, cambiando solo la configurazione
+6. Da Claude Code, via MCP (stdio o HTTP) con token di progetto, eseguo tutte le stesse operazioni e le modifiche compaiono nella UI
+7. Login funziona, JWT protegge le route REST, ogni progetto ha token MCP dedicati e revocabili
+8. Vedo una board aggregata con i task di tutti i progetti
+9. La UI è usabile da smartphone (board scrollabile, form leggibili)
+10. Il progetto parte in locale con un solo comando e i dati sopravvivono al riavvio

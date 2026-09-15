@@ -11,8 +11,6 @@ import {
   getTask,
   updateTask,
   deleteTask,
-  createSubtask,
-  listSubtasks,
   moveTask,
   addDependency,
   removeDependency,
@@ -66,7 +64,7 @@ describe("taskService — progetti", () => {
   });
 });
 
-describe("taskService — task/subtask CRUD", () => {
+describe("taskService — task CRUD", () => {
   it("crea un task con default corretti", async () => {
     const project = await setupProject();
     const task = await createTask(project.id, { title: "Fare qualcosa" });
@@ -102,52 +100,26 @@ describe("taskService — task/subtask CRUD", () => {
     await expect(updateTask("inesistente", { title: "x" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("crea e lista subtask", async () => {
+  it("getTask include blockedBy/blocking, conteggi", async () => {
     const project = await setupProject();
-    const parent = await createTask(project.id, { title: "Padre" });
-    const child = await createSubtask(parent.id, { title: "Figlio" });
-    expect(child.parentTaskId).toBe(parent.id);
+    const task = await createTask(project.id, { title: "Task" });
+    await addComment(task.id, "Un commento");
 
-    const subtasks = await listSubtasks(parent.id);
-    expect(subtasks).toHaveLength(1);
-    expect(subtasks[0].id).toBe(child.id);
-  });
-
-  it("getTask include subtaskProgress, blockedBy/blocking, conteggi", async () => {
-    const project = await setupProject();
-    const parent = await createTask(project.id, { title: "Padre" });
-    const child = await createSubtask(parent.id, { title: "Figlio" });
-    await moveTask(child.id, "done");
-    await addComment(parent.id, "Un commento");
-
-    const detail = await getTask(parent.id);
-    expect(detail.subtaskProgress).toEqual({ done: 1, total: 1 });
+    const detail = await getTask(task.id);
     expect(detail.commentsCount).toBe(1);
     expect(detail.attachmentsCount).toBe(0);
     expect(detail.blockedBy).toEqual([]);
     expect(detail.blocking).toEqual([]);
   });
-
-  it("parentTaskId di altro progetto è rifiutato con VALIDATION_ERROR", async () => {
-    const projectA = await setupProject("A");
-    const projectB = await setupProject("B");
-    const taskInB = await createTask(projectB.id, { title: "In B" });
-    await expect(
-      createTask(projectA.id, { title: "In A", parentTaskId: taskInB.id })
-    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
-  });
 });
 
 describe("taskService — cascade delete", () => {
-  it("cancella task, subtask annidati, commenti, allegati e dipendenze", async () => {
+  it("cancella task, commenti, allegati e dipendenze", async () => {
     const project = await setupProject();
     const root = await createTask(project.id, { title: "Root" });
-    const child = await createSubtask(root.id, { title: "Child" });
-    const grandchild = await createSubtask(child.id, { title: "Grandchild" });
 
     await addComment(root.id, "commento root");
-    await addComment(grandchild.id, "commento grandchild");
-    await createAttachment(grandchild.id, {
+    await createAttachment(root.id, {
       fileName: "note.txt",
       mimeType: "text/plain",
       buffer: Buffer.from("contenuto"),
@@ -156,32 +128,25 @@ describe("taskService — cascade delete", () => {
     const other = await createTask(project.id, { title: "Altro task" });
     await addDependency(other.id, root.id); // other bloccato da root
 
-    const blockerOfGrandchild = await createTask(project.id, { title: "Blocker" });
-    await addDependency(grandchild.id, blockerOfGrandchild.id);
-
     const result = await deleteTask(root.id);
     expect(result).toEqual({ id: root.id, deleted: true });
 
     await expect(getTask(root.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(getTask(child.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
-    await expect(getTask(grandchild.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-    const remainingComments = await prisma.comment.findMany({ where: { taskId: { in: [root.id, grandchild.id] } } });
+    const remainingComments = await prisma.comment.findMany({ where: { taskId: root.id } });
     expect(remainingComments).toHaveLength(0);
 
-    const remainingAttachments = await prisma.attachment.findMany({ where: { taskId: grandchild.id } });
+    const remainingAttachments = await prisma.attachment.findMany({ where: { taskId: root.id } });
     expect(remainingAttachments).toHaveLength(0);
 
     const remainingDeps = await prisma.taskDependency.findMany({
-      where: { OR: [{ taskId: other.id }, { blockedByTaskId: root.id }, { taskId: grandchild.id }] },
+      where: { OR: [{ taskId: other.id }, { blockedByTaskId: root.id }] },
     });
     expect(remainingDeps).toHaveLength(0);
 
-    // Il task "other" e "blockerOfGrandchild" (fuori dall'albero cancellato) devono sopravvivere.
+    // Il task "other" (fuori dal task cancellato) deve sopravvivere.
     const survivingOther = await getTask(other.id);
     expect(survivingOther).toBeDefined();
-    const survivingBlocker = await getTask(blockerOfGrandchild.id);
-    expect(survivingBlocker).toBeDefined();
   });
 });
 

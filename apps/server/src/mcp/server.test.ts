@@ -134,19 +134,6 @@ describe("createProjectMcpServer — tool scoping e domain errors", () => {
     expect(parseToolResult(result).error.code).toBe("FORBIDDEN");
   });
 
-  it("add_subtask/list_subtasks operano correttamente nel progetto scoped", async () => {
-    const parent = await createTask(projectA.id, { title: "Padre" });
-    const created = await clientA.callTool({
-      name: "add_subtask",
-      arguments: { parentTaskId: parent.id, title: "Figlio" },
-    });
-    const subtask = parseToolResult(created);
-    expect(subtask.parentTaskId).toBe(parent.id);
-
-    const listed = await clientA.callTool({ name: "list_subtasks", arguments: { parentTaskId: parent.id } });
-    expect(parseToolResult(listed)).toHaveLength(1);
-  });
-
   it("add_comment/list_comments funzionano e FORBIDDEN su task di altro progetto", async () => {
     const a = await createTask(projectA.id, { title: "A" });
     const added = await clientA.callTool({ name: "add_comment", arguments: { taskId: a.id, body: "ciao" } });

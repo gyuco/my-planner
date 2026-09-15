@@ -6,7 +6,6 @@ import {
   ApiRequestError,
   addComment,
   addDependency,
-  createSubtask,
   deleteAttachment,
   downloadAttachment,
   getTask,
@@ -31,7 +30,7 @@ interface TaskDrawerProps {
   taskId: string;
   projectId: string;
   onClose: () => void;
-  /** Chiamato dopo modifiche rilevanti (stato subtask, dipendenze) per rifare il refresh della board. */
+  /** Chiamato dopo modifiche rilevanti (stato task, dipendenze) per rifare il refresh della board. */
   onChanged: () => void;
 }
 
@@ -53,7 +52,6 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
   const [tagsInput, setTagsInput] = useState("");
   const [dueDate, setDueDate] = useState("");
 
-  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -136,29 +134,6 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
       }
     } finally {
       setChangingStatus(false);
-    }
-  }
-
-  async function handleToggleSubtaskDone(subtaskId: string, done: boolean) {
-    try {
-      await moveTask(subtaskId, done ? "done" : "draft");
-      await load();
-      onChanged();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante l'aggiornamento del subtask");
-    }
-  }
-
-  async function handleAddSubtask(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newSubtaskTitle.trim()) return;
-    try {
-      await createSubtask(taskId, { title: newSubtaskTitle.trim() });
-      setNewSubtaskTitle("");
-      await load();
-      onChanged();
-    } catch (err) {
-      setError(err instanceof ApiRequestError ? err.message : "Errore durante la creazione del subtask");
     }
   }
 
@@ -366,33 +341,6 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
               <button type="button" className="drawer-save-button" onClick={saveFields}>
                 Salva
               </button>
-            </section>
-
-            <section className="drawer-section">
-              <h3>Subtask</h3>
-              <ul className="drawer-list">
-                {(task.subtasks ?? []).map((s) => (
-                  <li key={s.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={s.status === "done"}
-                        onChange={(e) => handleToggleSubtaskDone(s.id, e.target.checked)}
-                      />
-                      {s.title}
-                    </label>
-                  </li>
-                ))}
-                {(task.subtasks ?? []).length === 0 && <li className="drawer-empty">Nessun subtask</li>}
-              </ul>
-              <form onSubmit={handleAddSubtask} className="drawer-inline-form">
-                <input
-                  placeholder="Nuovo subtask"
-                  value={newSubtaskTitle}
-                  onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                />
-                <button type="submit">Aggiungi</button>
-              </form>
             </section>
 
             <section className="drawer-section">

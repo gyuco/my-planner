@@ -19,7 +19,6 @@ export const taskFiltersQuerySchema = z.object({
   priority: taskPrioritySchema.optional(),
   tag: z.string().optional(),
   search: z.string().optional(),
-  includeSubtasks: z.string().optional(),
 });
 
 export const boardFiltersQuerySchema = z.object({
@@ -39,7 +38,6 @@ export const taskInputSchema = z.object({
   complexity: complexitySchema,
   tags: z.array(z.string()).optional(),
   dueDate: z.string().datetime().nullable().optional(),
-  parentTaskId: z.string().nullable().optional(),
 });
 
 export const taskUpdateInputSchema = z.object({

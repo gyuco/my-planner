@@ -22,7 +22,6 @@ export interface Project {
 export interface Task {
   id: string;
   projectId: string;
-  parentTaskId: string | null;
   title: string;
   description: string;
   status: TaskStatus;
@@ -33,10 +32,8 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
   projectName?: string;
-  subtaskProgress?: { done: number; total: number };
   blockedByOpenCount?: number;
   // Presenti solo su GET /tasks/:taskId (dettaglio esteso, vedi API_CONTRACT.md §4)
-  subtasks?: Task[];
   blockedBy?: TaskDependency[];
   blocking?: TaskDependency[];
   commentsCount?: number;

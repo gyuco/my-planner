@@ -2,11 +2,13 @@
 
 Generato dal `planner` a partire da `prd.md`. Priorità: low/medium/high/urgent. Complessità: Fibonacci (1,2,3,5,8,13,21).
 
+> **Nota (2026-09-15):** il concetto di "subtask" (gerarchia padre/figlio tra task) è stato rimosso dal prodotto su richiesta esplicita dell'utente. I riferimenti a subtask nei task già completati sotto restano come cronologia dell'implementazione originale ma non riflettono più lo stato attuale del codice (vedi `prd.md` e `API_CONTRACT.md` aggiornati).
+
 Decisioni chiuse durante la revisione del backlog (già integrate in `prd.md`):
 - `get_aggregated_board` **non** esposto via MCP — solo `get_board` scoped al token di progetto
 - Utente unico creato al bootstrap da variabili d'ambiente, nessuna registrazione
 - JWT a lunga scadenza (~30gg), nessun refresh token
-- Cancellare un task fa cascade su subtask/commenti/allegati/dipendenze
+- Cancellare un task fa cascade su commenti/allegati/dipendenze
 - Allegati: max 20MB, tipi comuni (immagini, PDF, Office, testo/markdown, zip)
 - Ricerca testuale: titolo + descrizione, case-insensitive
 - Formato esatto di endpoint/schemi REST e MCP: da fissare da `architect` prima dell'implementazione di B6-B8 e B14-B15
@@ -33,18 +35,18 @@ App Fastify base: plugin, error handler globale, logging, CORS, config da `.env`
 - Subtask: hashing/verifica password · generazione/validazione JWT · middleware `preHandler` · bootstrap utente da env
 
 ### B5 — Service layer condiviso (business logic)
-CRUD progetti/task/subtask/commenti/dipendenze, calcolo avanzamento subtask, validazione transizioni di stato, validazione dipendenze (rifiuto cicli), cascade su delete.
+CRUD progetti/task/commenti/dipendenze, validazione transizioni di stato, validazione dipendenze (rifiuto cicli), cascade su delete.
 - Priorità: urgent · Complessità: 8 · Dipendenze: B2
-- Subtask: service Progetti · service Task · service Subtask · service Dipendenze (cicli + blocco transizione) · service Commenti
+- Subtask: service Progetti · service Task · service Dipendenze (cicli + blocco transizione) · service Commenti
 
 ### B6 — REST API Progetti
 `/projects`: list, create, update/rename, archive, unarchive.
 - Priorità: high · Complessità: 3 · Dipendenze: B4, B5
 
-### B7 — REST API Task, Subtask, Dipendenze, Commenti
-CRUD/move task, subtask, dipendenze (con errore esplicito su blocco/ciclo), commenti.
+### B7 — REST API Task, Dipendenze, Commenti
+CRUD/move task, dipendenze (con errore esplicito su blocco/ciclo), commenti.
 - Priorità: high · Complessità: 8 · Dipendenze: B5, B6
-- Subtask: Task CRUD+move con position · Subtask · Dipendenze · Commenti
+- Subtask: Task CRUD+move con position · Dipendenze · Commenti
 
 ### B8 — REST API Board (singola + aggregata) e filtri
 Board per progetto e board aggregata multi-progetto, filtri priorità/tag/progetto/ricerca testuale (titolo+descrizione).
@@ -74,8 +76,8 @@ Validazione token contro `ProjectToken`, risoluzione progetto, gestione token re
 `list_tasks, get_task, create_task, update_task, delete_task, move_task` (transizioni di stato libere in entrambe le direzioni, unico vincolo il blocco dipendenze per `in_progress`). **Nessun tool di gestione progetti via MCP** (resta solo REST/UI, come `get_aggregated_board`).
 - Priorità: high · Complessità: 5 · Dipendenze: B5, B13
 
-### B15 — Server MCP: tool Subtask, Dipendenze, Commenti, Allegati, Board
-`add_subtask, list_subtasks, update_subtask, add_dependency, remove_dependency, list_blockers, add_comment, list_comments, list_attachments, attach_file, get_attachment_url, get_board`. **Nessun `get_aggregated_board` via MCP.**
+### B15 — Server MCP: tool Dipendenze, Commenti, Allegati, Board
+`add_dependency, remove_dependency, list_blockers, add_comment, list_comments, list_attachments, attach_file, get_attachment_url, get_board`. **Nessun `get_aggregated_board` via MCP.**
 - Priorità: high · Complessità: 8 · Dipendenze: B14, B11
 
 ### B16 — Transport MCP stdio
@@ -87,7 +89,7 @@ Endpoint `/mcp`, `Authorization: Bearer <token>`.
 - Priorità: high · Complessità: 3 · Dipendenze: B14
 
 ### B18 — Validazione dipendenze circolari e regole di stato (hardening)
-Rifiuto cicli (anche indiretti), messaggi di errore consistenti REST/MCP, cascade delete corretto su subtask/dipendenze/allegati orfani.
+Rifiuto cicli (anche indiretti), messaggi di errore consistenti REST/MCP, cascade delete corretto su dipendenze/allegati orfani.
 - Priorità: high · Complessità: 5 · Dipendenze: B5, B7, B15
 
 ---
@@ -112,7 +114,7 @@ Lista progetti, selezione progetto corrente, navigazione board/vista aggregata, 
 - Subtask: rendering colonne/card · drag&drop+riordino · gestione errore di blocco
 
 ### F5 — Card task
-Badge priorità, complessità Fibonacci, tag, progress subtask, indicatore dipendenze bloccanti.
+Badge priorità, complessità Fibonacci, tag, indicatore dipendenze bloccanti.
 - Priorità: high · Complessità: 5 · Dipendenze: F4
 
 ### F6 — Modale creazione task
@@ -120,9 +122,9 @@ Titolo, descrizione markdown, priorità, complessità, tag, scadenza, progetto/c
 - Priorità: high · Complessità: 5 · Dipendenze: F3, B7
 
 ### F7 — Drawer dettaglio task
-Editing campi, subtask, dipendenze (bloccata da/blocca), commenti, allegati.
+Editing campi, dipendenze (bloccata da/blocca), commenti, allegati.
 - Priorità: urgent · Complessità: 13 · Dipendenze: F5, B7, B11
-- Subtask: campi principali · subtask · dipendenze · commenti · allegati
+- Subtask: campi principali · dipendenze · commenti · allegati
 
 ### F8 — Vista aggregata multi-progetto
 Board unica su progetti selezionati, card etichettate col progetto. (Solo UI/JWT, non disponibile via MCP.)
@@ -168,12 +170,12 @@ Migrazioni già presenti (`init`, `attachment_size`) create con `prisma migrate 
 ## TEST
 
 ### T1 — Unit Vitest: service layer e validazione zod
-`apps/server/src/services/taskService.ts` (progetti/task/subtask/dipendenze incl. cicli e blocco stato/commenti/board) e `attachmentService.ts`. Aggiunto: test degli schemi condivisi in `lib/validation.ts` (coerenza errori REST/MCP su input malformati).
+`apps/server/src/services/taskService.ts` (progetti/task/dipendenze incl. cicli e blocco stato/commenti/board) e `attachmentService.ts`. Aggiunto: test degli schemi condivisi in `lib/validation.ts` (coerenza errori REST/MCP su input malformati).
 - Priorità: high · Complessità: 5 · Dipendenze: B5
-- Subtask: service progetti/task/subtask · service dipendenze (cicli+blocco transizione) · service commenti · attachmentService · schemi zod (validation.ts)
+- Subtask: service progetti/task · service dipendenze (cicli+blocco transizione) · service commenti · attachmentService · schemi zod (validation.ts)
 
 ### T2 — Unit Vitest: tool MCP
-Testare `createProjectMcpServer` (`mcp/server.ts`) in-process: tool task/subtask/dipendenze/commenti/allegati/board, risoluzione token via `mcp/auth.ts` (auth fallita/token revocato), errore su blocco dipendenze. Più un test minimale di wiring per ciascun transport (`mcp/stdio.ts`, `mcp/http.ts`).
+Testare `createProjectMcpServer` (`mcp/server.ts`) in-process: tool task/dipendenze/commenti/allegati/board, risoluzione token via `mcp/auth.ts` (auth fallita/token revocato), errore su blocco dipendenze. Più un test minimale di wiring per ciascun transport (`mcp/stdio.ts`, `mcp/http.ts`).
 - Priorità: high · Complessità: 5 · Dipendenze: B14, B15, B16, B17
 
 ### T3 — Unit Vitest: storage allegati pluggabile
@@ -185,8 +187,8 @@ Nessuna configurazione Playwright esiste ancora in `apps/web`. Task include il b
 - Priorità: high · Complessità: 8 (rivista da 5, include setup Playwright) · Dipendenze: F2, F4, F6
 - Subtask: bootstrap Playwright (config, script npm/CI) · scenario login+board+creazione task · scenario drag&drop+persistenza
 
-### T5 — E2E Playwright: subtask, dipendenze, blocco stato
-Subtask con avanzamento (`TaskDrawer.tsx`), dipendenza A bloccato da B, verifica blocco/sblocco, incluso il controllo stato esplicito nel drawer (non solo drag&drop).
+### T5 — E2E Playwright: dipendenze, blocco stato
+Dipendenza A bloccato da B, verifica blocco/sblocco, incluso il controllo stato esplicito nel drawer (non solo drag&drop). (Rinominato da "T5 — subtask, dipendenze, blocco stato": la parte subtask è stata rimossa insieme alla feature, vedi nota a inizio file.)
 - Priorità: high · Complessità: 5 · Dipendenze: F7, T4
 
 ### T6 — E2E Playwright: allegati locale e S3
@@ -212,7 +214,6 @@ Board/drawer/form su viewport mobile (device emulation Playwright).
 Segnalato da `reviewer`, non bloccante per la v1, da rivedere in un secondo momento:
 - `remove_dependency` (MCP) verifica lo scoping progetto solo su `taskId`, non su `blockedByTaskId` (non sfruttabile in pratica, ma incoerente per difesa in profondità)
 - Gestione token MCP (`routes/projects.ts`) accede a Prisma direttamente invece che tramite un service dedicato, diversamente dal resto del dominio
-- Calcolo `position` di un nuovo task/subtask non è scoped per `parentTaskId` (concettualmente sporco, nessun bug visibile)
 - Nessun rate limiting su `/auth/login` (accettabile per utente singolo locale)
 - Magic-byte check sugli allegati è minimale (non rileva script testuali/macro Office/eseguibili in zip)
 
