@@ -7,5 +7,11 @@ build/
 *.db-journal
 apps/server/prisma/dev.db
 attachments/local/
+/data/
 .DS_Store
 *.tsbuildinfo
+apps/server/test-tmp/
+test-results/
+apps/web/playwright-report/
+apps/web/test-results/
+apps/web/.playwright/
