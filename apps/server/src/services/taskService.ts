@@ -1,5 +1,6 @@
 import { ApiErrorException, FIBONACCI_COMPLEXITY, type TaskComplexity } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -144,7 +145,7 @@ function validateComplexity(complexity: unknown) {
   }
 }
 
-async function getTaskOrThrow(taskId: string) {
+export async function getTaskOrThrow(taskId: string) {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
   return task;
@@ -286,6 +287,12 @@ export async function deleteTask(taskId: string) {
     frontier.forEach((id) => toDelete.add(id));
   }
   const ids = Array.from(toDelete);
+
+  // Elimina prima i file fisici/oggetti S3 (best-effort, vedi
+  // AttachmentStorage.delete), poi i record DB in cascade.
+  const attachments = await prisma.attachment.findMany({ where: { taskId: { in: ids } } });
+  const storage = getAttachmentStorage();
+  await Promise.all(attachments.map((a) => storage.delete(a.storageRef).catch(() => {})));
 
   await prisma.$transaction([
     prisma.comment.deleteMany({ where: { taskId: { in: ids } } }),

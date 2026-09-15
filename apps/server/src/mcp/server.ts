@@ -18,6 +18,7 @@ import {
   addComment,
   listComments,
 } from "../services/taskService.js";
+import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
 
 const complexitySchema = z
   .union([
@@ -245,6 +246,45 @@ export function createProjectMcpServer(projectId: string) {
       await assertTaskInProject(taskId);
       return listComments(taskId);
     })
+  );
+
+  // --- Allegati ----------------------------------------------------------
+
+  server.tool("list_attachments", "Elenca gli allegati di taskId", { taskId: z.string() }, async ({ taskId }) =>
+    withErrors(async () => {
+      await assertTaskInProject(taskId);
+      return listAttachments(taskId);
+    })
+  );
+
+  server.tool(
+    "attach_file",
+    "Allega un file a taskId; il contenuto va passato come base64 inline (limite 20MB sul contenuto decodificato)",
+    {
+      taskId: z.string(),
+      fileName: z.string(),
+      mimeType: z.string(),
+      contentBase64: z.string(),
+    },
+    async ({ taskId, fileName, mimeType, contentBase64 }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        const buffer = Buffer.from(contentBase64, "base64");
+        return createAttachment(taskId, { fileName, mimeType, buffer });
+      })
+  );
+
+  server.tool(
+    "get_attachment_url",
+    "Restituisce l'URL di download per un allegato (autenticato con lo stesso token MCP del progetto)",
+    { attachmentId: z.string() },
+    async ({ attachmentId }) =>
+      withErrors(async () => {
+        const attachment = await getAttachmentOrThrow(attachmentId);
+        const task = await assertTaskInProject(attachment.taskId);
+        void task;
+        return getAttachmentUrl(attachmentId);
+      })
   );
 
   // --- Board -----------------------------------------------------------------

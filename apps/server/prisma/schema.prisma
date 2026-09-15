@@ -84,6 +84,7 @@ model Attachment {
   task            Task   @relation(fields: [taskId], references: [id])
   fileName        String
   mimeType        String
+  size            Int      @default(0)
   storageBackend  String // local | s3
   storageRef      String
   createdAt       DateTime @default(now())

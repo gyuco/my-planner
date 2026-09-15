@@ -17,6 +17,12 @@ S3_ENDPOINT=
 S3_BUCKET=
 S3_ACCESS_KEY_ID=
 S3_SECRET_ACCESS_KEY=
+S3_REGION=us-east-1
+
+# Base URL pubblico del server MCP HTTP, usato per costruire l'URL di
+# download allegati (backend locale) restituito da get_attachment_url.
+# Default: http://localhost:<MCP_HTTP_PORT>
+MCP_HTTP_BASE_URL=http://localhost:3100
 
 # Solo per apps/server/src/mcp/stdio.ts
 MCP_PROJECT_TOKEN=

@@ -1,11 +1,14 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import jwt from "@fastify/jwt";
+import multipart from "@fastify/multipart";
 import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-planner/core";
 import { authRoutes, bootstrapUser } from "./routes/auth.js";
 import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { boardRoutes } from "./routes/board.js";
+import { attachmentRoutes } from "./routes/attachments.js";
+import { MAX_ATTACHMENT_SIZE_BYTES } from "./services/attachmentService.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -16,6 +19,13 @@ declare module "fastify" {
 const app = Fastify({ logger: true });
 
 app.register(jwt, { secret: process.env.JWT_SECRET ?? "dev-secret-change-me" });
+
+// Limite fastify-multipart volutamente più alto del limite applicativo
+// (MAX_ATTACHMENT_SIZE_BYTES, 20MB) cosi' che sia il service layer
+// (attachmentService.validateAttachment) a restituire l'errore tipizzato
+// ATTACHMENT_TOO_LARGE, condiviso con MCP, invece di un errore generico
+// di fastify-multipart.
+app.register(multipart, { limits: { fileSize: MAX_ATTACHMENT_SIZE_BYTES + 1024 * 1024 } });
 
 app.decorate("authenticate", async function (req: any, reply: any) {
   try {
@@ -42,6 +52,7 @@ app.register(authRoutes);
 app.register(projectRoutes);
 app.register(taskRoutes);
 app.register(boardRoutes);
+app.register(attachmentRoutes);
 
 const port = Number(process.env.PORT ?? 3000);
 

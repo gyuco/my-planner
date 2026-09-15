@@ -44,8 +44,10 @@ export interface Attachment {
   taskId: string;
   fileName: string;
   mimeType: string;
+  size: number;
   storageBackend: "local" | "s3";
   storageRef: string;
+  createdAt: string;
 }
 
 export interface ProjectToken {
