@@ -95,12 +95,16 @@ On brownfield, most of this was inferred in Step 1b — present those inferences
 
 Summarize the technical decisions (destined for `docs/architecture.md`, with any contested choice as an ADR in `docs/decisions/`) and ask me to confirm before continuing.
 
-## STEP 4 — Roles, self-improving skills, integrations, workflow states
+## STEP 4 — Roles, skills, escalation, integrations, and the workflow itself
 Propose the following, and ask for my explicit confirmation on each item before creating anything.
 
 **4a. Process roles** — tool-agnostic role descriptions in plain markdown (`docs/roles/<role>.md`), not vendor agent configs: analyst, architect, scrum-master, coder, reviewer, dev-ops. Each role doc states its responsibilities, its inputs/outputs, and which skills it owns.
 
 **4b. Baseline skills (pre-seeded, mandatory)** — some behaviour must be standardized from day one, not learned by accident. Propose creating these skill files immediately, filled in with the Git and delivery conventions confirmed in Step 3, using the same schema as 4c. They are the default operating procedure for their role; deviating from one requires saying so explicitly.
+
+- `analyst/refine-requirements` — **Trigger**: a new feature, change request, or an unclear area of `prd.md` enters the pipeline. **Procedure**: restate the requirement in terms of the problem it solves and for whom; derive acceptance criteria that are independently testable and observable; identify affected areas using the code index; list open questions and contradictions with `prd.md` explicitly. **A blocking ambiguity is a question to me, never an assumption** — stop and ask.
+- `architect/technical-decisions` — **Trigger**: refined requirements imply a choice not already settled in `docs/architecture.md` or the ADRs. **Procedure**: make the decisions that must exist *before* work can be decomposed (data model, API/interface contracts, integration points, migration impact); record each as an ADR with context, options considered, and consequences; flag anything that invalidates an existing decision. Decisions that only emerge during implementation are not forced here — but nothing gets decomposed on top of an unmade one.
+- `analyst/decompose-to-backlog` — **Trigger**: requirements are refined and the architectural decisions they depend on exist. **Procedure**: break the work into tasks **created directly in the external tracker** (never in a local file); each task carries its acceptance criteria, priority, a size estimate, and its dependencies on other tasks; sequence them so dependencies are respected; keep tasks small enough to complete in one working session, splitting anything larger. This skill is the **entry point of the whole workflow** — every task the coder later picks up originates here.
 
 - `coder/start-of-work` — **Trigger**: a task moves to "in progress". **Procedure**: confirm the task id and acceptance criteria from the external tracker; ensure a clean working tree (no uncommitted leftovers from a previous task); sync the integration branch (fetch + fast-forward `develop`/`main` as confirmed); create the branch using the agreed naming convention including the ticket id; consult `docs/skills/INDEX.md` for skills relevant to the task area; confirm the tracker item is actually in the working state.
 - `coder/end-of-work` — **Trigger**: implementation is complete and tests pass locally. **Procedure**: run the project's test and lint commands; review your own diff before staging; stage deliberately and verify nothing secret or unrelated is included; commit using the agreed message convention referencing the ticket id; push the branch; open a PR against the integration branch, with a body linking the tracker item and listing what changed and how it was verified; move the tracker item to the review state; hand off to the reviewer.
@@ -108,7 +112,17 @@ Propose the following, and ask for my explicit confirmation on each item before 
 - `scrum-master/state-sync` — **Trigger**: any status change in the external tracker. **Procedure**: verify the transition is legal under the status model in 4e, that its Definition of Done is met, and that the work is reflected where it should be; flag stalled or skipped transitions.
 - `dev-ops/release` — **Trigger**: changes reach the integration branch and a release is intended. **Procedure**: as confirmed in Step 3 (versioning, tagging, migrations, deploy, rollback). Propose a placeholder to be filled in if release details are still undecided.
 
-Ask me to confirm, adjust, or drop each baseline skill. On the fast lane, `dev-ops/release` and `scrum-master/state-sync` may be folded into the other files, but `coder/start-of-work`, `coder/end-of-work` and `reviewer/review-and-merge` remain.
+Ask me to confirm, adjust, or drop each baseline skill. On the fast lane, `dev-ops/release` and `scrum-master/state-sync` may be folded into the other files, and the three analysis skills may collapse into a single `decompose-to-backlog`; but `coder/start-of-work`, `coder/end-of-work`, `reviewer/review-and-merge` and an entry point into the backlog always remain.
+
+**4b-bis. Stop conditions and escalation (applies to every role)** — autonomy without a brake burns tokens and causes damage. State these once, in `AGENTS.md`, as binding on all roles: **stop and ask me rather than guess** when any of these holds.
+- Acceptance criteria are ambiguous, contradictory, or conflict with `prd.md` or an existing ADR.
+- The task requires a decision not covered by `docs/architecture.md` or the ADRs — escalate to the architect role, or to me if it changes product scope.
+- Tests or checks still fail after a small number of genuine attempts (agree the number with me) — report what was tried and what the failure actually is, instead of trying variations indefinitely.
+- The work needs an irreversible or destructive action: force push, history rewrite, deleting branches or data, data migrations, touching secrets, production or infrastructure changes.
+- Scope is growing beyond the ticket — split it back to the backlog rather than quietly expanding the change.
+- A precondition of the workflow is missing: no tracker item, no acceptance criteria, a dirty working tree, or a stale skill whose preconditions no longer hold.
+
+When stopping, state what was attempted, what blocks it, and the options as you see them — a bare "I'm blocked" is not an escalation.
 
 **4c. Self-improving skill system** — this is a closed loop, not an aspiration. Propose:
 - **Storage**: `docs/skills/<role>/<skill>.md`, portable markdown, no tool-specific format.
@@ -138,7 +152,13 @@ Ask before configuring any of them.
 
 **4e. Workflow states & Definition of Done** — agree an explicit status model mapped onto the chosen external tracker's real statuses (e.g. draft → in progress → done, or whatever that tool uses), with a written Definition of Done per status in `docs/roles/scrum-master.md`. Status changes in the external tracker are communicated to the scrum-master role — via that tool's webhook, notification, or MCP mechanism — so the workflow stays in sync.
 
+**4f. The workflow document** — the skill files are each role's operating instructions; nobody can read the flow as a whole from them. Propose a single `docs/workflow.md` giving the end-to-end lifecycle in one readable page, short enough to be read in under a minute:
+- A **transition table**: for each step of the lifecycle — from requirement to analysis, decomposition into the backlog, implementation, review, merge, release, and the retro that feeds 4c — give the *from → to* states, who triggers it, which skill executes it, and the Definition of Done that must hold for it to be legitimate.
+- A statement of what is never skipped, and what "done" is not: a change is not done because it compiles, because types check, or because an ad-hoc manual test worked — it is done when its acceptance criteria are verified and the agreed review has happened.
+- A pointer to the skills for the detail, so this document stays the map and never duplicates the procedures.
+`AGENTS.md` links to it as the entry point for anyone — human or agent — opening the repo for the first time. Keep it generated from the decisions already confirmed in 4a–4e: if it says something those files do not, one of the two is wrong.
+
 ## STEP 5 — Final manifest and single go-ahead
-Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore` — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Mark each as created, modified, or left untouched, and never list an existing file as a full rewrite — existing files are amended in place. Then ask for one final explicit go-ahead.
+Before writing anything to disk, list **every** file you intend to create or modify, with a one-line purpose each (expected: `AGENTS.md`, `prd.md`, `docs/architecture.md`, `docs/roles/*.md`, `docs/skills/INDEX.md`, `docs/workflow.md`, `docs/decisions/*.md`, `docs/project-init.md`, `.env.example`, `.gitignore` — on the fast lane: `docs/roles.md` and `docs/decisions.md` as single files, and `docs/project-init.md` only if proposed). Mark each as created, modified, or left untouched, and never list an existing file as a full rewrite — existing files are amended in place. Then ask for one final explicit go-ahead.
 
 **Do not create any file or run any command until I have confirmed each step and given the final go-ahead in Step 5.**
