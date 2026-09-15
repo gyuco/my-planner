@@ -56,3 +56,10 @@ I token si generano/revocano dalla UI, uno per progetto.
 
 Definiti in `.claude/agents/`: `analyst`, `architect`, `planner`, `coder`, `reviewer`, `dev-ops`.
 Il `planner` è notificato di ogni cambio di stato dei task (`draft → in_progress → done`) e verifica le dipendenze bloccanti.
+
+## Inizializzazione di nuovi progetti
+
+Il prompt generico per inizializzare il workflow di un progetto (qualsiasi
+progetto, qualsiasi CLI AI) vive in un repo a parte, per non divergere:
+<https://github.com/gyuco/dev-workflow> —
+`https://raw.githubusercontent.com/gyuco/dev-workflow/main/prompts/project-init.md`
