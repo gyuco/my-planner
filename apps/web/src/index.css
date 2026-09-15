@@ -248,6 +248,12 @@ body.dnd-dragging * {
   user-select: none !important;
 }
 
+/* Card mostrata dentro il DragOverlay: segue il cursore durante il drag. */
+.task-card-dragging {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  cursor: grabbing;
+}
+
 .task-card-badges {
   display: flex;
   gap: 0.35rem;

@@ -1,11 +1,13 @@
 import { useState } from "react";
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   closestCenter,
   useDroppable,
   useSensor,
   useSensors,
+  type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
@@ -100,23 +102,35 @@ function Column({ status, label, tasks, showProject, onTaskClick }: ColumnProps)
   );
 }
 
+function findTaskById(board: Board, id: string): BoardTask | undefined {
+  for (const status of COLUMNS.map((c) => c.status)) {
+    const found = (board[status] as BoardTask[]).find((t) => t.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
   const [dragError, setDragError] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<BoardTask | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  function handleDragStart() {
+  function handleDragStart(event: DragStartEvent) {
     document.body.classList.add("dnd-dragging");
+    setActiveTask(findTaskById(board, String(event.active.id)) ?? null);
   }
 
   function handleDragCancel() {
     document.body.classList.remove("dnd-dragging");
+    setActiveTask(null);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     document.body.classList.remove("dnd-dragging");
+    setActiveTask(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -185,6 +199,9 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
             />
           ))}
         </div>
+        <DragOverlay>
+          {activeTask && <TaskCard task={activeTask} showProject={showProject} isDragging />}
+        </DragOverlay>
       </DndContext>
     </div>
   );
