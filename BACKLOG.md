@@ -199,3 +199,14 @@ Board aggregata multi-progetto, creazione/revoca token, verifica che token revoc
 ### T9 — E2E Playwright: responsive mobile
 Board/drawer/form su viewport mobile (device emulation).
 - Priorità: low · Complessità: 3 · Dipendenze: F12
+
+---
+
+## Debito tecnico noto (da review B1-B18)
+
+Segnalato da `reviewer`, non bloccante per la v1, da rivedere in un secondo momento:
+- `remove_dependency` (MCP) verifica lo scoping progetto solo su `taskId`, non su `blockedByTaskId` (non sfruttabile in pratica, ma incoerente per difesa in profondità)
+- Gestione token MCP (`routes/projects.ts`) accede a Prisma direttamente invece che tramite un service dedicato, diversamente dal resto del dominio
+- Calcolo `position` di un nuovo task/subtask non è scoped per `parentTaskId` (concettualmente sporco, nessun bug visibile)
+- Nessun rate limiting su `/auth/login` (accettabile per utente singolo locale)
+- Magic-byte check sugli allegati è minimale (non rileva script testuali/macro Office/eseguibili in zip)
