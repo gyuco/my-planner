@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createProjectMcpServer } from "./server.js";

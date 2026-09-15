@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createProjectMcpServer } from "./server.js";
 import { resolveProjectFromToken } from "./auth.js";

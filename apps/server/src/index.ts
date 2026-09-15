@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import jwt from "@fastify/jwt";
 import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-planner/core";
