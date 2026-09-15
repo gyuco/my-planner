@@ -14,14 +14,22 @@ import {
   addComment,
   listComments,
 } from "../services/taskService.js";
+import {
+  taskFiltersQuerySchema,
+  taskInputSchema,
+  taskUpdateInputSchema,
+  moveTaskInputSchema,
+  dependencyInputSchema,
+  commentInputSchema,
+} from "../lib/validation.js";
 
 export async function taskRoutes(app: FastifyInstance) {
   app.get("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
-    const { status, priority, tag, search, includeSubtasks } = req.query as Record<string, string | undefined>;
+    const { status, priority, tag, search, includeSubtasks } = taskFiltersQuerySchema.parse(req.query ?? {});
     return listTasks(projectId, {
-      status: status as any,
-      priority: priority as any,
+      status,
+      priority,
       tag,
       search,
       includeSubtasks: includeSubtasks === "true",
@@ -30,7 +38,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
-    const body = (req.body ?? {}) as any;
+    const body = taskInputSchema.parse(req.body ?? {});
     const task = await createTask(projectId, body);
     return reply.code(201).send(task);
   });
@@ -42,7 +50,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.patch("/tasks/:taskId", { onRequest: [app.authenticate] }, async (req) => {
     const { taskId } = req.params as { taskId: string };
-    const body = (req.body ?? {}) as any;
+    const body = taskUpdateInputSchema.parse(req.body ?? {});
     return updateTask(taskId, body);
   });
 
@@ -53,7 +61,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.post("/tasks/:taskId/move", { onRequest: [app.authenticate] }, async (req) => {
     const { taskId } = req.params as { taskId: string };
-    const { status, position } = (req.body ?? {}) as { status: "draft" | "in_progress" | "done"; position?: number };
+    const { status, position } = moveTaskInputSchema.parse(req.body ?? {});
     return moveTask(taskId, status, position);
   });
 
@@ -61,7 +69,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.post("/tasks/:taskId/subtasks", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { taskId } = req.params as { taskId: string };
-    const body = (req.body ?? {}) as any;
+    const body = taskInputSchema.parse(req.body ?? {});
     const subtask = await createSubtask(taskId, body);
     return reply.code(201).send(subtask);
   });
@@ -73,7 +81,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.patch("/subtasks/:subtaskId", { onRequest: [app.authenticate] }, async (req) => {
     const { subtaskId } = req.params as { subtaskId: string };
-    const body = (req.body ?? {}) as any;
+    const body = taskUpdateInputSchema.parse(req.body ?? {});
     return updateTask(subtaskId, body);
   });
 
@@ -81,7 +89,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.post("/tasks/:taskId/dependencies", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { taskId } = req.params as { taskId: string };
-    const { blockedByTaskId } = (req.body ?? {}) as { blockedByTaskId: string };
+    const { blockedByTaskId } = dependencyInputSchema.parse(req.body ?? {});
     const dep = await addDependency(taskId, blockedByTaskId);
     return reply.code(201).send(dep);
   });
@@ -100,7 +108,7 @@ export async function taskRoutes(app: FastifyInstance) {
 
   app.post("/tasks/:taskId/comments", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { taskId } = req.params as { taskId: string };
-    const { body } = (req.body ?? {}) as { body: string };
+    const { body } = commentInputSchema.parse(req.body ?? {});
     const comment = await addComment(taskId, body);
     return reply.code(201).send(comment);
   });

@@ -24,6 +24,7 @@
     "fastify": "^4.28.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^16.4.5",
+    "zod": "^4.6.5",
     "@my-planner/core": "0.1.0"
   },
   "devDependencies": {

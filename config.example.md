@@ -4,6 +4,9 @@ Copia questi valori in un file `.env` locale (non committare mai `.env`):
 
 ```
 DATABASE_URL="file:./dev.db"
+# Obbligatorio: il server si rifiuta di avviarsi se JWT_SECRET non e'
+# impostato (nessun fallback insicuro). Usa un valore lungo e casuale in
+# produzione, es. `openssl rand -hex 32`.
 JWT_SECRET="change-me-in-production"
 PORT=3000
 MCP_HTTP_PORT=3100

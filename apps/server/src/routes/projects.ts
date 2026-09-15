@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { listProjects, createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
+import { projectNameInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 
 export async function projectRoutes(app: FastifyInstance) {
   app.get("/projects", { onRequest: [app.authenticate] }, async (req) => {
@@ -12,15 +13,15 @@ export async function projectRoutes(app: FastifyInstance) {
   });
 
   app.post("/projects", { onRequest: [app.authenticate] }, async (req, reply) => {
-    const { name } = (req.body ?? {}) as { name?: string };
-    const project = await createProject(name ?? "");
+    const { name } = projectNameInputSchema.parse(req.body ?? {});
+    const project = await createProject(name);
     return reply.code(201).send(project);
   });
 
   app.patch("/projects/:projectId", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
-    const { name } = (req.body ?? {}) as { name?: string };
-    return renameProject(projectId, name ?? "");
+    const { name } = projectNameInputSchema.parse(req.body ?? {});
+    return renameProject(projectId, name);
   });
 
   app.post("/projects/:projectId/archive", { onRequest: [app.authenticate] }, async (req) => {
@@ -37,7 +38,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/tokens", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
-    const { label } = (req.body ?? {}) as { label?: string };
+    const { label } = projectTokenInputSchema.parse(req.body ?? {});
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return reply.code(404).send(apiError("NOT_FOUND", "Progetto non trovato"));
 
