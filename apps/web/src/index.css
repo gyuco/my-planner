@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f7; }
+
+.board {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.column {
+  flex: 1 1 260px;
+  min-width: 240px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+
+.column h2 {
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.card {
+  background: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+@media (max-width: 600px) {
+  .board { flex-direction: column; }
+  .column { min-width: 0; }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@my-planner/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "mcp:stdio": "tsx src/mcp/stdio.ts",
+    "mcp:http": "tsx watch src/mcp/http.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@prisma/client": "^5.18.0",
+    "@fastify/jwt": "^8.0.0",
+    "fastify": "^4.28.0",
+    "bcryptjs": "^2.4.3",
+    "@my-planner/core": "0.1.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.18.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
