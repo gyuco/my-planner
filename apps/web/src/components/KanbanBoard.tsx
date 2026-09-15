@@ -107,7 +107,16 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  function handleDragStart() {
+    document.body.classList.add("dnd-dragging");
+  }
+
+  function handleDragCancel() {
+    document.body.classList.remove("dnd-dragging");
+  }
+
   async function handleDragEnd(event: DragEndEvent) {
+    document.body.classList.remove("dnd-dragging");
     const { active, over } = event;
     if (!over) return;
 
@@ -157,7 +166,13 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
           <button onClick={() => setDragError(null)}>&times;</button>
         </div>
       )}
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragCancel={handleDragCancel}
+        onDragEnd={handleDragEnd}
+      >
         <div className="board">
           {COLUMNS.map((col) => (
             <Column

@@ -236,6 +236,16 @@ body { margin: 0; font-family: system-ui, sans-serif; background: #f5f5f7; }
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  touch-action: none;
+}
+
+/* Durante un drag&drop dnd-kit non blocca il cursore sull'elemento
+   trascinato: senza questa regola il cursore torna a "default" appena
+   il puntatore passa sopra un'altra card/colonna. */
+body.dnd-dragging,
+body.dnd-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .task-card-badges {
