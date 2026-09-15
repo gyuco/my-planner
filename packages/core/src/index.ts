@@ -32,6 +32,15 @@ export interface Task {
   dueDate: string | null;
   createdAt: string;
   updatedAt: string;
+  projectName?: string;
+  subtaskProgress?: { done: number; total: number };
+  blockedByOpenCount?: number;
+  // Presenti solo su GET /tasks/:taskId (dettaglio esteso, vedi API_CONTRACT.md §4)
+  subtasks?: Task[];
+  blockedBy?: TaskDependency[];
+  blocking?: TaskDependency[];
+  commentsCount?: number;
+  attachmentsCount?: number;
 }
 
 export interface TaskDependency {

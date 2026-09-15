@@ -15,6 +15,26 @@ const PRIORITY_LABEL: Record<TaskPriority, string> = {
   urgent: "Urgente",
 };
 
+const PROJECT_COLOR_PALETTE = [
+  "#2563eb",
+  "#16a34a",
+  "#d97706",
+  "#dc2626",
+  "#7c3aed",
+  "#0891b2",
+  "#db2777",
+  "#65a30d",
+];
+
+/** Colore stabile per progetto, derivato da un hash del suo id (F8). */
+function colorForProject(projectId: string): string {
+  let hash = 0;
+  for (let i = 0; i < projectId.length; i++) {
+    hash = (hash * 31 + projectId.charCodeAt(i)) >>> 0;
+  }
+  return PROJECT_COLOR_PALETTE[hash % PROJECT_COLOR_PALETTE.length];
+}
+
 interface TaskCardProps {
   task: BoardTask;
   showProject?: boolean;
@@ -40,7 +60,12 @@ export function TaskCard({ task, showProject, onDragStart, onClick }: TaskCardPr
         </span>
         {task.complexity != null && <span className="badge badge-complexity">{task.complexity}</span>}
         {showProject && task.projectName && (
-          <span className="badge badge-project">{task.projectName}</span>
+          <span
+            className="badge badge-project"
+            style={{ background: colorForProject(task.projectId), color: "#fff" }}
+          >
+            {task.projectName}
+          </span>
         )}
       </div>
 

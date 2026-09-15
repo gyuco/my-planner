@@ -1,14 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Board, Project } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
 import { CreateTaskModal } from "./components/CreateTaskModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
+import { TaskDrawer } from "./components/TaskDrawer";
+import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
+import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { clearToken, hasValidToken } from "./auth";
 import { getAggregatedBoard, getProjectBoard, listProjects, setUnauthorizedHandler } from "./api";
 
 const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
+const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "" };
+
+function filterBoard(board: Board, filters: BoardFiltersState): Board {
+  function applyFilters(tasks: BoardTask[]): BoardTask[] {
+    return tasks.filter((t) => {
+      if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
+      if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
+      return true;
+    });
+  }
+  return {
+    draft: applyFilters(board.draft as BoardTask[]),
+    in_progress: applyFilters(board.in_progress as BoardTask[]),
+    done: applyFilters(board.done as BoardTask[]),
+  };
+}
 
 export function App() {
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
@@ -18,6 +37,9 @@ export function App() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
+  const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
+  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
+  const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
 
   const handleLogout = useCallback(() => {
     clearToken();
@@ -53,20 +75,25 @@ export function App() {
   const loadBoard = useCallback(async () => {
     if (!selectedProjectId) return;
     try {
+      // Priorità multi-chip e "solo bloccati" filtrati lato client (il
+      // contratto REST supporta un solo `priority` alla volta); la ricerca
+      // testuale invece è delegata al server (`search`, vedi API_CONTRACT.md §5).
       const data =
         selectedProjectId === "all"
-          ? await getAggregatedBoard()
-          : await getProjectBoard(selectedProjectId);
+          ? await getAggregatedBoard(undefined, { search: filters.search || undefined })
+          : await getProjectBoard(selectedProjectId, { search: filters.search || undefined });
       setBoard(data);
       setLoadError(null);
     } catch {
       setLoadError("Impossibile caricare la board");
     }
-  }, [selectedProjectId]);
+  }, [selectedProjectId, filters.search]);
 
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
+
+  const filteredBoard = useMemo(() => filterBoard(board, filters), [board, filters]);
 
   if (!loggedIn) {
     return (
@@ -79,6 +106,11 @@ export function App() {
   }
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) ?? null;
+
+  function handleTaskClick(task: BoardTask) {
+    setOpenTaskId(task.id);
+    setOpenTaskProjectId(task.projectId);
+  }
 
   return (
     <div className="app-shell">
@@ -99,12 +131,15 @@ export function App() {
           </div>
         </header>
 
+        <FilterBar filters={filters} onChange={setFilters} />
+
         {loadError && <div className="board-error">{loadError}</div>}
 
         <KanbanBoard
-          board={board}
+          board={filteredBoard}
           showProject={selectedProjectId === "all"}
           onBoardChange={loadBoard}
+          onTaskClick={handleTaskClick}
         />
       </div>
 
@@ -120,6 +155,18 @@ export function App() {
         <CreateProjectModal
           onClose={() => setShowCreateProject(false)}
           onCreated={loadProjects}
+        />
+      )}
+
+      {openTaskId && openTaskProjectId && (
+        <TaskDrawer
+          taskId={openTaskId}
+          projectId={openTaskProjectId}
+          onClose={() => {
+            setOpenTaskId(null);
+            setOpenTaskProjectId(null);
+          }}
+          onChanged={loadBoard}
         />
       )}
     </div>
