@@ -148,56 +148,61 @@ Board scrollabile, drawer/modali e form leggibili su viewport mobile.
 
 ## INFRA
 
+Rifinito da `planner` sullo stato reale del codice (route separate in projects/tasks/board/attachments.ts, due transport MCP stdio+http, attachmentStorage pluggabile local/s3, validazione zod condivisa). Decisione utente: MinIO in docker-compose/CI per testare davvero il backend S3.
+
 ### I1 — Docker Compose per sviluppo/produzione locale
-Un comando per server+web, volumi per SQLite e attachments locali, dati persistenti.
-- Priorità: high · Complessità: 5 · Dipendenze: B3, F1
+`docker-compose.yml` (root) esiste già e definisce i servizi `server`/`web` con volumi `./data` (SQLite) e `./attachments` (storage locale), ma referenzia `apps/server/Dockerfile` e `apps/web/Dockerfile` che non esistono ancora. Task: creare i due Dockerfile mancanti (multi-stage: build con `npm run build --workspace ...`, runtime minimale), verificare che il compose funzioni end-to-end (`docker compose up`), allineare porte (3000 REST, 3100 MCP HTTP, 5173 web) ed env a `config.example.md`. Aggiungere anche un servizio **MinIO** (S3-compatibile) al compose, con bucket di test creato all'avvio, per poter eseguire `ATTACHMENTS_BACKEND=s3` end-to-end in locale/CI (decisione utente, vedi T6).
+- Priorità: high · Complessità: 8 (rivista da 5, include MinIO) · Dipendenze: B3, F1
+- Subtask: Dockerfile `apps/server` (con `prisma generate`+`migrate deploy` all'avvio) · Dockerfile `apps/web` · verifica/allineamento `docker-compose.yml` e volumi persistenti · servizio MinIO + bucket di test
 
 ### I2 — CI GitHub Actions
-Lint, typecheck, test (Vitest/Playwright) ad ogni push/PR, nessun deploy automatico.
-- Priorità: high · Complessità: 3 · Dipendenze: T1, T2
+`.github/workflows/ci.yml` esiste già ma è generico e incompleto. Task: estenderlo per farlo corrispondere allo stack reale — step `prisma generate`+`migrate deploy` su DB SQLite effimero prima di typecheck/build/test del server; env minime (`DATABASE_URL`, `JWT_SECRET`); aggiungere script `lint`/`test` mancanti in `apps/web/package.json` (oggi `--if-present` li salta silenziosamente); step Playwright (`npx playwright install --with-deps`) e job e2e che avvia server+web+MinIO; nessun deploy automatico.
+- Priorità: high · Complessità: 5 (rivista da 3) · Dipendenze: T1, T2
 
-### I3 — Gestione migrazioni Prisma in dev/CI
-Script/documentazione per dev, CI (DB effimero) e docker-compose.
+### I3 — Gestione migrazioni Prisma in dev/CI/docker-compose
+Migrazioni già presenti (`init`, `attachment_size`) create con `prisma migrate dev`. Manca uno script esplicito `prisma:migrate:deploy` (usa `prisma migrate deploy`, non interattivo) da usare in CI (I2) e nel Dockerfile server (I1). Documentare in README il flusso dev vs CI/produzione vs docker-compose.
 - Priorità: medium · Complessità: 3 · Dipendenze: B2, I1
 
 ---
 
 ## TEST
 
-### T1 — Unit Vitest: service layer
-Progetti/Task/Subtask/Dipendenze (cicli, blocco stato)/Commenti.
+### T1 — Unit Vitest: service layer e validazione zod
+`apps/server/src/services/taskService.ts` (progetti/task/subtask/dipendenze incl. cicli e blocco stato/commenti/board) e `attachmentService.ts`. Aggiunto: test degli schemi condivisi in `lib/validation.ts` (coerenza errori REST/MCP su input malformati).
 - Priorità: high · Complessità: 5 · Dipendenze: B5
+- Subtask: service progetti/task/subtask · service dipendenze (cicli+blocco transizione) · service commenti · attachmentService · schemi zod (validation.ts)
 
 ### T2 — Unit Vitest: tool MCP
-Progetti/task/subtask/dipendenze/commenti/allegati/board, auth fallita/token revocato, errore su blocco dipendenze.
+Testare `createProjectMcpServer` (`mcp/server.ts`) in-process: tool task/subtask/dipendenze/commenti/allegati/board, risoluzione token via `mcp/auth.ts` (auth fallita/token revocato), errore su blocco dipendenze. Più un test minimale di wiring per ciascun transport (`mcp/stdio.ts`, `mcp/http.ts`).
 - Priorità: high · Complessità: 5 · Dipendenze: B14, B15, B16, B17
 
 ### T3 — Unit Vitest: storage allegati pluggabile
-Interfaccia `AttachmentStorage` per locale e S3 (mock).
+Interfaccia `AttachmentStorage` (`lib/attachmentStorage/types.ts`) per `local.ts` e `s3.ts` (mock client `@aws-sdk/client-s3`), più test di `getAttachmentStorage()` (selezione backend via `ATTACHMENTS_BACKEND`).
 - Priorità: medium · Complessità: 3 · Dipendenze: B9, B10
 
 ### T4 — E2E Playwright: login e board base
-Login, creazione progetto, board, creazione task, drag&drop, persistenza dopo reload.
-- Priorità: high · Complessità: 5 · Dipendenze: F2, F4, F6
+Nessuna configurazione Playwright esiste ancora in `apps/web`. Task include il bootstrap: installazione `@playwright/test`, config base, poi gli scenari: login, creazione progetto, board, creazione task, drag&drop (dnd-kit), persistenza dopo reload.
+- Priorità: high · Complessità: 8 (rivista da 5, include setup Playwright) · Dipendenze: F2, F4, F6
+- Subtask: bootstrap Playwright (config, script npm/CI) · scenario login+board+creazione task · scenario drag&drop+persistenza
 
 ### T5 — E2E Playwright: subtask, dipendenze, blocco stato
-Subtask con avanzamento, dipendenza A bloccato da B, verifica blocco/sblocco.
+Subtask con avanzamento (`TaskDrawer.tsx`), dipendenza A bloccato da B, verifica blocco/sblocco, incluso il controllo stato esplicito nel drawer (non solo drag&drop).
 - Priorità: high · Complessità: 5 · Dipendenze: F7, T4
 
 ### T6 — E2E Playwright: allegati locale e S3
-Upload/download con storage locale, poi S3 cambiando solo config.
-- Priorità: medium · Complessità: 5 · Dipendenze: F7, B10
+Upload/download con storage locale (`ATTACHMENTS_BACKEND=local`), poi con `ATTACHMENTS_BACKEND=s3` contro il container **MinIO** aggiunto in I1 (decisione utente), cambiando solo configurazione — nessuno stub/mock in questo scenario e2e.
+- Priorità: medium · Complessità: 5 · Dipendenze: F7, B10, I1
 
 ### T7 — E2E Playwright: MCP end-to-end verso UI
-Da MCP (stdio/HTTP) con token progetto, CRUD, verifica riflesso in UI.
+Da MCP (stdio via `mcp/stdio.ts` con `MCP_PROJECT_TOKEN`, e HTTP via `mcp/http.ts` con `Authorization: Bearer <token>`), CRUD, verifica riflesso in UI.
 - Priorità: high · Complessità: 5 · Dipendenze: B16, B17, F4
 
 ### T8 — E2E Playwright: vista aggregata e token MCP UI
-Board aggregata multi-progetto, creazione/revoca token, verifica che token revocato non funzioni più via MCP.
+Board aggregata multi-progetto (incl. selezione sottoinsieme progetti), creazione/revoca token via `ProjectSettingsModal`, verifica che token revocato non funzioni più via MCP.
 - Priorità: medium · Complessità: 5 · Dipendenze: F8, F10, T7
 
 ### T9 — E2E Playwright: responsive mobile
-Board/drawer/form su viewport mobile (device emulation).
+Board/drawer/form su viewport mobile (device emulation Playwright).
 - Priorità: low · Complessità: 3 · Dipendenze: F12
 
 ---
