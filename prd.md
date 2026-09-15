@@ -12,7 +12,10 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 
 ## 3. Autenticazione e accesso
 - **UI/REST:** login singolo utente (username/password), sessione via **JWT**. Tutte le route REST richiedono JWT valido tranne `/auth/login`.
+  - **Bootstrap utente:** al primo avvio, se non esiste nessun utente, il server lo crea leggendo username/password da variabili d'ambiente. Nessuna registrazione self-service, nessun comando manuale richiesto.
+  - **Scadenza JWT:** token a lunga scadenza (es. 30 giorni), senza refresh token né blacklist — coerente con utente singolo locale a basso rischio.
 - **MCP:** autenticazione separata tramite **token per progetto**. Un token dà accesso a un solo progetto. I token si creano/revocano dalla UI (Impostazioni progetto → Token MCP).
+  - `get_aggregated_board` **non è esposto via MCP** (incompatibile con lo scope a singolo progetto del token): resta una funzionalità solo UI/JWT. Via MCP resta `get_board`, scoped al progetto del token.
 
 ## 4. Funzionalità v1
 
@@ -32,14 +35,16 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
   - Le dipendenze circolari sono rifiutate
 - **Commenti/note** cronologici sul task
 - **Allegati:** upload e download di file per task
+- **Eliminazione:** cancellare un task elimina in cascata subtask, commenti, allegati e le dipendenze che lo coinvolgono
 
 ### Board Kanban
 - Board per singolo progetto: tre colonne (`draft`/`in progress`/`done`), drag & drop, ordinamento manuale
 - **Vista aggregata multi-progetto:** board unica su tutti i progetti (o un sottoinsieme selezionato), ogni card etichettata col progetto di appartenenza
-- Filtri per priorità, tag, progetto e ricerca testuale
+- Filtri per priorità, tag, progetto e ricerca testuale (su titolo e descrizione, case-insensitive)
 
 ### Allegati — storage pluggabile
 - Backend **locale** (filesystem) o **cloud** (S3-compatibile), scelto via configurazione
+- Limiti: max **20MB** per file; tipi ammessi: immagini, PDF, documenti Office, testo/markdown, zip. Eseguibili e script bloccati.
 
 ### Server MCP
 Transport: **stdio** (Claude Code/Desktop locali) e **HTTP** (uso remoto). Autenticazione via token di progetto.
@@ -51,7 +56,7 @@ Tool esposti, con parità funzionale rispetto alla UI:
 - Dipendenze: `add_dependency`, `remove_dependency`, `list_blockers`
 - Commenti: `add_comment`, `list_comments`
 - Allegati: `list_attachments`, `attach_file`, `get_attachment_url`
-- Board: `get_board`, `get_aggregated_board`
+- Board: `get_board` (scoped al progetto del token — nessun equivalente aggregato via MCP)
 
 ### UI mobile
 - Web responsive, usabile da browser smartphone. Nessuna app nativa.
