@@ -8,11 +8,13 @@
     "mcp:stdio": "tsx src/mcp/stdio.ts",
     "mcp:http": "tsx watch src/mcp/http.ts",
     "build": "tsc -p tsconfig.json",
+    "prebuild": "prisma generate",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "typecheck": "tsc --noEmit",
+    "pretypecheck": "prisma generate",
     "test": "vitest run",
     "e2e:server": "node scripts/e2e-server.mjs"
   },
