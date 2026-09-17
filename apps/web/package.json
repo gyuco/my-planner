@@ -12,7 +12,8 @@
     "test": "echo \"no unit tests yet (vedi e2e Playwright, BACKLOG.md T4-T9)\" && exit 0",
     "test:e2e": "playwright test",
     "pages:dev": "npm run build && wrangler pages dev",
-    "pages:deploy": "npm run build && wrangler pages deploy"
+    "pages:deploy": "npm run build && wrangler pages deploy",
+    "pages:deploy:prod": "npm run build && wrangler pages deploy --branch master"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
