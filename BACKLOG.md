@@ -209,6 +209,89 @@ Board/drawer/form su viewport mobile (device emulation Playwright).
 
 ---
 
+---
+
+## PORTING CLOUDFLARE (Hono + Workers + D1 + R2)
+
+Riscrittura completa dello stack di esecuzione su Cloudflare, a parità di funzionalità con v1. Sostituisce Fastify con Hono, SQLite/Prisma-Node con D1 (Prisma driver adapter), storage locale/S3-MinIO con R2, hosting web con Cloudflare Pages. MCP HTTP portato su `McpAgent` (Durable Objects, pacchetto `agents`); MCP stdio resta invariato come tool CLI locale (fuori da Cloudflare, nessun task di porting).
+
+Decisioni chiuse (vedi analisi precedente in conversazione, da confermare con `architect` prima di CF3/CF9):
+- Transport MCP stdio non viene portato: resta locale, invariato (`mcp:stdio` continua a girare via Node/tsx sulla macchina dell'utente)
+- MCP HTTP diventa un `McpAgent` (Durable Object) per progetto, instradato dal token
+- Storage attachment: R2 sostituisce sia il backend locale sia MinIO/S3 (stessa interfaccia `AttachmentStorage`, nuova implementazione `r2.ts`)
+- DB: D1 sostituisce SQLite, Prisma resta l'ORM tramite `@prisma/adapter-d1`
+
+### CF1 — Setup progetto Cloudflare e wrangler
+Account/progetto Cloudflare, `wrangler.toml` (o `wrangler.jsonc`) per i Worker (API REST + MCP), binding dichiarati (D1, R2, eventuali secrets JWT), script npm (`dev`/`deploy` via `wrangler`), ambiente locale con `wrangler dev`.
+- Priorità: urgent · Complessità: 3 · Dipendenze: nessuna
+
+### CF2 — Migrazione schema DB a D1 + Prisma driver adapter
+Provisioning D1 (`wrangler d1 create`), porting `schema.prisma` (provider `sqlite` è già compatibile), migrazioni esistenti (`init`, `attachment_size`) applicate a D1 (`wrangler d1 migrations apply`), sostituzione client Prisma in `lib/prisma.ts` con `@prisma/adapter-d1` sul binding D1.
+- Priorità: urgent · Complessità: 5 · Dipendenze: CF1
+
+### CF3 — Bootstrap Worker REST API su Hono
+Nuovo entrypoint Worker (`apps/server` o nuovo `apps/api-worker`) con app Hono, error handler globale equivalente a quello Fastify attuale (`apiError`/`ApiErrorException` → status HTTP), CORS, config da `wrangler.toml` vars/secrets invece di `.env`.
+- Priorità: urgent · Complessità: 5 · Dipendenze: CF1, CF2
+
+### CF4 — Porting service layer (taskService, attachmentService, storageSettingsService)
+Adattamento dei service esistenti (`services/*.ts`) al client Prisma/D1 di CF2. Logica di business (transizioni stato, cicli dipendenze, cascade delete) invariata; verifica compatibilità query Prisma con D1 (limiti note su alcune query complesse/transazioni).
+- Priorità: urgent · Complessità: 5 · Dipendenze: CF2
+
+### CF5 — Porting rotte REST su Hono
+`routes/{auth,projects,tasks,board,attachments,settings}.ts` riscritte come router Hono, stessi path/contratti di `API_CONTRACT.md`, validazione zod condivisa (`lib/validation.ts`) invariata.
+- Priorità: high · Complessità: 8 · Dipendenze: CF3, CF4
+- Subtask: auth (login/JWT) · projects · tasks+board · attachments · settings
+
+### CF6 — Autenticazione JWT su Workers
+Sostituzione `@fastify/jwt` con verifica/firma JWT compatibile Workers (Web Crypto API, es. libreria `jose`), middleware Hono equivalente al `preHandler` attuale, bootstrap utente singolo da secrets Wrangler.
+- Priorità: urgent · Complessità: 3 · Dipendenze: CF3
+
+### CF7 — Storage allegati: backend R2
+Nuova implementazione `AttachmentStorage` (`lib/attachmentStorage/r2.ts`) su binding R2, sostituisce sia il backend locale sia quello S3/MinIO. Download come `ReadableStream` nativo (niente conversione da stream Node).
+- Priorità: high · Complessità: 5 · Dipendenze: CF1, CF4
+
+### CF8 — Porting rotta REST allegati (upload/download multipart)
+Adattamento upload multipart (oggi `@fastify/multipart`) a Hono/Workers (parsing `FormData` via Fetch API nativa), validazione dimensione 20MB e tipo file invariata, delega a R2 (CF7).
+- Priorità: high · Complessità: 5 · Dipendenze: CF5, CF7
+
+### CF9 — MCP HTTP su Cloudflare: McpAgent (Durable Objects)
+Nuovo Worker (o stesso Worker con routing dedicato) che instrada `/mcp` a un `McpAgent` (pacchetto `agents`) scoped per progetto via Durable Object, sostituendo Fastify + `StreamableHTTPServerTransport` Node-based. Porting 1:1 dei 14 tool già definiti in `mcp/server.ts` (stessa firma zod, stessa logica `withErrors`/`assertTaskInProject`) sul modello `McpAgent`.
+- Priorità: high · Complessità: 8 · Dipendenze: CF4, CF6, CF7
+
+### CF10 — Autenticazione MCP via token su Worker
+Porting `mcp/auth.ts` (`resolveProjectFromToken`) al nuovo Worker MCP: risoluzione token dal binding D1, instradamento al Durable Object corretto, gestione token revocato/non valido.
+- Priorità: high · Complessità: 3 · Dipendenze: CF9
+
+### CF11 — Download allegati via MCP su R2
+Porting dell'endpoint `/mcp/attachments/:id/download` (oggi in `mcp/http.ts`) sul Worker MCP, stream diretto da R2 (o URL firmato R2 quando disponibile) invece dello stream Node attuale.
+- Priorità: medium · Complessità: 3 · Dipendenze: CF9, CF7
+
+### CF12 — MCP stdio: verifica compatibilità invariata
+Nessun porting: verificare solo che `mcp/stdio.ts` continui a funzionare puntando al nuovo Worker REST/D1 per la risoluzione token (stessa logica `resolveProjectFromToken`, ora contro D1 via HTTP invece che Prisma diretto — valutare se serve un endpoint dedicato o una query D1 remota).
+- Priorità: medium · Complessità: 2 · Dipendenze: CF10
+
+### CF13 — Hosting frontend su Cloudflare Pages
+Build `apps/web` (React/Vite) pubblicata su Pages, sostituzione reverse proxy nginx `/api` con redirect/rewrite Pages verso il Worker REST (CF5), variabili build (URL API) da configurazione Pages.
+- Priorità: high · Complessità: 3 · Dipendenze: CF5
+
+### CF14 — Rimozione stack Docker/MinIO legacy (post-migrazione)
+Una volta verificata la parità funzionale su Cloudflare: rimuovere `docker-compose.yml`, Dockerfile, servizio MinIO, backend storage locale/S3 (`local.ts`/`s3.ts`) se non più necessari per sviluppo locale. Da fare solo a migrazione confermata stabile, non in parallelo.
+- Priorità: low · Complessità: 2 · Dipendenze: CF9, CF13
+
+### CF15 — CI/CD su Cloudflare (deploy Workers + Pages)
+Aggiornamento `.github/workflows/ci.yml`: step `wrangler deploy` per i Worker (API + MCP), deploy Pages, gestione secrets (JWT, credenziali D1/R2) via GitHub Actions secrets, ambiente di test con D1 locale (`wrangler d1 execute --local`) per i test esistenti (T1-T3).
+- Priorità: high · Complessità: 5 · Dipendenze: CF3, CF9, CF13
+
+### CF16 — Aggiornamento test esistenti per Workers runtime
+Adattamento test Vitest (`taskService.test.ts`, `attachmentService.test.ts`, `mcp/server.test.ts`, `mcp/auth.test.ts`) al nuovo client Prisma/D1 e ai nuovi moduli storage/MCP; valutare `@cloudflare/vitest-pool-workers` per test nel runtime Workers reale invece di Node.
+- Priorità: medium · Complessità: 5 · Dipendenze: CF4, CF9
+
+### CF17 — E2E Playwright contro ambiente Cloudflare
+Adattamento degli scenari e2e esistenti (T4-T9) per puntare a `wrangler dev` (o preview deployment) invece di docker-compose; in particolare T6 (allegati) sostituisce lo scenario S3/MinIO con R2, T7 (MCP e2e) verifica il nuovo `McpAgent`.
+- Priorità: medium · Complessità: 5 · Dipendenze: CF9, CF13, CF15
+
+---
+
 ## Debito tecnico noto (da review B1-B18)
 
 Segnalato da `reviewer`, non bloccante per la v1, da rivedere in un secondo momento:
