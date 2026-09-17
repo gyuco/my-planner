@@ -51,7 +51,9 @@ export interface Attachment {
   fileName: string;
   mimeType: string;
   size: number;
-  storageBackend: "local" | "s3";
+  // "r2" è il backend del porting Cloudflare (CF7); resta compatibile con i
+  // record storici "local"/"s3".
+  storageBackend: "local" | "s3" | "r2";
   storageRef: string;
   createdAt: string;
 }

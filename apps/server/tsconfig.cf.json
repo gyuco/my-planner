@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["@cloudflare/workers-types", "node"],
+    "lib": ["ES2022", "WebWorker"]
+  },
+  "include": ["src/cf", "src/lib", "src/services", "src/mcp/server.ts", "src/mcp/auth.ts", "src/lib/validation.ts"]
+}

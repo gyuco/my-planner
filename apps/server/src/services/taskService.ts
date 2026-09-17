@@ -1,6 +1,6 @@
 import { ApiErrorException, FIBONACCI_COMPLEXITY, type TaskComplexity } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
+import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.

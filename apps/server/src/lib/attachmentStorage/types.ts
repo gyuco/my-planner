@@ -13,7 +13,7 @@ export interface AttachmentStorageUploadInput {
 }
 
 export interface AttachmentStorageUploadResult {
-  storageBackend: "local" | "s3";
+  storageBackend: "local" | "s3" | "r2";
   storageRef: string;
 }
 
@@ -30,7 +30,13 @@ export interface AttachmentUrlResult {
 
 export interface AttachmentStorage {
   upload(input: AttachmentStorageUploadInput): Promise<AttachmentStorageUploadResult>;
-  download(storageRef: string): Promise<NodeJS.ReadableStream>;
+  /**
+   * Ritorna il corpo dell'allegato come stream. Su runtime Node si tratta di
+   * un NodeJS.ReadableStream (local.ts/s3.ts); sul Worker Cloudflare/R2
+   * (r2.ts) di un web ReadableStream. Entrambi sono accettati da
+   * reply.send(Fastify) e c.body(Hono).
+   */
+  download(storageRef: string): Promise<NodeJS.ReadableStream | ReadableStream>;
   delete(storageRef: string): Promise<void>;
   getUrl(storageRef: string, attachment: AttachmentUrlInfo): Promise<AttachmentUrlResult>;
 }

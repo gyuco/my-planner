@@ -33,7 +33,9 @@ test.describe("T8 - vista aggregata e token MCP UI", () => {
     await modal.getByPlaceholder("Label (optional)").fill("token-ui-e2e");
     await modal.getByRole("button", { name: "New token" }).click();
 
-    const revealedCode = modal.locator(".token-reveal code");
+    // `.token-reveal-row code` per evitare la strict-mode violation con il
+    // secondo <code> dentro il blocco config MCP.
+    const revealedCode = modal.locator(".token-reveal-row code");
     await expect(revealedCode).toBeVisible();
     const token = await revealedCode.textContent();
     expect(token).toBeTruthy();

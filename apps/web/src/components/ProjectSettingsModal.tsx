@@ -118,9 +118,14 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
   }
 
   function buildMcpConfig(token: string): string {
-    // Default: MCP HTTP sulla stessa host della UI, porta 3100 (vedi
-    // MCP_HTTP_PORT/MCP_HTTP_BASE_URL in config.example.md e README.md §MCP).
-    const mcpUrl = `${window.location.protocol}//${window.location.hostname}:3100/mcp`;
+    // Su Cloudflare Worker e MCP HTTP condividono lo stesso host (nessuna
+    // porta 3100): si configura la base via VITE_MCP_HTTP_BASE_URL in build
+    // (vedi README §Cloudflare). Default: stesso host della UI, porta 3100,
+    // coerente con lo stack Node/Docker.
+    const configuredBase = import.meta.env.VITE_MCP_HTTP_BASE_URL;
+    const mcpUrl = configuredBase
+      ? `${configuredBase.replace(/\/$/, "")}/mcp`
+      : `${window.location.protocol}//${window.location.hostname}:3100/mcp`;
     const config = {
       mcpServers: {
         [`my-planner-${project.name}`]: {

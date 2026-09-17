@@ -215,9 +215,30 @@ Board/drawer/form su viewport mobile (device emulation Playwright).
 
 Riscrittura completa dello stack di esecuzione su Cloudflare, a parità di funzionalità con v1. Sostituisce Fastify con Hono, SQLite/Prisma-Node con D1 (Prisma driver adapter), storage locale/S3-MinIO con R2, hosting web con Cloudflare Pages. MCP HTTP portato su `McpAgent` (Durable Objects, pacchetto `agents`); MCP stdio resta invariato come tool CLI locale (fuori da Cloudflare, nessun task di porting).
 
+> **Stato implementazione (2026-09-17):** CF1–CF13, CF15 e CF17 implementati e
+> verificati in locale (`wrangler dev` con D1/R2 miniflare + suite Playwright in
+> modalità `E2E_CF=1`, 6 scenari verdi). CF16 parziale: gli unit test T1–T3
+> restano su Node/SQLite (testano la business logic condivisa) mentre il Worker è
+> coperto dagli e2e. CF14 non eseguito (rimozione dello stack Docker/MinIO legacy
+> solo a migrazione confermata stabile, come da task).
+>
+> **Amendamento decisione MCP HTTP:** al posto del pacchetto `agents`/`McpAgent`
+> (Durable Object per sessione) è stato usato il transport raw Web Standard del SDK
+> MCP (`WebStandardStreamableHTTPServerTransport`) nello stesso Worker, con
+> autenticazione a token di progetto. Motivo: i 14 tool sono stateless (tutto lo
+> stato è in D1/R2), il porting è 1:1 con `mcp/http.ts`, è testabile localmente e
+> non richiede il ciclo di vita dei Durable Object. L'isolamento per progetto resta
+> garantito dal token (`resolveProjectFromToken`) e da `assertTaskInProject`.
+> MCP stdio resta invariato.
+>
+> **Note tecniche:** il Worker usa un secondo client Prisma generato
+> (`prisma/d1client`, `driverAdapters` + `engineType=client`) accanto a quello Node;
+> l'accesso al DB sul Worker è serializzato perché il query compiler WASM non è
+> rientrante (vedi `apps/server/src/cf/db.ts`).
+
 Decisioni chiuse (vedi analisi precedente in conversazione, da confermare con `architect` prima di CF3/CF9):
 - Transport MCP stdio non viene portato: resta locale, invariato (`mcp:stdio` continua a girare via Node/tsx sulla macchina dell'utente)
-- MCP HTTP diventa un `McpAgent` (Durable Object) per progetto, instradato dal token
+- MCP HTTP diventa un `McpAgent` (Durable Object) per progetto, instradato dal token — **revisionato:** vedi amendamento sopra (transport Web Standard nello stesso Worker)
 - Storage attachment: R2 sostituisce sia il backend locale sia MinIO/S3 (stessa interfaccia `AttachmentStorage`, nuova implementazione `r2.ts`)
 - DB: D1 sostituisce SQLite, Prisma resta l'ORM tramite `@prisma/adapter-d1`
 

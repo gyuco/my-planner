@@ -1,0 +1,11 @@
+# Config Cloudflare Pages per il frontend (CF13).
+# `wrangler pages dev` / `wrangler pages deploy` usano questo file.
+name = "my-planner-web"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-07-18"
+
+# Service binding verso il Worker REST (stesso nome di apps/server/wrangler.toml).
+# La Pages Function functions/api/[[path]].ts inoltra `/api/*` a questo Worker.
+[[services]]
+binding = "API"
+service = "my-planner"

@@ -76,6 +76,28 @@ export default defineConfig({
     },
   ],
   webServer: [
+    // Modalita' Cloudflare (CF17): E2E_CF=1 avvia il Worker (wrangler dev) al
+    // posto del backend Fastify. REST, MCP HTTP e allegati (R2 miniflare)
+    // girano tutti sullo stesso Worker; MCP_HTTP_BASE punta quindi alla 3050.
+    ...(process.env.E2E_CF === "1"
+      ? [
+          {
+            command: "npm run e2e:cf-server --workspace apps/server",
+            cwd: repoRoot,
+            url: "http://localhost:3050/health",
+            reuseExistingServer: false,
+            timeout: 120_000,
+          },
+          {
+            command: "npx vite",
+            cwd: webRoot,
+            url: BASE_URL,
+            reuseExistingServer: false,
+            timeout: 60_000,
+            env: { ...process.env, VITE_DEV_PORT: "5183", VITE_API_PROXY_TARGET: "http://localhost:3050" },
+          },
+        ]
+      : [
     {
       command: "npm run e2e:server --workspace apps/server",
       cwd: repoRoot,
@@ -136,6 +158,7 @@ export default defineConfig({
           },
         ]
       : []),
+      ]),
   ],
   outputDir: path.join(repoRoot, "test-results", "playwright"),
 });

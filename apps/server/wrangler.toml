@@ -1,0 +1,26 @@
+# Config Cloudflare Worker per my-planner (porting CF, vedi BACKLOG.md).
+# Worker unico che serve sia la REST API (Hono) sia MCP HTTP
+# (WebStandardStreamableHTTPServerTransport, controparte Workers del
+# transport Node usato da apps/server), con DB su D1 e allegati su R2.
+name = "my-planner"
+main = "src/cf/index.ts"
+compatibility_date = "2025-07-18"
+compatibility_flags = ["nodejs_compat"]
+
+# ---- Binding D1 (DB principale, sostituisce SQLite) -------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "my-planner"
+database_id = "93aac4dd-6211-47bc-82a9-5ba834539fdd"
+migrations_dir = "migrations"
+
+# ---- Binding R2 (storage allegati, sostituisce local/S3/MinIO) --------------
+[[r2_buckets]]
+binding = "ATTACHMENTS"
+bucket_name = "my-planner-attachments"
+
+# ---- Var statiche ------------------------------------------------------------
+# JWT_SECRET, BOOTSTRAP_USERNAME, BOOTSTRAP_PASSWORD vanno impostate come
+# secrets (`wrangler secret put`) o vars in produzione.
+[vars]
+MCP_HTTP_BASE_URL = "https://my-planner.giuseppe-concas.workers.dev"
