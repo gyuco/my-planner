@@ -47,7 +47,7 @@ import {
   storageSettingsInputSchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
-import bcrypt from "bcryptjs";
+import { hashToken } from "../mcp/auth.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -138,7 +138,7 @@ export function buildRestApp() {
     if (!project) throw new ApiErrorException("NOT_FOUND", "Progetto non trovato");
 
     const rawToken = randomTokenHex();
-    const tokenHash = await bcrypt.hash(rawToken, 10);
+    const tokenHash = await hashToken(rawToken);
     const created = await prisma.projectToken.create({ data: { projectId, tokenHash, label: label ?? null } });
     return c.json(
       {

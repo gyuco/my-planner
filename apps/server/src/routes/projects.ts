@@ -1,8 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { apiError } from "@my-planner/core";
-import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
+import { hashToken } from "../mcp/auth.js";
 import { listProjects, createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
 import { projectNameInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 
@@ -43,7 +43,7 @@ export async function projectRoutes(app: FastifyInstance) {
     if (!project) return reply.code(404).send(apiError("NOT_FOUND", "Progetto non trovato"));
 
     const rawToken = randomBytes(32).toString("hex");
-    const tokenHash = await bcrypt.hash(rawToken, 10);
+    const tokenHash = await hashToken(rawToken);
     const created = await prisma.projectToken.create({
       data: { projectId, tokenHash, label: label ?? null },
     });
