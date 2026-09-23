@@ -58,6 +58,8 @@ export function TaskCard({
     urgent: t.taskCard.priorityUrgent,
   };
   const blocked = (task.blockedByOpenCount ?? 0) > 0;
+  const subtaskCount = task.subtaskCount ?? 0;
+  const doneSubtasks = subtaskCount - (task.openSubtaskCount ?? 0);
 
   return (
     <div
@@ -101,6 +103,11 @@ export function TaskCard({
         {blocked && (
           <span className="task-card-blocked" title={t.taskCard.blockedTitle}>
             🔒 {task.blockedByOpenCount}
+          </span>
+        )}
+        {subtaskCount > 0 && (
+          <span className="task-card-subtasks" title={t.taskCard.subtasksTitle}>
+            ☑ {doneSubtasks}/{subtaskCount}
           </span>
         )}
         {task.dueDate && (

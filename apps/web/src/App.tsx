@@ -22,6 +22,11 @@ const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, s
 function filterBoard(board: Board, filters: BoardFiltersState): Board {
   function applyFilters(tasks: BoardTask[]): BoardTask[] {
     return tasks.filter((t) => {
+      // Le sotto-task non compaiono come card indipendenti sulla board: si
+      // vedono raggruppate sotto il parent (badge + lista nel drawer),
+      // altrimenti un task grande con 13 sotto-task disperderebbe le
+      // colonne. Vedi API_CONTRACT.md §4 e BACKLOG.md (nota 2026-09-23).
+      if (t.parentId) return false;
       if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
       if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
       if (filters.tag && !t.tags.includes(filters.tag)) return false;
@@ -137,6 +142,12 @@ export function App() {
     setOpenTaskProjectId(task.projectId);
   }
 
+  // Navigazione dentro il drawer: aprire una sotto-task o risalire al parent
+  // sostituisce semplicemente il task mostrato, stesso progetto.
+  function handleOpenTask(taskId: string) {
+    setOpenTaskId(taskId);
+  }
+
   const settingsProject = projects.find((p) => p.id === settingsProjectId) ?? null;
 
   return (
@@ -219,6 +230,7 @@ export function App() {
             setOpenTaskProjectId(null);
           }}
           onChanged={loadBoard}
+          onOpenTask={handleOpenTask}
         />
       )}
 

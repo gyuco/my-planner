@@ -59,6 +59,14 @@ model Task {
   dueDate     DateTime?
   position    Int      @default(0)
 
+  // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
+  // volta avere subtasks, vedi validazione in taskService.ts). Nessun
+  // onDelete cascade: deleteTask rifiuta la cancellazione di un parent con
+  // subtasks ancora presenti, cosi' non si perdono dati per errore.
+  parentId String?
+  parent   Task?   @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks Task[]  @relation("Subtasks")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

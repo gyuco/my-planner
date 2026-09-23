@@ -6,6 +6,7 @@ import {
   ApiRequestError,
   addComment,
   addDependency,
+  createSubtasks,
   deleteAttachment,
   downloadAttachment,
   getTask,
@@ -28,6 +29,8 @@ interface TaskDrawerProps {
   onClose: () => void;
   /** Chiamato dopo modifiche rilevanti (stato task, dipendenze) per rifare il refresh della board. */
   onChanged: () => void;
+  /** Naviga il drawer su un altro task (sotto-task o parent), sostituendo quello mostrato. */
+  onOpenTask: (taskId: string) => void;
 }
 
 function toDateInputValue(iso: string | null): string {
@@ -35,7 +38,7 @@ function toDateInputValue(iso: string | null): string {
   return iso.slice(0, 10);
 }
 
-export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawerProps) {
+export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const STATUS_LABEL: Record<TaskStatus, string> = {
     draft: t.board.draft,
@@ -63,6 +66,8 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
   const [statusError, setStatusError] = useState<string | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
   const [editingDescription, setEditingDescription] = useState(false);
+  const [newSubtaskTitles, setNewSubtaskTitles] = useState("");
+  const [addingSubtasks, setAddingSubtasks] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -161,6 +166,44 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
     }
   }
 
+  /**
+   * Una riga = una sotto-task: cosi' lo stesso form copre sia "aggiungi una
+   * sotto-task" sia "crea un gruppo di sotto-task" incollando piu' righe,
+   * senza due UI separate (vedi discussione su task grandi con 13+ elementi).
+   */
+  async function handleAddSubtasks(e: React.FormEvent) {
+    e.preventDefault();
+    const titles = newSubtaskTitles
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (titles.length === 0) return;
+    setAddingSubtasks(true);
+    try {
+      await createSubtasks(
+        taskId,
+        titles.map((title) => ({ title })),
+      );
+      setNewSubtaskTitles("");
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.addSubtaskError);
+    } finally {
+      setAddingSubtasks(false);
+    }
+  }
+
+  async function handleToggleSubtaskDone(subtaskId: string, done: boolean) {
+    try {
+      await moveTask(subtaskId, done ? "done" : "draft");
+      await load();
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.statusChangeError);
+    }
+  }
+
   async function handleAddComment(e: React.FormEvent) {
     e.preventDefault();
     if (!newComment.trim()) return;
@@ -235,6 +278,14 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
 
         {!loading && task && (
           <div className="drawer-body">
+            {task.parentId && (
+              <div className="drawer-parent-link">
+                {t.taskDrawer.parentOf}{" "}
+                <button type="button" className="link-button" onClick={() => onOpenTask(task.parentId as string)}>
+                  {projectTasks.find((pt) => pt.id === task.parentId)?.title ?? task.parentId}
+                </button>
+              </div>
+            )}
             <section className="drawer-section">
               <label>
                 {t.taskDrawer.statusLabel}
@@ -387,6 +438,42 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged }: TaskDrawer
                 {(task.blocking ?? []).length === 0 && <li className="drawer-empty">{t.taskDrawer.notBlocking}</li>}
               </ul>
             </section>
+
+            {!task.parentId && (
+              <section className="drawer-section">
+                <h3>{t.taskDrawer.subtasks}</h3>
+                <ul className="drawer-list">
+                  {(task.subtasks ?? []).map((s) => (
+                    <li key={s.id}>
+                      <label className="drawer-subtask-item">
+                        <input
+                          type="checkbox"
+                          checked={s.status === "done"}
+                          onChange={(e) => handleToggleSubtaskDone(s.id, e.target.checked)}
+                        />
+                        <button type="button" className="link-button" onClick={() => onOpenTask(s.id)}>
+                          {s.title}
+                        </button>
+                      </label>
+                    </li>
+                  ))}
+                  {(task.subtasks ?? []).length === 0 && (
+                    <li className="drawer-empty">{t.taskDrawer.noSubtasks}</li>
+                  )}
+                </ul>
+                <form onSubmit={handleAddSubtasks} className="drawer-inline-form drawer-inline-form-column">
+                  <textarea
+                    placeholder={t.taskDrawer.addSubtaskPlaceholder}
+                    value={newSubtaskTitles}
+                    onChange={(e) => setNewSubtaskTitles(e.target.value)}
+                    rows={2}
+                  />
+                  <button type="submit" disabled={addingSubtasks || !newSubtaskTitles.trim()}>
+                    {t.taskDrawer.add}
+                  </button>
+                </form>
+              </section>
+            )}
 
             <section className="drawer-section">
               <h3>{t.taskDrawer.comments}</h3>

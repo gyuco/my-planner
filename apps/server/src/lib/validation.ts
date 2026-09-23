@@ -38,6 +38,7 @@ export const taskInputSchema = z.object({
   complexity: complexitySchema,
   tags: z.array(z.string()).optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  parentId: z.string().nullable().optional(),
 });
 
 export const taskUpdateInputSchema = z.object({
@@ -47,6 +48,22 @@ export const taskUpdateInputSchema = z.object({
   complexity: complexitySchema,
   tags: z.array(z.string()).optional(),
   dueDate: z.string().datetime().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+});
+
+export const createSubtasksInputSchema = z.object({
+  subtasks: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(300),
+        description: z.string().optional(),
+        priority: taskPrioritySchema.optional(),
+        complexity: complexitySchema,
+        tags: z.array(z.string()).optional(),
+        dueDate: z.string().datetime().nullable().optional(),
+      })
+    )
+    .min(1),
 });
 
 export const moveTaskInputSchema = z.object({

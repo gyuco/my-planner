@@ -15,6 +15,7 @@ import {
   listBlockers,
   addComment,
   listComments,
+  createSubtasks,
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
 
@@ -83,16 +84,23 @@ export function createProjectMcpServer(projectId: string) {
     async (input) => withErrors(() => listTasks(projectId, input))
   );
 
-  server.tool("get_task", "Recupera un task del progetto associato al token", { taskId: z.string() }, async ({ taskId }) =>
-    withErrors(async () => {
-      await assertTaskInProject(taskId);
-      return getTask(taskId);
-    })
+  server.tool(
+    "get_task",
+    "Recupera un task del progetto associato al token. Se il task ha sotto-task, la risposta include " +
+      "subtaskCount/openSubtaskCount e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
+      "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro.",
+    { taskId: z.string() },
+    async ({ taskId }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        return getTask(taskId);
+      })
   );
 
   server.tool(
     "create_task",
-    "Crea un task nel progetto associato al token",
+    "Crea un task nel progetto associato al token. Passa parentId per creare direttamente una sotto-task di un " +
+      "task esistente (che non deve essere a sua volta una sotto-task: un solo livello di annidamento).",
     {
       title: z.string().min(1).max(300),
       description: z.string().default(""),
@@ -100,13 +108,41 @@ export function createProjectMcpServer(projectId: string) {
       complexity: complexitySchema,
       tags: z.array(z.string()).default([]),
       dueDate: z.string().datetime().nullable().optional(),
+      parentId: z.string().nullable().optional(),
     },
     async (input) => withErrors(() => createTask(projectId, input))
   );
 
   server.tool(
+    "create_subtasks",
+    "Crea in un'unica chiamata piu' sotto-task sotto parentId — usalo quando un task grande va scomposto in un " +
+      "gruppo di sotto-task invece che una per una. Tutto o niente: se una riga non e' valida non viene creato nulla.",
+    {
+      parentId: z.string(),
+      subtasks: z
+        .array(
+          z.object({
+            title: z.string().min(1).max(300),
+            description: z.string().default(""),
+            priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+            complexity: complexitySchema,
+            tags: z.array(z.string()).default([]),
+            dueDate: z.string().datetime().nullable().optional(),
+          })
+        )
+        .min(1),
+    },
+    async ({ parentId, subtasks }) =>
+      withErrors(async () => {
+        await assertTaskInProject(parentId);
+        return createSubtasks(projectId, parentId, subtasks);
+      })
+  );
+
+  server.tool(
     "update_task",
-    "Aggiorna un task del progetto associato al token",
+    "Aggiorna un task del progetto associato al token. parentId puo' essere impostato per riassegnare la task " +
+      "come sotto-task di un'altra (null per staccarla e renderla di nuovo un task di primo livello).",
     {
       taskId: z.string(),
       title: z.string().min(1).max(300).optional(),
@@ -115,6 +151,7 @@ export function createProjectMcpServer(projectId: string) {
       complexity: complexitySchema,
       tags: z.array(z.string()).optional(),
       dueDate: z.string().datetime().nullable().optional(),
+      parentId: z.string().nullable().optional(),
     },
     async ({ taskId, ...rest }) =>
       withErrors(async () => {
@@ -236,7 +273,8 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "get_board",
-    "Restituisce la board Kanban del progetto associato al token",
+    "Restituisce la board Kanban del progetto associato al token. Ogni task include subtaskCount/openSubtaskCount " +
+      "(0 se non ha sotto-task) cosi' da distinguere a colpo d'occhio i task singoli da quelli con un gruppo di sotto-task.",
     {
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),

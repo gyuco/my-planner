@@ -19,6 +19,13 @@ export interface Project {
   createdAt: string;
 }
 
+/** Riepilogo di una sotto-task, presente solo nell'array `subtasks` del dettaglio (GET /tasks/:taskId). */
+export interface SubtaskSummary {
+  id: string;
+  title: string;
+  status: TaskStatus;
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -33,11 +40,19 @@ export interface Task {
   updatedAt: string;
   projectName?: string;
   blockedByOpenCount?: number;
+  // Sotto-task: un solo livello di annidamento (vedi API_CONTRACT.md §4/§7).
+  // parentId presente solo se il task e' esso stesso una sotto-task.
+  parentId?: string | null;
+  // subtaskCount/openSubtaskCount presenti ovunque venga restituito un Task
+  // (list/board/detail), sempre 0 se il task non ha sotto-task.
+  subtaskCount?: number;
+  openSubtaskCount?: number;
   // Presenti solo su GET /tasks/:taskId (dettaglio esteso, vedi API_CONTRACT.md §4)
   blockedBy?: TaskDependency[];
   blocking?: TaskDependency[];
   commentsCount?: number;
   attachmentsCount?: number;
+  subtasks?: SubtaskSummary[];
 }
 
 export interface TaskDependency {

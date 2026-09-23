@@ -3,6 +3,8 @@
 Generato dal `planner` a partire da `prd.md`. Priorità: low/medium/high/urgent. Complessità: Fibonacci (1,2,3,5,8,13,21).
 
 > **Nota (2026-09-15):** il concetto di "subtask" (gerarchia padre/figlio tra task) è stato rimosso dal prodotto su richiesta esplicita dell'utente. I riferimenti a subtask nei task già completati sotto restano come cronologia dell'implementazione originale ma non riflettono più lo stato attuale del codice (vedi `prd.md` e `API_CONTRACT.md` aggiornati).
+>
+> **Nota (2026-09-23):** la gerarchia è stata **reintrodotta** (schema + service layer + REST + MCP) come `Task.parentId`, un solo livello di annidamento. La rimozione del 2026-09-15 era dovuta al fatto che la subtask, pur essendo un `Task` completo lato backend, in UI era ridotta a una riga con checkbox (titolo + done/non-done), senza priority/complexity/commenti gestibili — uno pseudo-task. Questa volta la sotto-task resta un `Task` a tutti gli effetti; il frontend (non ancora fatto) dovrà aprirla nello stesso pannello di dettaglio di un task normale, non ripetere il pattern checkbox-only. Vedi `API_CONTRACT.md` §4/§7 per `parentId`, `create_subtasks`, `subtaskCount`/`openSubtaskCount`.
 
 Decisioni chiuse durante la revisione del backlog (già integrate in `prd.md`):
 - `get_aggregated_board` **non** esposto via MCP — solo `get_board` scoped al token di progetto

@@ -62,6 +62,7 @@ export const it: Dictionary = {
     priorityHigh: "Alta",
     priorityUrgent: "Urgente",
     blockedTitle: "Task bloccato da dipendenze non risolte",
+    subtasksTitle: "Sotto-task completate",
   },
   createTask: {
     title: "Nuovo task",
@@ -193,6 +194,12 @@ export const it: Dictionary = {
     noAttachments: "Nessun allegato",
     download: "Scarica",
     delete: "Elimina",
+    subtasks: "Sotto-task",
+    noSubtasks: "Nessuna sotto-task",
+    addSubtaskPlaceholder: "Titolo nuova sotto-task",
+    addSubtaskError: "Errore durante la creazione della sotto-task",
+    parentOf: "Sotto-task di:",
+    openParent: "Apri task genitore",
   },
   api: {
     sessionExpired: "Sessione scaduta, effettua di nuovo il login",

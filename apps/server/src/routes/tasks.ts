@@ -11,6 +11,8 @@ import {
   listBlockers,
   addComment,
   listComments,
+  createSubtasks,
+  getTaskOrThrow,
 } from "../services/taskService.js";
 import {
   taskFiltersQuerySchema,
@@ -19,6 +21,7 @@ import {
   moveTaskInputSchema,
   dependencyInputSchema,
   commentInputSchema,
+  createSubtasksInputSchema,
 } from "../lib/validation.js";
 
 export async function taskRoutes(app: FastifyInstance) {
@@ -49,6 +52,14 @@ export async function taskRoutes(app: FastifyInstance) {
   app.delete("/tasks/:taskId", { onRequest: [app.authenticate] }, async (req) => {
     const { taskId } = req.params as { taskId: string };
     return deleteTask(taskId);
+  });
+
+  app.post("/tasks/:taskId/subtasks", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { taskId } = req.params as { taskId: string };
+    const { subtasks } = createSubtasksInputSchema.parse(req.body ?? {});
+    const parent = await getTaskOrThrow(taskId);
+    const created = await createSubtasks(parent.projectId, taskId, subtasks);
+    return reply.code(201).send(created);
   });
 
   app.post("/tasks/:taskId/move", { onRequest: [app.authenticate] }, async (req) => {
