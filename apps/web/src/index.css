@@ -867,6 +867,14 @@ body.dnd-dragging * {
   padding: 0.1rem 0.45rem;
 }
 
+.task-card-subtasks {
+  color: var(--ink-400);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: 0.1rem 0.45rem;
+}
+
 /* =========================================================================
    Modali
    ========================================================================= */
@@ -1271,13 +1279,15 @@ body.dnd-dragging * {
 .drawer-inline-form { display: flex; gap: 0.5rem; }
 
 .drawer-inline-form input,
-.drawer-inline-form select {
+.drawer-inline-form select,
+.drawer-inline-form textarea {
   flex: 1;
   padding: 0.5rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   font-family: inherit;
   font-size: 0.875rem;
+  resize: vertical;
 }
 
 .drawer-inline-form button {
@@ -1287,6 +1297,27 @@ body.dnd-dragging * {
   background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
   color: #fff;
   cursor: pointer;
+}
+
+/* Textarea "una riga = una sotto-task": bottone sotto invece che a fianco. */
+.drawer-inline-form-column {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.drawer-subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.drawer-subtask-item .link-button { text-align: left; }
+
+.drawer-parent-link {
+  font-size: 0.8rem;
+  color: var(--ink-400);
+  margin-bottom: 0.75rem;
 }
 
 .dep-resolved { color: var(--success); font-weight: 600; }

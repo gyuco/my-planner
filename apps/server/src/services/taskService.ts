@@ -1,6 +1,6 @@
 import { ApiErrorException, FIBONACCI_COMPLEXITY, type TaskComplexity } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
+import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -37,6 +37,22 @@ function serializeTask(task: any): any {
     delete out.project;
   }
   return out;
+}
+
+async function computeSubtaskCounts(taskIds: string[]) {
+  if (taskIds.length === 0) return new Map<string, { total: number; open: number }>();
+  const subtasks = await prisma.task.findMany({
+    where: { parentId: { in: taskIds } },
+    select: { parentId: true, status: true },
+  });
+  const map = new Map<string, { total: number; open: number }>();
+  for (const s of subtasks) {
+    const entry = map.get(s.parentId as string) ?? { total: 0, open: 0 };
+    entry.total += 1;
+    if (s.status !== "done") entry.open += 1;
+    map.set(s.parentId as string, entry);
+  }
+  return map;
 }
 
 async function computeBlockedByOpenCount(taskIds: string[]) {
@@ -107,6 +123,7 @@ export interface TaskInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
+  parentId?: string | null;
 }
 
 function validateComplexity(complexity: unknown) {
@@ -115,6 +132,28 @@ function validateComplexity(complexity: unknown) {
     throw new ApiErrorException(
       "VALIDATION_ERROR",
       `complexity deve essere uno dei valori Fibonacci ammessi: ${FIBONACCI_COMPLEXITY.join(", ")}`
+    );
+  }
+}
+
+/**
+ * Valida parentId per createTask/updateTask: il parent deve esistere nello
+ * stesso progetto, non puo' essere il task stesso, e non puo' essere a sua
+ * volta una subtask — un solo livello di annidamento, niente epic/story
+ * ricorsive (vedi discussione su gerarchia task grandi).
+ */
+async function validateParent(projectId: string, parentId: string, taskId?: string) {
+  if (parentId === taskId) {
+    throw new ApiErrorException("VALIDATION_ERROR", "Un task non può essere sotto-task di se stesso");
+  }
+  const parent = await prisma.task.findUnique({ where: { id: parentId } });
+  if (!parent || parent.projectId !== projectId) {
+    throw new ApiErrorException("NOT_FOUND", "Task genitore non trovato nel progetto");
+  }
+  if (parent.parentId) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      "Una sotto-task non può a sua volta avere sotto-task (un solo livello di annidamento)"
     );
   }
 }
@@ -132,6 +171,7 @@ export async function createTask(projectId: string, input: TaskInput) {
     throw new ApiErrorException("VALIDATION_ERROR", "title deve avere tra 1 e 300 caratteri");
   }
   validateComplexity(input.complexity);
+  if (input.parentId) await validateParent(projectId, input.parentId);
 
   const maxPosition = await prisma.task.aggregate({
     where: { projectId, status: "draft" },
@@ -148,6 +188,7 @@ export async function createTask(projectId: string, input: TaskInput) {
       tags: tagsToCsv(input.tags) ?? "",
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
       position: (maxPosition._max.position ?? -1) + 1,
+      parentId: input.parentId ?? null,
     },
   });
   return serializeTask(task);
@@ -174,18 +215,30 @@ export async function listTasks(
     tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
   }
 
-  return tasks.map(serializeTask);
+  const subtaskMap = await computeSubtaskCounts(tasks.map((t) => t.id));
+  return tasks.map((t) => {
+    const serialized = serializeTask(t);
+    const counts = subtaskMap.get(t.id);
+    serialized.subtaskCount = counts?.total ?? 0;
+    serialized.openSubtaskCount = counts?.open ?? 0;
+    return serialized;
+  });
 }
 
 export async function getTask(taskId: string) {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
 
-  const [blockedBy, blocking, commentsCount, attachmentsCount] = await Promise.all([
+  const [blockedBy, blocking, commentsCount, attachmentsCount, subtasks] = await Promise.all([
     prisma.taskDependency.findMany({ where: { taskId } }),
     prisma.taskDependency.findMany({ where: { blockedByTaskId: taskId } }),
     prisma.comment.count({ where: { taskId } }),
     prisma.attachment.count({ where: { taskId } }),
+    prisma.task.findMany({
+      where: { parentId: taskId },
+      orderBy: { position: "asc" },
+      select: { id: true, title: true, status: true },
+    }),
   ]);
 
   const serialized = serializeTask(task);
@@ -193,6 +246,9 @@ export async function getTask(taskId: string) {
   serialized.blocking = blocking;
   serialized.commentsCount = commentsCount;
   serialized.attachmentsCount = attachmentsCount;
+  serialized.subtasks = subtasks;
+  serialized.subtaskCount = subtasks.length;
+  serialized.openSubtaskCount = subtasks.filter((s) => s.status !== "done").length;
   return serialized;
 }
 
@@ -203,15 +259,26 @@ export interface TaskUpdateInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
+  parentId?: string | null;
 }
 
 export async function updateTask(taskId: string, input: TaskUpdateInput) {
-  await getTaskOrThrow(taskId);
+  const existing = await getTaskOrThrow(taskId);
 
   if (input.title !== undefined && (input.title.trim().length === 0 || input.title.length > 300)) {
     throw new ApiErrorException("VALIDATION_ERROR", "title deve avere tra 1 e 300 caratteri");
   }
   if (input.complexity !== undefined) validateComplexity(input.complexity);
+  if (input.parentId) {
+    await validateParent(existing.projectId, input.parentId, taskId);
+    const ownSubtaskCount = await prisma.task.count({ where: { parentId: taskId } });
+    if (ownSubtaskCount > 0) {
+      throw new ApiErrorException(
+        "VALIDATION_ERROR",
+        "Un task con sotto-task proprie non può diventare a sua volta una sotto-task"
+      );
+    }
+  }
 
   const data: any = {};
   if (input.title !== undefined) data.title = input.title;
@@ -220,6 +287,7 @@ export async function updateTask(taskId: string, input: TaskUpdateInput) {
   if (input.complexity !== undefined) data.complexity = input.complexity;
   if (input.tags !== undefined) data.tags = tagsToCsv(input.tags);
   if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
+  if (input.parentId !== undefined) data.parentId = input.parentId;
 
   const task = await prisma.task.update({ where: { id: taskId }, data });
   return serializeTask(task);
@@ -227,6 +295,14 @@ export async function updateTask(taskId: string, input: TaskUpdateInput) {
 
 export async function deleteTask(taskId: string) {
   await getTaskOrThrow(taskId);
+
+  const subtaskCount = await prisma.task.count({ where: { parentId: taskId } });
+  if (subtaskCount > 0) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      `Il task ha ${subtaskCount} sotto-task: eliminale o riassegnale prima di eliminare il task`
+    );
+  }
 
   // Elimina prima i file fisici/oggetti S3 (best-effort, vedi
   // AttachmentStorage.delete), poi i record DB in cascade.
@@ -298,12 +374,18 @@ export async function getBoard(
   let tasks = await prisma.task.findMany({ where, orderBy: [{ status: "asc" }, { position: "asc" }] });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
-  const blockedMap = await computeBlockedByOpenCount(tasks.map((t) => t.id));
+  const [blockedMap, subtaskMap] = await Promise.all([
+    computeBlockedByOpenCount(tasks.map((t) => t.id)),
+    computeSubtaskCounts(tasks.map((t) => t.id)),
+  ]);
 
   const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
+    const counts = subtaskMap.get(t.id);
+    serialized.subtaskCount = counts?.total ?? 0;
+    serialized.openSubtaskCount = counts?.open ?? 0;
     board[t.status as TaskStatus].push(serialized);
   }
   return board;
@@ -331,15 +413,65 @@ export async function getAggregatedBoard(
   });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
-  const blockedMap = await computeBlockedByOpenCount(tasks.map((t) => t.id));
+  const [blockedMap, subtaskMap] = await Promise.all([
+    computeBlockedByOpenCount(tasks.map((t) => t.id)),
+    computeSubtaskCounts(tasks.map((t) => t.id)),
+  ]);
 
   const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
+    const counts = subtaskMap.get(t.id);
+    serialized.subtaskCount = counts?.total ?? 0;
+    serialized.openSubtaskCount = counts?.open ?? 0;
     board[t.status as TaskStatus].push(serialized);
   }
   return board;
+}
+
+/**
+ * Crea piu' sotto-task di `parentId` in un'unica chiamata (il "gruppo di
+ * task" discusso: una epic grande diventa un parent + N subtasks create in
+ * blocco invece che una per una). Tutto o niente: se una sola riga fallisce
+ * la validazione, non viene creato nulla.
+ */
+export async function createSubtasks(projectId: string, parentId: string, inputs: TaskInput[]) {
+  await validateParent(projectId, parentId);
+  if (inputs.length === 0) {
+    throw new ApiErrorException("VALIDATION_ERROR", "Serve almeno una sotto-task da creare");
+  }
+  for (const input of inputs) {
+    if (!input.title || input.title.trim().length === 0 || input.title.length > 300) {
+      throw new ApiErrorException("VALIDATION_ERROR", "title deve avere tra 1 e 300 caratteri");
+    }
+    validateComplexity(input.complexity);
+  }
+
+  const maxPosition = await prisma.task.aggregate({
+    where: { projectId, status: "draft" },
+    _max: { position: true },
+  });
+  let nextPosition = (maxPosition._max.position ?? -1) + 1;
+
+  const created = await prisma.$transaction(
+    inputs.map((input) =>
+      prisma.task.create({
+        data: {
+          projectId,
+          parentId,
+          title: input.title,
+          description: input.description ?? "",
+          priority: input.priority ?? "medium",
+          complexity: input.complexity ?? null,
+          tags: tagsToCsv(input.tags) ?? "",
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          position: nextPosition++,
+        },
+      })
+    )
+  );
+  return created.map(serializeTask);
 }
 
 // ---------------------------------------------------------------------------

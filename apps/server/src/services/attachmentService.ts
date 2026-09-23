@@ -1,6 +1,6 @@
 import { ApiErrorException } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
+import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { getTaskOrThrow } from "./taskService.js";
 
 /**

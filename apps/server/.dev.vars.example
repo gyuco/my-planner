@@ -1,0 +1,7 @@
+# Variabili per `wrangler dev` locale (CF1).
+# Copiare in `.dev.vars` (gitignorato) e adattare i valori.
+# In produzione usare `wrangler secret put JWT_SECRET` ecc.
+JWT_SECRET=local-dev-secret-change-me-0123456789abcdef
+BOOTSTRAP_USERNAME=admin
+BOOTSTRAP_PASSWORD=admin-password
+MCP_HTTP_BASE_URL=http://localhost:8787

@@ -152,7 +152,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### `GET /tasks/:taskId`
 - Auth: JWT
-- 200: `Task` esteso con `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`
+- 200: `Task` esteso con `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`, `subtaskCount`, `openSubtaskCount`, `subtasks: { id, title, status }[]` (0/`[]` se il task non ha sotto-task)
 - 404 `NOT_FOUND`
 
 ### `POST /projects/:projectId/tasks`
@@ -164,16 +164,25 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
   "priority": "low|medium|high|urgent (default medium)",
   "complexity": "1|2|3|5|8|13|21|null",
   "tags": ["string"],
-  "dueDate": "ISO8601|null"
+  "dueDate": "ISO8601|null",
+  "parentId": "string|null"
 }
 ```
 - 201: `Task`
-- 400 `VALIDATION_ERROR` se `complexity` non è un valore Fibonacci ammesso
+- 400 `VALIDATION_ERROR` se `complexity` non è un valore Fibonacci ammesso, o se `parentId` punta a un task che è già esso stesso una sotto-task (un solo livello di annidamento)
+- 404 `NOT_FOUND` se `parentId` non esiste o appartiene a un altro progetto
+
+### `POST /tasks/:taskId/subtasks`
+- Crea in blocco più sotto-task di `taskId` in un'unica chiamata (tutto o niente: se una riga non è valida non viene creato nulla)
+- Body: `{ "subtasks": [{ "title": "...", "description"?, "priority"?, "complexity"?, "tags"?, "dueDate"? }] }` (almeno 1 elemento)
+- 201: `Task[]` (le sotto-task create, tutte con `parentId = taskId`)
+- 400 `VALIDATION_ERROR`, 404 `NOT_FOUND` (parent inesistente)
 
 ### `PATCH /tasks/:taskId`
-- Body: qualunque sottoinsieme dei campi di create eccetto `status` (che passa da `move`, vedi sotto)
+- Body: qualunque sottoinsieme dei campi di create eccetto `status` (che passa da `move`, vedi sotto), incluso `parentId` per riassegnare/staccare (`null`) la sotto-task
 - 200: `Task`
 - 404 `NOT_FOUND`
+- 400 `VALIDATION_ERROR` se `parentId` creerebbe un annidamento a più livelli, un self-parenting, o se il task ha già proprie sotto-task (non può diventare a sua volta una sotto-task)
 
 ### `POST /tasks/:taskId/move`
 - Body: `{ "status": "draft"|"in_progress"|"done", "position"?: number }`
@@ -190,6 +199,7 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 ### `DELETE /tasks/:taskId`
 - 200: `{ "id": "...", "deleted": true }`
 - Cascade: elimina commenti, allegati (incl. file fisico/oggetto S3 tramite `AttachmentStorage.delete`), e tutte le `TaskDependency` che coinvolgono il task (come `taskId` o `blockedByTaskId`).
+- 400 `VALIDATION_ERROR` se il task ha ancora sotto-task: vanno eliminate o riassegnate (`parentId: null`) prima di eliminare il parent — nessun cascade automatico sulle sotto-task, per non perderle per errore.
 - 404 `NOT_FOUND`
 
 ### Dipendenze
@@ -301,7 +311,7 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 
 **`get_task`**
 - Input: `{ taskId: z.string() }`
-- Output: `Task` esteso (blockedBy, blocking, commentsCount, attachmentsCount)
+- Output: `Task` esteso (blockedBy, blocking, commentsCount, attachmentsCount, `subtaskCount`, `openSubtaskCount`, `subtasks: { id, title, status }[]`) — cosi' un agente MCP distingue un task singolo (`subtaskCount: 0`) da uno con un gruppo di sotto-task senza dover interpretare testo libero
 - Errori: `NOT_FOUND`, `FORBIDDEN` (task di altro progetto)
 
 **`create_task`**
@@ -314,20 +324,29 @@ z.object({
   complexity: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(5),z.literal(8),z.literal(13),z.literal(21)]).nullable().optional(),
   tags: z.array(z.string()).default([]),
   dueDate: z.string().datetime().nullable().optional(),
+  parentId: z.string().nullable().optional(),
 })
 ```
+- `parentId` crea direttamente una sotto-task di un task esistente (che non deve essere a sua volta una sotto-task: un solo livello di annidamento)
 - Output: `Task`
-- Errori: `VALIDATION_ERROR`
+- Errori: `VALIDATION_ERROR`, `NOT_FOUND` (`parentId` inesistente/altro progetto)
+
+**`create_subtasks`**
+- Input: `{ parentId: z.string(), subtasks: z.array({ title, description?, priority?, complexity?, tags?, dueDate? }).min(1) }`
+- Crea in blocco un gruppo di sotto-task sotto `parentId` in un'unica chiamata — pensato per scomporre un task grande (es. 13 elementi) senza 13 chiamate separate a `create_task`. Tutto o niente.
+- Output: `Task[]`
+- Errori: `VALIDATION_ERROR`, `NOT_FOUND`, `FORBIDDEN`
 
 **`update_task`**
 - Input: come `create_task` ma tutti i campi `.optional()` (no default) + `taskId: z.string()` obbligatorio; niente `status`
+- `parentId: null` stacca la sotto-task e la rende di nuovo un task di primo livello
 - Output: `Task`
-- Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR`
+- Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR` (annidamento >1 livello, self-parenting, o il task ha già proprie sotto-task)
 
 **`delete_task`**
 - Input: `{ taskId: z.string() }`
 - Output: `{ id: string, deleted: true }`
-- Errori: `NOT_FOUND`, `FORBIDDEN`
+- Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR` (ha ancora sotto-task: eliminale o riassegnale prima)
 
 **`move_task`**
 - Input: `{ taskId: z.string(), status: z.enum(["draft","in_progress","done"]), position: z.number().int().nonnegative().optional() }`
@@ -381,7 +400,7 @@ z.object({
 
 **`get_board`**
 - Input: `{ priority: z.enum([...]).optional(), tag: z.string().optional(), search: z.string().optional() }`
-- Output: `{ draft: Task[], in_progress: Task[], done: Task[] }` — scoped al progetto del token.
+- Output: `{ draft: Task[], in_progress: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
 - **Nessun `get_aggregated_board` via MCP** (per costruzione: il token è scoped a un progetto).
 
 ---

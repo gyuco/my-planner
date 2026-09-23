@@ -18,3 +18,10 @@ apps/web/.playwright/
 
 # Uploaded attachments (local storage)
 apps/server/attachments/
+
+# Cloudflare (porting CF): client Prisma D1 generato, build wrangler e
+# variabili locali di `wrangler dev`.
+apps/server/prisma/d1client/
+apps/server/.cf-dist/
+apps/server/.wrangler/
+apps/server/.dev.vars

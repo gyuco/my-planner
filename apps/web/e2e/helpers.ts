@@ -3,7 +3,9 @@ import { E2E_BOOTSTRAP_PASSWORD, E2E_BOOTSTRAP_USERNAME } from "../playwright.co
 
 /** Base REST del backend "local" avviato da playwright.config.ts (webServer). */
 export const API_BASE = "http://localhost:3050";
-export const MCP_HTTP_BASE = "http://localhost:3150";
+// In modalita' Cloudflare (E2E_CF=1) MCP e REST sono serviti dallo stesso
+// Worker (porta 3050): il base MCP e' override-abile via env.
+export const MCP_HTTP_BASE = process.env.MCP_HTTP_BASE ?? "http://localhost:3150";
 
 export const API_BASE_S3 = "http://localhost:3051";
 export const MCP_HTTP_BASE_S3 = "http://localhost:3151";

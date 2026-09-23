@@ -2,6 +2,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Client D1 dedicato al runtime Cloudflare Workers (CF2): usa i driver
+// adapter (@prisma/adapter-d1) e il query compiler WASM (engineType "client"),
+// quindi nessun engine binario Node da bundle. Il client classico per
+// Node/SQLite resta quello sopra (default, @prisma/client).
+generator clientD1 {
+  provider        = "prisma-client-js"
+  output          = "./d1client"
+  previewFeatures = ["driverAdapters"]
+  engineType      = "client"
+}
+
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -47,6 +58,14 @@ model Task {
   tags        String   @default("") // comma-separated
   dueDate     DateTime?
   position    Int      @default(0)
+
+  // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
+  // volta avere subtasks, vedi validazione in taskService.ts). Nessun
+  // onDelete cascade: deleteTask rifiuta la cancellazione di un parent con
+  // subtasks ancora presenti, cosi' non si perdono dati per errore.
+  parentId String?
+  parent   Task?   @relation("Subtasks", fields: [parentId], references: [id])
+  subtasks Task[]  @relation("Subtasks")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

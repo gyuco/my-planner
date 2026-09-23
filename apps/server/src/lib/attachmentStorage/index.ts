@@ -2,6 +2,7 @@ import type { AttachmentStorage } from "./types.js";
 import { createLocalAttachmentStorage } from "./local.js";
 import { createS3AttachmentStorage } from "./s3.js";
 import { getInternalStorageSettings } from "../../services/storageSettingsService.js";
+import { setAttachmentStorageFactory } from "./provider.js";
 
 export type {
   AttachmentStorage,
@@ -11,13 +12,19 @@ export type {
   AttachmentUrlResult,
 } from "./types.js";
 
+export { getAttachmentStorage, setAttachmentStorageFactory } from "./provider.js";
+
 /**
- * Selezione del backend allegati: la config persistita in DB
+ * Selezione del backend allegati su runtime Node: la config persistita in DB
  * (StorageSettings, modificabile da UI) ha priorità; se il DB non è stato
  * ancora popolato si ricade sulle variabili d'ambiente storiche
  * (ATTACHMENTS_BACKEND / S3_*, vedi config.example.md).
+ *
+ * IMPORTANTE: questo modulo è Node-only (importa local.ts/s3.ts con node:fs e
+ * @aws-sdk). Il Worker Cloudflare usa il provider con la factory R2 e non deve
+ * importare questo file.
  */
-export async function getAttachmentStorage(): Promise<AttachmentStorage> {
+async function selectNodeAttachmentStorage(): Promise<AttachmentStorage> {
   const settings = await getInternalStorageSettings();
   const backend = settings.backend.toLowerCase();
 
@@ -35,3 +42,7 @@ export async function getAttachmentStorage(): Promise<AttachmentStorage> {
     baseDir: settings.localDir || process.env.ATTACHMENTS_LOCAL_DIR || "./attachments/local",
   });
 }
+
+// Registra il selettore Node all'import (side effect voluto). Su Node questo
+// modulo va importato dal bootstrap (src/index.ts, test/setup.ts).
+setAttachmentStorageFactory(selectNodeAttachmentStorage);

@@ -173,12 +173,30 @@ export interface CreateTaskInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
+  parentId?: string | null;
 }
 
 export function createTask(projectId: string, input: CreateTaskInput): Promise<Task> {
   return apiFetch(`/projects/${projectId}/tasks`, {
     method: "POST",
     body: JSON.stringify(input),
+  });
+}
+
+export interface CreateSubtaskInput {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  complexity?: TaskComplexity | null;
+  tags?: string[];
+  dueDate?: string | null;
+}
+
+/** Crea in blocco un gruppo di sotto-task di parentId (vedi API_CONTRACT.md §4). */
+export function createSubtasks(parentId: string, subtasks: CreateSubtaskInput[]): Promise<Task[]> {
+  return apiFetch(`/tasks/${parentId}/subtasks`, {
+    method: "POST",
+    body: JSON.stringify({ subtasks }),
   });
 }
 
@@ -208,6 +226,7 @@ export interface UpdateTaskInput {
   complexity?: TaskComplexity | null;
   tags?: string[];
   dueDate?: string | null;
+  parentId?: string | null;
 }
 
 export function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {

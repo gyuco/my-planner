@@ -4,6 +4,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { apiError, ApiErrorException, HTTP_STATUS_BY_ERROR_CODE } from "@my-planner/core";
 import { createProjectMcpServer } from "./server.js";
 import { resolveProjectFromToken } from "./auth.js";
+import { initNodePrisma } from "../lib/prisma.node.js";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
 
@@ -79,6 +80,7 @@ app.get("/mcp/attachments/:attachmentId/download", async (req, reply) => {
 });
 
 const port = Number(process.env.MCP_HTTP_PORT ?? 3100);
+initNodePrisma();
 app.listen({ port, host: "0.0.0.0" }).catch((err) => {
   app.log.error(err);
   process.exit(1);

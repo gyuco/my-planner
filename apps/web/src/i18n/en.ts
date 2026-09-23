@@ -60,6 +60,7 @@ export const en = {
     priorityHigh: "High",
     priorityUrgent: "Urgent",
     blockedTitle: "Task blocked by unresolved dependencies",
+    subtasksTitle: "Subtasks completed",
   },
   createTask: {
     title: "New task",
@@ -191,6 +192,12 @@ export const en = {
     noAttachments: "No attachments",
     download: "Download",
     delete: "Delete",
+    subtasks: "Subtasks",
+    noSubtasks: "No subtasks",
+    addSubtaskPlaceholder: "New subtask title",
+    addSubtaskError: "Error creating the subtask",
+    parentOf: "Subtask of:",
+    openParent: "Open parent task",
   },
   api: {
     sessionExpired: "Session expired, please log in again",

@@ -1,7 +1,21 @@
 import { afterAll, afterEach } from "vitest";
 import { rmSync } from "node:fs";
 import path from "node:path";
+import { initNodePrisma } from "../src/lib/prisma.node.js";
 import { prisma } from "../src/lib/prisma.js";
+import { setAttachmentStorageFactory } from "../src/lib/attachmentStorage/provider.js";
+import { createLocalAttachmentStorage } from "../src/lib/attachmentStorage/local.js";
+
+initNodePrisma();
+
+// Nei test lo storage allegati e' sempre locale: registra direttamente la
+// factory sul provider condiviso senza importare index.ts (che caricherebbe
+// anche s3.ts/@aws-sdk, interferendo con i mock di s3.test.ts).
+setAttachmentStorageFactory(async () =>
+  createLocalAttachmentStorage({
+    baseDir: process.env.ATTACHMENTS_LOCAL_DIR ?? "./test-tmp/attachments-local",
+  })
+);
 
 /**
  * Pulisce tutte le tabelle applicative dopo ogni test (ordine che rispetta

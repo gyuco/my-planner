@@ -1,11 +1,10 @@
 import { describe, it, expect } from "vitest";
-import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
 import { createProject } from "../services/taskService.js";
-import { resolveProjectFromToken } from "./auth.js";
+import { resolveProjectFromToken, hashToken } from "./auth.js";
 
 async function createRawTokenForProject(projectId: string, rawToken: string) {
-  const tokenHash = await bcrypt.hash(rawToken, 10);
+  const tokenHash = await hashToken(rawToken);
   return prisma.projectToken.create({ data: { projectId, tokenHash } });
 }
 

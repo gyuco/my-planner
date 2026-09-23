@@ -17,6 +17,8 @@ import {
   listBlockers,
   addComment,
   listComments,
+  createSubtasks,
+  getBoard,
 } from "./taskService.js";
 import { createAttachment } from "./attachmentService.js";
 
@@ -110,6 +112,129 @@ describe("taskService — task CRUD", () => {
     expect(detail.attachmentsCount).toBe(0);
     expect(detail.blockedBy).toEqual([]);
     expect(detail.blocking).toEqual([]);
+  });
+});
+
+describe("taskService — sotto-task", () => {
+  it("crea un task con parentId e getTask espone subtasks/subtaskCount sul parent", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Epic grande" });
+    const child = await createTask(project.id, { title: "Sotto-task 1", parentId: parent.id });
+    expect(child.parentId).toBe(parent.id);
+
+    const detail = await getTask(parent.id);
+    expect(detail.subtaskCount).toBe(1);
+    expect(detail.openSubtaskCount).toBe(1);
+    expect(detail.subtasks).toEqual([{ id: child.id, title: "Sotto-task 1", status: "draft" }]);
+
+    const childDetail = await getTask(child.id);
+    expect(childDetail.subtaskCount).toBe(0);
+  });
+
+  it("openSubtaskCount si aggiorna quando una sotto-task va done", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    const child = await createTask(project.id, { title: "Child", parentId: parent.id });
+    await moveTask(child.id, "done");
+
+    const detail = await getTask(parent.id);
+    expect(detail.subtaskCount).toBe(1);
+    expect(detail.openSubtaskCount).toBe(0);
+  });
+
+  it("rifiuta parentId inesistente o di un altro progetto con NOT_FOUND", async () => {
+    const project = await setupProject();
+    const other = await setupProject("Altro progetto");
+    const foreignParent = await createTask(other.id, { title: "Foreign" });
+
+    await expect(
+      createTask(project.id, { title: "X", parentId: "inesistente" })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      createTask(project.id, { title: "X", parentId: foreignParent.id })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rifiuta un solo livello di annidamento: una sotto-task non può avere sotto-task", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    const child = await createTask(project.id, { title: "Child", parentId: parent.id });
+
+    await expect(
+      createTask(project.id, { title: "Grandchild", parentId: child.id })
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("rifiuta un task con sotto-task proprie che diventa a sua volta sotto-task", async () => {
+    const project = await setupProject();
+    const parentA = await createTask(project.id, { title: "A" });
+    await createTask(project.id, { title: "A.1", parentId: parentA.id });
+    const parentB = await createTask(project.id, { title: "B" });
+
+    await expect(updateTask(parentA.id, { parentId: parentB.id })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+
+  it("rifiuta self-parenting", async () => {
+    const project = await setupProject();
+    const a = await createTask(project.id, { title: "A" });
+    await expect(updateTask(a.id, { parentId: a.id })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("updateTask con parentId: null stacca la sotto-task e la rende di primo livello", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    const child = await createTask(project.id, { title: "Child", parentId: parent.id });
+
+    const detached = await updateTask(child.id, { parentId: null });
+    expect(detached.parentId).toBeNull();
+  });
+
+  it("deleteTask rifiuta un parent con sotto-task ancora presenti", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    await createTask(project.id, { title: "Child", parentId: parent.id });
+
+    await expect(deleteTask(parent.id)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("createSubtasks crea piu' sotto-task in blocco sotto lo stesso parent", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Epic" });
+
+    const created = await createSubtasks(project.id, parent.id, [
+      { title: "Sub 1" },
+      { title: "Sub 2", priority: "high" },
+    ]);
+    expect(created).toHaveLength(2);
+    expect(created.every((t) => t.parentId === parent.id)).toBe(true);
+
+    const detail = await getTask(parent.id);
+    expect(detail.subtaskCount).toBe(2);
+  });
+
+  it("createSubtasks non crea nulla se una riga è invalida (tutto o niente)", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Epic" });
+
+    await expect(
+      createSubtasks(project.id, parent.id, [{ title: "Ok" }, { title: "" }])
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    const detail = await getTask(parent.id);
+    expect(detail.subtaskCount).toBe(0);
+  });
+
+  it("getBoard espone subtaskCount/openSubtaskCount per ogni task", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    await createTask(project.id, { title: "Child", parentId: parent.id });
+
+    const board = await getBoard(project.id, {});
+    const parentOnBoard = board.draft.find((t: any) => t.id === parent.id);
+    expect(parentOnBoard.subtaskCount).toBe(1);
+    expect(parentOnBoard.openSubtaskCount).toBe(1);
   });
 });
 

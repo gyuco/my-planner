@@ -45,6 +45,119 @@ Avvia:
 
 Per usare S3 invece dello storage locale, impostare `ATTACHMENTS_BACKEND=s3` (env del servizio `server` in `docker-compose.yml` o variabile d'ambiente della shell prima di `docker compose up`).
 
+## Cloudflare (porting CF)
+
+Oltre allo stack Node/Fastify, il backend è disponibile come **Worker Cloudflare**
+(`apps/server/src/cf/`): un unico Worker che serve sia la REST API (Hono) sia MCP
+HTTP (transport Web Standard del SDK MCP), con DB su **D1** (Prisma + `@prisma/adapter-d1`)
+e allegati su **R2**. Il frontend è pubblicato su **Cloudflare Pages**, con una Pages
+Function che inoltra `/api/*` al Worker (al posto del reverse proxy nginx). Vedi
+`BACKLOG.md` sezione "PORTING CLOUDFLARE".
+
+Prerequisiti: account Cloudflare, `npx wrangler login`.
+
+```bash
+# 1. Provisioning (una tantum)
+npx wrangler d1 create my-planner          # copia il database_id in apps/server/wrangler.toml
+npx wrangler r2 bucket create my-planner-attachments
+
+# 2. Worker: URL pubblica per gli allegati MCP (vars, non segreta)
+#    In apps/server/wrangler.toml: MCP_HTTP_BASE_URL = "https://my-planner.<account>.workers.dev"
+#    (o il custom domain). Serve a get_attachment_url per restituire URL raggiungibili.
+
+# 3. Secrets del Worker (produzione)
+npx --workspace apps/server wrangler secret put JWT_SECRET
+npx --workspace apps/server wrangler secret put BOOTSTRAP_USERNAME
+npx --workspace apps/server wrangler secret put BOOTSTRAP_PASSWORD
+
+# 4. Migrazioni D1 (remote) e deploy del Worker (genera anche il client D1)
+npm run --workspace apps/server d1:migrate:remote
+npm run --workspace apps/server cf:deploy
+# -> https://my-planner.<account>.workers.dev  (REST /... e MCP /mcp)
+
+# 5. Frontend su Pages
+npx wrangler pages project create my-planner-web --production-branch master
+VITE_MCP_HTTP_BASE_URL="https://my-planner.<account>.workers.dev" \
+  npm run --workspace apps/web pages:deploy
+# -> https://my-planner-web.pages.dev   (la Function /api/* inoltra al Worker)
+
+# Sviluppo locale del Worker (miniflare: D1 + R2 simulati)
+cp apps/server/.dev.vars.example apps/server/.dev.vars
+npm run --workspace apps/server d1:migrate:local
+npm run --workspace apps/server cf:dev
+```
+
+Binding Pages → Worker: `apps/web/wrangler.toml` dichiara `[[services]] binding = "API"
+service = "my-planner"` (deve combaciare col nome del Worker). Se il deploy non lo
+applica, impostalo da dashboard: Pages → progetto → Settings → Functions → Service
+bindings → `API` → Worker `my-planner`.
+
+Note di architettura:
+- `schema.prisma` genera **due client**: quello classico Node (`@prisma/client`) e
+  quello D1/WASM per il Worker (`prisma/d1client`, `driverAdapters` + `engineType=client`).
+  I service layer sono condivisi e runtime-agnostici.
+- Sul Worker l'accesso al DB è **serializzato** (il query compiler WASM non è rientrante):
+  vedi `apps/server/src/cf/db.ts`.
+- MCP su Cloudflare usa il transport raw del SDK (`WebStandardStreamableHTTPServerTransport`),
+  equivalente Workers di `StreamableHTTPServerTransport` Node, con gli stessi 14 tool e
+  autenticazione a token di progetto (`Authorization: Bearer <token>`). MCP stdio resta
+  invariato come tool CLI locale.
+- L'URL MCP mostrato in UI deriva da `VITE_MCP_HTTP_BASE_URL` (build Pages). Nello stack
+  Node/Docker, senza quella variabile, resta `<host UI>:3100` come prima.
+- CF15/CF17: `.github/workflows/ci.yml` valida il Worker (typecheck, migrazioni D1 locali,
+  bundle `wrangler deploy --dry-run`) e lo deploya su `master`; gli e2e Playwright girano
+  contro il Worker con `E2E_CF=1 MCP_HTTP_BASE=http://localhost:3050 npm run --workspace apps/web test:e2e`.
+
+### Runbook aggiornamenti
+
+Variabili di riferimento (produzione attuale):
+`WORKER_URL=https://my-planner.giuseppe-concas.workers.dev`, frontend `https://my-planner-web.pages.dev`.
+
+**Backend (Worker) — modifiche a `apps/server/src/cf`, route, service, validation**
+1. Verifica locale: `npm run typecheck && npm run --workspace apps/server typecheck:cf && npm run test`
+   (facoltativo: `npm run --workspace apps/server cf:dry-run` per il bundle).
+2. Se cambi binding/vars: aggiorna `apps/server/wrangler.toml`.
+3. Deploy: `npm run --workspace apps/server cf:deploy` (esegue `prisma generate` + `wrangler deploy`).
+4. Health check: `GET $WORKER_URL/health` (o `GET https://my-planner-web.pages.dev/api/health`).
+
+**Frontend (Pages) — modifiche a `apps/web`**
+1. `npm run --workspace apps/web typecheck && npm run --workspace apps/web build`.
+2. Deploy in produzione (da locale):
+   `VITE_MCP_HTTP_BASE_URL="$WORKER_URL" npm run --workspace apps/web pages:deploy:prod`.
+   (`pages:deploy` senza `--branch` deploya il branch git corrente → solo preview.)
+3. Nota: `VITE_MCP_HTTP_BASE_URL` è **build-time**: senza variabile la config MCP in UI
+   punta a `<host>:3100` (default stack Node/Docker).
+
+**Database (D1) — modifiche a `apps/server/prisma/schema.prisma`**
+Il Worker e Node usano due migrazioni separate: `apps/server/prisma/migrations/` (Prisma/Node)
+e `apps/server/migrations/` (D1/Worker). Vanno aggiornate entrambe.
+1. Node: `npm run --workspace apps/server prisma:migrate` (crea `prisma/migrations/<ts>_*`).
+2. D1: `npx --workspace apps/server wrangler d1 migrations create DB <nome>` e incolla lo
+   stesso DDL in `apps/server/migrations/000N_*.sql` (SQLite; prima i data-fix, poi il DDL).
+3. Applica a D1 produzione: `npm run --workspace apps/server d1:migrate:remote`.
+4. Rigenera i client (entrambi): `npm run --workspace apps/server prisma:generate`.
+5. Rideploya il Worker (se cambiano query/servizi): `npm run --workspace apps/server cf:deploy`.
+
+**Secrets (Worker)**
+- `npx --workspace apps/server wrangler secret put <NOME>` (es. `JWT_SECRET`).
+  Cambiare `JWT_SECRET` invalida le sessioni attive; cambiare `BOOTSTRAP_*` **non** aggiorna
+  l'utente già creato (il bootstrap gira solo se la tabella `User` è vuota).
+
+**Reset login (utente unico)**
+1. Elimina l'utente: `npx --workspace apps/server wrangler d1 execute DB --remote --command "DELETE FROM User;"`
+2. Imposta nuovi `BOOTSTRAP_USERNAME`/`BOOTSTRAP_PASSWORD` (secrets).
+3. Fai una richiesta qualsiasi al Worker (es. `GET /health`): l'utente viene ricreato.
+
+**Rollback**
+- Worker: `npx --workspace apps/server wrangler rollback` (o redeploy del commit precedente).
+- Pages: dashboard → progetto → Deployments → "Rollback" a un deployment precedente.
+- D1: le migrazioni sono solo forward; per dati usa Time Travel
+  (`npx --workspace apps/server wrangler d1 time-travel info DB --remote`).
+
+**CI automatica**: su push a `master`, il job `deploy-cloudflare` applica migrazioni D1,
+deploya Worker e Pages. Richiede i secrets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` e
+la repo variable `MCP_HTTP_BASE_URL` (= `$WORKER_URL`).
+
 ## MCP
 
 - **stdio:** `npm run --workspace apps/server mcp:stdio` (richiede `MCP_PROJECT_TOKEN` in env)

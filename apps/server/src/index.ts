@@ -4,6 +4,9 @@ import jwt from "@fastify/jwt";
 import multipart from "@fastify/multipart";
 import { ZodError } from "zod";
 import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-planner/core";
+import { initNodePrisma } from "./lib/prisma.node.js";
+// Registra il selettore storage allegati Node (local/S3) sul provider condiviso.
+import "./lib/attachmentStorage/index.js";
 import { authRoutes, bootstrapUser } from "./routes/auth.js";
 import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
@@ -78,6 +81,7 @@ app.register(settingsRoutes);
 const port = Number(process.env.PORT ?? 3000);
 
 async function start() {
+  initNodePrisma();
   await bootstrapUser(app);
   await app.listen({ port, host: "0.0.0.0" });
 }
