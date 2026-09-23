@@ -7,6 +7,7 @@ interface SidebarProps {
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
   onOpenSettings: (projectId: string) => void;
+  onRefreshProject: (projectId: string) => void;
   onOpenArchived: () => void;
   onOpenStorageSettings: () => void;
 }
@@ -17,6 +18,7 @@ export function Sidebar({
   onSelect,
   onCreateProject,
   onOpenSettings,
+  onRefreshProject,
   onOpenArchived,
   onOpenStorageSettings,
 }: SidebarProps) {
@@ -43,6 +45,17 @@ export function Sidebar({
               onClick={() => onSelect(p.id)}
             >
               {p.name}
+            </button>
+            <button
+              className="icon-button sidebar-project-refresh"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRefreshProject(p.id);
+              }}
+              title={t.sidebar.refreshProjectTitle}
+              aria-label={`${t.sidebar.refreshProjectTitle} ${p.name}`}
+            >
+              ↻
             </button>
             <button
               className="icon-button sidebar-project-settings"

@@ -38,6 +38,7 @@ export const it: Dictionary = {
     newProjectTitle: "Nuovo progetto",
     allProjects: "Tutti i progetti",
     projectSettingsTitle: "Impostazioni progetto",
+    refreshProjectTitle: "Aggiorna task",
     archivedProjects: "Progetti archiviati",
     storageSettings: "Impostazioni storage",
   },

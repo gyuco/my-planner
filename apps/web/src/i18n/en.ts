@@ -36,6 +36,7 @@ export const en = {
     newProjectTitle: "New project",
     allProjects: "All projects",
     projectSettingsTitle: "Project settings",
+    refreshProjectTitle: "Refresh tasks",
     archivedProjects: "Archived projects",
     storageSettings: "Storage settings",
   },

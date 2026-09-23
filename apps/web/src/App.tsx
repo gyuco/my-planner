@@ -122,6 +122,21 @@ export function App() {
     loadBoard();
   }, [loadBoard]);
 
+  const refreshProject = useCallback(
+    async (projectId: string) => {
+      setSelectedProjectId(projectId);
+      try {
+        const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
+        const data = await getProjectBoard(projectId, boardFilters);
+        setBoard(data);
+        setLoadError(null);
+      } catch {
+        setLoadError(t.app.loadBoardError);
+      }
+    },
+    [filters.search, filters.tag, t],
+  );
+
   const filteredBoard = useMemo(() => filterBoard(board, filters), [board, filters]);
   const availableTags = useMemo(() => collectTags(board), [board]);
 
@@ -162,6 +177,7 @@ export function App() {
         }}
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
+        onRefreshProject={refreshProject}
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
       />

@@ -129,6 +129,7 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
     const config = {
       mcpServers: {
         [`my-planner-${project.name}`]: {
+          type: "http",
           url: mcpUrl,
           headers: { Authorization: `Bearer ${token}` },
         },

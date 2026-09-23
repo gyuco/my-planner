@@ -437,8 +437,9 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   white-space: nowrap;
 }
 
-/* L'ingranaggio appare solo all'hover della riga: meno rumore visivo. */
-.sidebar-project-settings {
+/* L'ingranaggio e il refresh appaiono solo all'hover della riga: meno rumore visivo. */
+.sidebar-project-settings,
+.sidebar-project-refresh {
   flex-shrink: 0;
   width: 1.75rem;
   height: 1.75rem;
@@ -450,7 +451,9 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 }
 
 .sidebar-project-row:hover .sidebar-project-settings,
-.sidebar-project-settings:focus-visible { opacity: 1; }
+.sidebar-project-settings:focus-visible,
+.sidebar-project-row:hover .sidebar-project-refresh,
+.sidebar-project-refresh:focus-visible { opacity: 1; }
 
 .sidebar-footer {
   padding: 0.6rem;
@@ -1466,7 +1469,8 @@ body.dnd-dragging * {
     z-index: 25;
   }
 
-  .sidebar-project-settings { opacity: 1; }
+  .sidebar-project-settings,
+  .sidebar-project-refresh { opacity: 1; }
 
   .sidebar-nav { flex-direction: column; }
 
