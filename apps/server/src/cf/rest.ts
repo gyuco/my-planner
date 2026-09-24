@@ -33,6 +33,8 @@ import {
   deleteAttachment,
 } from "../services/attachmentService.js";
 import { getStorageSettings, updateStorageSettings } from "../services/storageSettingsService.js";
+import { buildStandupSummary } from "./standup.js";
+import { sendStandupEmail } from "./email.js";
 import {
   taskFiltersQuerySchema,
   taskInputSchema,
@@ -80,6 +82,17 @@ export function buildRestApp() {
 
   app.get("/health", (c) => c.json({ status: "ok" }));
 
+  // --- Admin -----------------------------------------------------------------
+  // Lancia manualmente lo standup giornaliero (normalmente via Cron Trigger,
+  // vedi wrangler.toml [triggers]) — utile per testare il canale email senza
+  // aspettare l'orario schedulato.
+  app.post("/admin/run-standup", async (c) => {
+    const summary = await buildStandupSummary();
+    const today = new Date().toISOString().slice(0, 10);
+    await sendStandupEmail(c.env, `Standup my-planner — ${today}`, summary);
+    return c.json({ status: "sent" });
+  });
+
   // --- Auth ----------------------------------------------------------------
   app.post("/auth/login", async (c) => {
     const body = await c.req.json().catch(() => ({}));
@@ -102,6 +115,7 @@ export function buildRestApp() {
     "/board",
     "/attachments/*",
     "/settings/*",
+    "/admin/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
