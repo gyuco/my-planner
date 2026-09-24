@@ -5,3 +5,7 @@ JWT_SECRET=local-dev-secret-change-me-0123456789abcdef
 BOOTSTRAP_USERNAME=admin
 BOOTSTRAP_PASSWORD=admin-password
 MCP_HTTP_BASE_URL=http://localhost:8787
+# Standup giornaliero (vedi README: Account Google -> Sicurezza -> Password per le app)
+GMAIL_USER=tuo-indirizzo@gmail.com
+GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx
+STANDUP_RECIPIENT=giuconcas@gmail.com

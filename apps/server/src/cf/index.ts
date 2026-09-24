@@ -1,9 +1,11 @@
-import type { ExecutionContext } from "@cloudflare/workers-types";
+import type { ExecutionContext, ScheduledEvent } from "@cloudflare/workers-types";
 import { buildRestApp, bootstrapUserOnWorker } from "./rest.js";
 import { initD1Prisma } from "./db.js";
 import { setAttachmentStorageFactory } from "../lib/attachmentStorage/provider.js";
 import { createR2AttachmentStorage } from "./storage/r2.js";
 import { handleMcpRequest, handleMcpAttachmentDownload } from "./mcp.js";
+import { buildStandupSummary } from "./standup.js";
+import { sendStandupEmail } from "./email.js";
 import type { CfEnv } from "./env.js";
 
 /**
@@ -50,5 +52,19 @@ export default {
       return handleMcpRequest(request, env);
     }
     return rest.fetch(request, env, ctx as never);
+  },
+
+  // Standup giornaliero (CF: Cron Trigger, vedi wrangler.toml [triggers]).
+  // Legge direttamente D1 (tutti i progetti, non scoped come un token MCP)
+  // e invia il riepilogo via Gmail API.
+  async scheduled(_event: ScheduledEvent, env: CfEnv, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      (async () => {
+        await ensureInitialized(env);
+        const summary = await buildStandupSummary();
+        const today = new Date().toISOString().slice(0, 10);
+        await sendStandupEmail(env, `Standup my-planner — ${today}`, summary);
+      })()
+    );
   },
 };

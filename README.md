@@ -165,6 +165,44 @@ la repo variable `MCP_HTTP_BASE_URL` (= `$WORKER_URL`).
 
 I token si generano/revocano dalla UI, uno per progetto.
 
+## Standup giornaliero (Cron Trigger + Gmail)
+
+Il Worker CF invia ogni giorno alle 06:00 UTC (`apps/server/wrangler.toml`
+`[triggers]`) un riepilogo via email su tutti i progetti non archiviati
+(`apps/server/src/cf/standup.ts`): task completati nelle ultime 24h, task
+`in_progress` (con giorni di stallo) e task `draft` a priorità `high`/`urgent`.
+L'invio usa un client SMTP minimale su TCP socket (`apps/server/src/cf/email.ts`,
+API `cloudflare:sockets`) verso `smtp.gmail.com:465` (TLS implicita), non l'API
+Gmail: autenticazione con una **App Password**, non con la password
+dell'account né con OAuth2.
+
+**Setup una tantum:**
+1. Sul tuo Account Google, richiede la **verifica in due passaggi attiva**:
+   [myaccount.google.com/security](https://myaccount.google.com/security) →
+   "Verifica in due passaggi" → in fondo "Password per le app" → genera una
+   password per l'app "Mail" (o nome libero, es. "my-planner standup") →
+   copia la stringa di 16 caratteri mostrata (senza spazi).
+2. Imposta i secrets del Worker:
+   ```bash
+   npx --workspace apps/server wrangler secret put GMAIL_USER          # es. tuo-indirizzo@gmail.com
+   npx --workspace apps/server wrangler secret put GMAIL_APP_PASSWORD  # la stringa da 16 caratteri
+   ```
+3. `STANDUP_RECIPIENT` è già in `wrangler.toml` (`[vars]`); cambiarlo lì se serve.
+4. Deploy: `npm run --workspace apps/server cf:deploy` (applica anche `[triggers]`).
+
+**Test locale** (prima del deploy, senza aspettare l'orario):
+```bash
+cp apps/server/.dev.vars.example apps/server/.dev.vars   # e compila i valori Gmail
+npm run --workspace apps/server cf:dev
+# in un altro terminale:
+curl "http://localhost:8787/__scheduled?cron=0+6+*+*+*"
+```
+
+Nota fuso orario: Cloudflare valuta i cron sempre in UTC. `0 6 * * *` = 08:00
+locale in ora legale (CEST, mar-ott); in ora solare (CET, nov-mar) diventa
+07:00 locale — se serve l'orario locale esatto tutto l'anno, l'espressione
+cron va aggiornata a mano ai cambi d'ora.
+
 ## Agenti
 
 Definiti in `.claude/agents/`: `analyst`, `architect`, `planner`, `coder`, `reviewer`, `dev-ops`.

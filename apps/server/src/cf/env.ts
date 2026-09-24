@@ -14,4 +14,12 @@ export interface CfEnv {
   MCP_HTTP_BASE_URL?: string;
   // Var statiche optionale (vedi wrangler.toml [vars])
   PORT?: string;
+
+  // Standup giornaliero via Cron Trigger (vedi wrangler.toml [triggers] e
+  // src/cf/standup.ts). Invio via SMTP Gmail (smtp.gmail.com:465) con App
+  // Password (Account Google → Sicurezza → Password per le app) — non la
+  // password dell'account.
+  GMAIL_USER: string;
+  GMAIL_APP_PASSWORD: string;
+  STANDUP_RECIPIENT: string;
 }

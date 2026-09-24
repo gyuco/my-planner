@@ -20,7 +20,16 @@ binding = "ATTACHMENTS"
 bucket_name = "my-planner-attachments"
 
 # ---- Var statiche ------------------------------------------------------------
-# JWT_SECRET, BOOTSTRAP_USERNAME, BOOTSTRAP_PASSWORD vanno impostate come
-# secrets (`wrangler secret put`) o vars in produzione.
+# JWT_SECRET, BOOTSTRAP_USERNAME, BOOTSTRAP_PASSWORD, GMAIL_USER,
+# GMAIL_APP_PASSWORD vanno impostate come secrets (`wrangler secret put`)
+# o vars in produzione.
 [vars]
 MCP_HTTP_BASE_URL = "https://my-planner.giuseppe-concas.workers.dev"
+STANDUP_RECIPIENT = "giuconcas@gmail.com"
+
+# ---- Cron Trigger: standup giornaliero su tutti i progetti ------------------
+# 06:00 UTC = 08:00 Italia in ora legale (CEST, mar-ott); in ora solare (CET,
+# nov-mar) l'orario locale effettivo scala a 07:00 — Cloudflare valuta sempre
+# in UTC, va aggiustato manualmente se serve l'orario locale esatto tutto l'anno.
+[triggers]
+crons = ["0 6 * * *"]
