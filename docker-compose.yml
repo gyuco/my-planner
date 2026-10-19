@@ -41,9 +41,11 @@ services:
       - server
 
   minio:
-    # quay.io e' il registry ufficiale raccomandato da MinIO (docker.io/minio/*
-    # e' soggetto a rate limiting e a volte non risolve correttamente).
-    image: quay.io/minio/minio:latest
+    # Le immagini ufficiali MinIO sono state rimosse da Docker Hub (set 2026)
+    # e da quay.io (ott 2026). `pgsty/minio` è SILO, un fork drop-in
+    # compatible (stesso binario, CLI `mc` inclusa) utile per sviluppo e test.
+    # Tag pinnato per evitare aggiornamenti silenziosi dell'immagine.
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     command: server /data --console-address ":9001"
     ports:
       - "9000:9000"
@@ -54,23 +56,24 @@ services:
     volumes:
       - ./data/minio:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      # L'immagine include curl; usiamo l'endpoint HTTP invece di `mc ready
+      # local`, che richiederebbe un alias configurato nel container.
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   # Servizio one-shot che crea il bucket di test all'avvio (pattern comune per
-  # MinIO in docker-compose, dato che l'immagine minio/minio non espone un
-  # modo nativo per creare bucket al boot). Usa il client `mc` incluso
-  # nell'immagine minio/mc.
+  # MinIO in docker-compose, dato che l'immagine non espone un modo nativo per
+  # creare bucket al boot). Usa il client `mc` incluso nell'immagine SILO.
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     depends_on:
       minio:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
       mc alias set local http://minio:9000 ${S3_ACCESS_KEY_ID:-minioadmin} ${S3_SECRET_ACCESS_KEY:-minioadmin} &&
-      mc mb -p local/${S3_BUCKET:-my-planner-attachments} &&
+      mc mb --ignore-existing local/${S3_BUCKET:-my-planner-attachments} &&
       exit 0
       "

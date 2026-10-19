@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+  # Permette di rilanciare manualmente il workflow (e quindi il deploy) dal
+  # tab Actions, utile quando la CI fallisce per cause esterne o per un
+  # deploy di emergenza. Il job di deploy resta limitato a `master`.
+  workflow_dispatch:
 
 env:
   # DB SQLite effimero, ricreato ad ogni run da `prisma migrate deploy`
@@ -16,12 +20,12 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm ci
 
       - name: Prisma generate (apps/server)
         run: npm run --workspace apps/server prisma:generate
@@ -34,25 +38,18 @@ jobs:
       - run: npm run build
       - run: npm run test --if-present
 
-      # Predispone Playwright per gli scenari e2e (T4-T9, prossimo batch);
-      # nessun test e2e esiste ancora in questo batch, questo step prepara
-      # l'ambiente cosi' che il job e2e sotto sia pronto non appena arriveranno.
-      - name: Install Playwright browsers
-        run: npx --workspace apps/web playwright install --with-deps
-        continue-on-error: true
-
   # Validazione del porting Cloudflare (CF1-CF13) senza deploy: typecheck dei
   # sorgenti Worker e delle Pages Functions, migrazioni D1 su DB locale e
   # bundle del Worker con wrangler.
   cloudflare:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm ci
 
       - name: Prisma generate (apps/server, include client D1)
         run: npm run --workspace apps/server prisma:generate
@@ -69,11 +66,12 @@ jobs:
       - name: Bundle Worker (dry-run)
         run: npm run --workspace apps/server cf:dry-run
 
-  # Deploy su Cloudflare (CF15): solo su master, richiede i secrets
-  # CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID configurati nel repository.
-  # Applica le migrazioni D1 remote, deploya il Worker e il frontend su Pages.
+  # Deploy su Cloudflare (CF15): su push a master o workflow_dispatch da master.
+  # Richiede i secrets CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID configurati
+  # nel repository. Applica le migrazioni D1 remote, deploya il Worker e il
+  # frontend su Pages in produzione.
   deploy-cloudflare:
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [build-and-test, cloudflare]
     runs-on: ubuntu-latest
     env:
@@ -85,12 +83,23 @@ jobs:
       # usa invece il valore MCP_HTTP_BASE_URL in apps/server/wrangler.toml.
       VITE_MCP_HTTP_BASE_URL: ${{ vars.MCP_HTTP_BASE_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm install
+      - run: npm ci
+
+      - name: Verifica credenziali Cloudflare
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID devono essere configurati come secrets del repository (Settings -> Secrets and variables -> Actions)."
+            exit 1
+          fi
+          if [ -z "$VITE_MCP_HTTP_BASE_URL" ]; then
+            echo "::warning::La repo variable MCP_HTTP_BASE_URL non è configurata: la UI userà il default <host>:3100 per l'endpoint MCP."
+          fi
+
       - run: npm run --workspace apps/server prisma:generate
 
       - name: Migrazioni D1 (remote)
@@ -99,22 +108,21 @@ jobs:
       - name: Deploy Worker REST + MCP
         run: npm run --workspace apps/server cf:deploy
 
-      - name: Deploy frontend su Cloudflare Pages
-        run: npm run --workspace apps/web pages:deploy
+      - name: Deploy frontend su Cloudflare Pages (produzione)
+        # `pages:deploy` senza `--branch` può creare un preview deployment:
+        # per la produzione serve esplicitamente `--branch master`.
+        run: npm run --workspace apps/web pages:deploy:prod
 
   e2e:
     runs-on: ubuntu-latest
     needs: build-and-test
-    # Placeholder per T4-T9: nessun test e2e esiste ancora in apps/web/e2e,
-    # quindi il job termina subito senza avviare la stack (server+web+MinIO
-    # via docker-compose.yml) finche' gli scenari non vengono aggiunti.
     env:
       # Fa girare anche lo scenario T6/S3 (playwright.config.ts avvia un
       # backend/frontend dedicati con backend "s3" quando E2E_S3=1), usando
-      # il MinIO di docker-compose.yml avviato sotto.
+      # il servizio S3-compatibile di docker-compose.yml avviato sotto.
       E2E_S3: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Check for Playwright e2e tests
         id: check
         run: |
@@ -124,21 +132,27 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Avvia MinIO (per lo scenario T6/S3) via docker compose
+      - name: Avvia storage S3 (Silo, fork drop-in di MinIO)
         # I test Playwright avviano backend/frontend in locale via `webServer`
         # (porte dedicate, vedi playwright.config.ts): non serve buildare/
-        # avviare le immagini server/web di docker-compose.yml, solo MinIO
-        # (+ minio-init per creare il bucket) e' realmente utilizzato qui.
+        # avviare le immagini server/web di docker-compose.yml, solo lo
+        # storage S3 (+ init per creare il bucket) è realmente utilizzato qui.
+        #
+        # Nota: le immagini ufficiali MinIO sono state rimosse da Docker Hub
+        # (set 2026) e da quay.io (ott 2026). `pgsty/minio` è il fork SILO,
+        # drop-in compatible, con lo stesso binario e la CLI `mc`.
         if: steps.check.outputs.found == 'true'
-        run: docker compose up -d minio minio-init
+        run: |
+          docker compose up -d minio
+          docker compose run --rm minio-init
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.check.outputs.found == 'true'
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - run: npm install
+      - run: npm ci
         if: steps.check.outputs.found == 'true'
 
       - name: Install Playwright browsers
@@ -150,5 +164,5 @@ jobs:
         run: npm run --workspace apps/web test:e2e
 
       - name: Stop stack
-        if: steps.check.outputs.found == 'true'
+        if: always() && steps.check.outputs.found == 'true'
         run: docker compose down -v

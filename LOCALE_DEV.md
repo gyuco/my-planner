@@ -262,8 +262,8 @@ con porte dedicate e un DB e2e separato (mai `dev.db`).
 | Worker CF | 3050 (Worker) | 5183 | `E2E_CF=1` |
 
 ```bash
-# scenario S3 (richiede MinIO di docker-compose sulla 9000)
-docker compose up -d minio minio-init
+# scenario S3 (richiede lo storage S3-compatibile di docker-compose sulla 9000)
+docker compose up -d minio && docker compose run --rm minio-init
 E2E_S3=1 npm run --workspace apps/web test:e2e
 
 # scenario Cloudflare (Worker via wrangler dev)
@@ -294,10 +294,11 @@ S3_SECRET_ACCESS_KEY=minioadmin
 S3_REGION=us-east-1
 ```
 
-MinIO locale (dal `docker-compose.yml`, solo i servizi di storage):
+Storage S3 locale (dal `docker-compose.yml`, solo i servizi di storage; usa
+SILO/`pgsty/minio`, fork drop-in di MinIO):
 
 ```bash
-docker compose up -d minio minio-init
+docker compose up -d minio && docker compose run --rm minio-init
 # console web: http://localhost:9001 (minioadmin / minioadmin)
 ```
 
@@ -410,7 +411,7 @@ curl "http://localhost:8787/__scheduled?cron=0+6+*+*+*"
 | `Credenziali non valide` al login | password diversa da quella salvata nel DB | `npm run --workspace apps/server user:set-password -- admin <password>` (§5) |
 | `EADDRINUSE :3000` / `:5173` | processo precedente ancora vivo (spesso per il `&` dello script root) | `lsof -ti:3000 \| xargs kill` |
 | UI carica ma le chiamate API falliscono | backend non avviato / porta diversa | controlla `curl :3000/health`, poi `VITE_API_PROXY_TARGET` |
-| `502`/`404` sugli allegati | `ATTACHMENTS_LOCAL_DIR` non scrivibile o backend S3 non raggiungibile | verifica la dir / `docker compose up -d minio minio-init` |
+| `502`/`404` sugli allegati | `ATTACHMENTS_LOCAL_DIR` non scrivibile o backend S3 non raggiungibile | verifica la dir / `docker compose up -d minio && docker compose run --rm minio-init` |
 | Migrazioni non applicate dopo un pull | nuove migrazioni committate | `npm run --workspace apps/server prisma:migrate` |
 | `tsx`/`vite` non trovati | `npm install` non eseguito | `npm install` dalla root |
 

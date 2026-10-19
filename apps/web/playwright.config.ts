@@ -19,10 +19,10 @@ import { defineConfig, devices } from "@playwright/test";
  * - frontend "local" (proxy verso il backend "local"): 5183
  * - frontend "s3"    (proxy verso il backend "s3"): 5184
  *
- * Lo scenario T6 "s3" richiede il servizio MinIO di `docker-compose.yml`
- * (root del repo) attivo su localhost:9000 con le credenziali di default
- * (minioadmin/minioadmin) e il bucket `my-planner-attachments` già creato
- * (`docker compose up -d minio minio-init`). Se MinIO non è raggiungibile,
+ * Lo scenario T6 "s3" richiede il servizio S3-compatibile di `docker-compose.yml`
+ * (root del repo, SILO/`pgsty/minio`) attivo su localhost:9000 con le credenziali
+ * di default (minioadmin/minioadmin) e il bucket `my-planner-attachments` già creato
+ * (`docker compose up -d minio && docker compose run --rm minio-init`). Se non è raggiungibile,
  * il backend "s3" fallirà ad avviarsi e lo scenario T6/s3 fallirà: è una
  * scelta esplicita (vedi BACKLOG.md T6/I1), non c'è fallback/mocking.
  */
@@ -123,7 +123,7 @@ export default defineConfig({
     },
     // Backend/frontend dedicati allo scenario T6 "s3": avviati solo se
     // E2E_S3=1 (richiede il MinIO di docker-compose.yml già attivo, vedi
-    // BACKLOG.md T6/I1 - "docker compose up -d minio minio-init"). Di
+    // BACKLOG.md T6/I1 - "docker compose up -d minio && docker compose run --rm minio-init"). Di
     // default disattivati per non far fallire l'intera suite quando Docker
     // non è disponibile; lo scenario s3 stesso si auto-skippa in quel caso
     // (vedi e2e/t6-attachments.spec.ts).

@@ -44,7 +44,7 @@ docker compose up --build
 Avvia:
 - `server`: REST API (porta 3000) + server MCP HTTP (porta 3100), nello stesso container (due processi Node lanciati da `apps/server/docker-entrypoint.sh`, che esegue prima `prisma migrate deploy`). SQLite persistito su `./data`, allegati locali su `./attachments`.
 - `web`: build statica React servita da nginx (porta 5173), con reverse proxy `/api` → `server:3000` (vedi `apps/web/nginx.conf`), stesso schema del proxy Vite usato in sviluppo.
-- `minio` + `minio-init`: storage S3-compatibile per testare `ATTACHMENTS_BACKEND=s3` end-to-end in locale/CI. Console su `http://localhost:9001` (credenziali `minioadmin`/`minioadmin` di default, sovrascrivibili con `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`). Il servizio `minio-init` crea automaticamente il bucket di test (`S3_BUCKET`, default `my-planner-attachments`) all'avvio.
+- `minio` + `minio-init`: storage S3-compatibile per testare `ATTACHMENTS_BACKEND=s3` end-to-end in locale/CI. Usa **SILO** (`pgsty/minio`), fork drop-in di MinIO: le immagini ufficiali MinIO sono state rimosse da Docker Hub (set 2026) e da quay.io (ott 2026). Console su `http://localhost:9001` (credenziali `minioadmin`/`minioadmin` di default, sovrascrivibili con `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`). Il servizio `minio-init` crea automaticamente il bucket di test (`S3_BUCKET`, default `my-planner-attachments`) all'avvio.
 
 Per usare S3 invece dello storage locale, impostare `ATTACHMENTS_BACKEND=s3` (env del servizio `server` in `docker-compose.yml` o variabile d'ambiente della shell prima di `docker compose up`).
 
@@ -81,7 +81,7 @@ npm run --workspace apps/server cf:deploy
 # 5. Frontend su Pages
 npx wrangler pages project create my-planner-web --production-branch master
 VITE_MCP_HTTP_BASE_URL="https://my-planner.<account>.workers.dev" \
-  npm run --workspace apps/web pages:deploy
+  npm run --workspace apps/web pages:deploy:prod
 # -> https://my-planner-web.pages.dev   (la Function /api/* inoltra al Worker)
 
 # Sviluppo locale del Worker (miniflare: D1 + R2 simulati)
@@ -159,8 +159,20 @@ e `apps/server/migrations/` (D1/Worker). Vanno aggiornate entrambe.
   (`npx --workspace apps/server wrangler d1 time-travel info DB --remote`).
 
 **CI automatica**: su push a `master`, il job `deploy-cloudflare` applica migrazioni D1,
-deploya Worker e Pages. Richiede i secrets `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` e
-la repo variable `MCP_HTTP_BASE_URL` (= `$WORKER_URL`).
+deploya Worker e Pages in produzione (`pages:deploy:prod`). Lo stesso job può essere
+rilanciato manualmente dal tab **Actions → CI → Run workflow** selezionando `master`
+(`workflow_dispatch`).
+
+Prerequisiti una tantum nel repository GitHub:
+
+```bash
+gh secret set CLOUDFLARE_API_TOKEN
+gh secret set CLOUDFLARE_ACCOUNT_ID --body "<account-id>"
+gh variable set MCP_HTTP_BASE_URL --body "$WORKER_URL"
+```
+
+Senza `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` il job di deploy fallisce con un
+errore esplicito prima di toccare la produzione.
 
 ## MCP
 

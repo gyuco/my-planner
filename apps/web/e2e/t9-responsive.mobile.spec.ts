@@ -27,9 +27,15 @@ test.describe("T9 - responsive mobile (375x667)", () => {
     await page.locator(".task-card", { hasText: task.title }).click();
     const drawer = page.locator(".drawer");
     await expect(drawer).toBeVisible();
+    // Il drawer ha un'animazione `modal-rise` (scale 0.98 -> 1): aspettiamo
+    // che finisca, altrimenti il boundingBox può essere letto a metà e
+    // risultare più stretto del viewport (test flaky).
+    await drawer.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
+    });
     const box = await drawer.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(370);
+    expect(box!.width).toBeGreaterThanOrEqual(374);
 
     // Nessun overflow orizzontale della pagina
     const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
