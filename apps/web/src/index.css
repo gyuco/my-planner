@@ -1113,6 +1113,226 @@ body.dnd-dragging * {
   background: linear-gradient(135deg, var(--violet-500), var(--indigo-500));
 }
 
+/* --- Parametri avanzati (chiusi di default) ------------------------------ */
+
+.advanced-section {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.45rem;
+  margin-top: 0.1rem;
+}
+
+.advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.35rem 0.1rem;
+  background: transparent;
+  border: none;
+  color: var(--ink-500);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: left;
+}
+
+.advanced-toggle:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-800);
+}
+
+.advanced-chevron {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--ink-300);
+  transition: transform 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.advanced-section.is-open .advanced-chevron {
+  transform: rotate(90deg);
+  color: var(--indigo-500);
+}
+
+.advanced-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: var(--r-full);
+  background: var(--indigo-100);
+  color: var(--indigo-700);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.advanced-hint {
+  margin-left: auto;
+  color: var(--ink-300);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.advanced-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-top: 0.4rem;
+  animation: advanced-in 0.2s var(--ease) both;
+}
+
+.advanced-panel[hidden] { display: none; }
+
+@keyframes advanced-in { from { opacity: 0; transform: translateY(-4px); } }
+
+/* --- Upload allegati (drag & drop) --------------------------------------- */
+
+.file-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.file-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  padding: 1.15rem 1rem;
+  border: 1.5px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+  color: var(--ink-400);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease),
+    box-shadow 0.18s var(--ease), transform 0.12s var(--ease);
+}
+
+.file-dropzone:hover {
+  border-color: var(--indigo-300);
+  background: var(--indigo-50);
+}
+
+.file-dropzone:focus-visible {
+  outline: none;
+  border-color: var(--indigo-500);
+  box-shadow: var(--shadow-focus);
+}
+
+.file-dropzone.is-dragging {
+  border-style: solid;
+  border-color: var(--indigo-500);
+  background: var(--indigo-50);
+  box-shadow: var(--shadow-focus);
+  transform: scale(1.01);
+}
+
+.file-dropzone-icon {
+  width: 26px;
+  height: 26px;
+  margin-bottom: 0.15rem;
+  color: var(--indigo-500);
+}
+
+.file-dropzone-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink-700);
+}
+
+.file-dropzone-hint {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--ink-300);
+}
+
+.file-list {
+  list-style: none;
+  margin: 0.1rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  animation: file-in 0.2s var(--ease) both;
+}
+
+@keyframes file-in { from { opacity: 0; transform: translateY(3px); } }
+
+.file-list-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: var(--indigo-50);
+  color: var(--indigo-500);
+}
+
+.file-list-icon svg { width: 17px; height: 17px; }
+
+.file-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.file-list-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-700);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-list-size {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ink-300);
+}
+
+.file-list-remove {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-300);
+}
+
+.file-list-remove svg { width: 15px; height: 15px; }
+
+.file-list-remove:hover {
+  background: var(--danger-bg);
+  border-color: transparent;
+  color: var(--danger);
+}
+
 .settings-modal { max-width: 580px; }
 
 /* --- Gestione utenti ----------------------------------------------------- */
