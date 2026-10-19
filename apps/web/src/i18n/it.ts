@@ -55,6 +55,7 @@ export const it: Dictionary = {
     allTags: "Tutti i tag",
     searchPlaceholder: "Cerca per titolo o descrizione...",
     includedProjects: "Progetti inclusi:",
+    showSubtasks: "Mostra sotto-task",
   },
   board: {
     draft: "Draft",
@@ -73,6 +74,9 @@ export const it: Dictionary = {
     priorityUrgent: "Urgente",
     blockedTitle: "Task bloccato da dipendenze non risolte",
     subtasksTitle: "Sotto-task completate",
+    subtask: "Sotto-task",
+    subtaskOf: "Sotto-task di {title}",
+    statusMismatch: "Stato non allineato alle sotto-task: sposta in {status}",
   },
   createTask: {
     title: "Nuovo task",

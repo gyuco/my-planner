@@ -63,6 +63,32 @@ export interface SubtaskSummary {
   status: TaskStatus;
 }
 
+export type SubtaskStatusCounts = Record<TaskStatus, number>;
+
+export function emptySubtaskStatusCounts(): SubtaskStatusCounts {
+  return { draft: 0, todo: 0, in_progress: 0, testing: 0, done: 0 };
+}
+
+/**
+ * Stato suggerito per un parent in base alle sue sotto-task (lo stato del
+ * parent resta manuale: questo valore serve solo a segnalare un
+ * disallineamento). null se non ci sono sotto-task.
+ * - tutte done -> done
+ * - tutte in testing/done -> testing
+ * - almeno una avviata (in_progress/testing/done) -> in_progress
+ * - tutte draft -> draft
+ * - altrimenti -> todo
+ */
+export function suggestParentStatus(counts: SubtaskStatusCounts): TaskStatus | null {
+  const total = TASK_STATUSES.reduce((sum, s) => sum + counts[s], 0);
+  if (total === 0) return null;
+  if (counts.done === total) return "done";
+  if (counts.testing + counts.done === total) return "testing";
+  if (counts.in_progress + counts.testing + counts.done > 0) return "in_progress";
+  if (counts.draft === total) return "draft";
+  return "todo";
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -84,6 +110,9 @@ export interface Task {
   // (list/board/detail), sempre 0 se il task non ha sotto-task.
   subtaskCount?: number;
   openSubtaskCount?: number;
+  // Ripartizione delle sotto-task per stato (tutti gli stati sempre presenti,
+  // a 0 se vuoti): permette di mostrare l'avanzamento reale del parent.
+  subtaskStatusCounts?: SubtaskStatusCounts;
   // Presenti solo su GET /tasks/:taskId (dettaglio esteso, vedi API_CONTRACT.md §4)
   blockedBy?: TaskDependency[];
   blocking?: TaskDependency[];

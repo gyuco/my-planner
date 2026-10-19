@@ -195,7 +195,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### `GET /tasks/:taskId`
 - Auth: JWT
-- 200: `Task` esteso con `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`, `subtaskCount`, `openSubtaskCount`, `subtasks: { id, title, status }[]` (0/`[]` se il task non ha sotto-task)
+- 200: `Task` esteso con `blockedBy: TaskDependency[]`, `blocking: TaskDependency[]`, `commentsCount`, `attachmentsCount`, `subtaskCount`, `openSubtaskCount`, `subtaskStatusCounts: { draft, todo, in_progress, testing, done }`, `subtasks: { id, title, status }[]` (0/`[]` se il task non ha sotto-task)
 - 404 `NOT_FOUND`
 
 ### `POST /projects/:projectId/tasks`
@@ -402,7 +402,7 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 
 **`get_task`**
 - Input: `{ taskId: z.string() }`
-- Output: `Task` esteso (blockedBy, blocking, commentsCount, attachmentsCount, `subtaskCount`, `openSubtaskCount`, `subtasks: { id, title, status }[]`) — cosi' un agente MCP distingue un task singolo (`subtaskCount: 0`) da uno con un gruppo di sotto-task senza dover interpretare testo libero
+- Output: `Task` esteso (blockedBy, blocking, commentsCount, attachmentsCount, `subtaskCount`, `openSubtaskCount`, `subtaskStatusCounts`, `subtasks: { id, title, status }[]`) — cosi' un agente MCP distingue un task singolo (`subtaskCount: 0`) da uno con un gruppo di sotto-task senza dover interpretare testo libero
 - Errori: `NOT_FOUND`, `FORBIDDEN` (task di altro progetto)
 
 **`create_task`**
@@ -491,7 +491,7 @@ z.object({
 
 **`get_board`**
 - Input: `{ priority: z.enum([...]).optional(), tag: z.string().optional(), search: z.string().optional() }`
-- Output: `{ draft: Task[], todo: Task[], in_progress: Task[], testing: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
+- Output: `{ draft: Task[], todo: Task[], in_progress: Task[], testing: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount`/`subtaskStatusCounts` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
 - **Nessun `get_aggregated_board` via MCP** (per costruzione: il token è scoped a un progetto).
 
 ---

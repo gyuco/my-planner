@@ -91,7 +91,7 @@ export function createProjectMcpServer(projectId: string) {
   server.tool(
     "get_task",
     "Recupera un task del progetto associato al token. Se il task ha sotto-task, la risposta include " +
-      "subtaskCount/openSubtaskCount e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
+      "subtaskCount/openSubtaskCount/subtaskStatusCounts e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
       "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro.",
     { taskId: z.string() },
     async ({ taskId }) =>
@@ -277,7 +277,7 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "get_board",
-    "Restituisce la board Kanban del progetto associato al token. Ogni task include subtaskCount/openSubtaskCount " +
+    "Restituisce la board Kanban del progetto associato al token. Ogni task include subtaskCount/openSubtaskCount/subtaskStatusCounts " +
       "(0 se non ha sotto-task) cosi' da distinguere a colpo d'occhio i task singoli da quelli con un gruppo di sotto-task.",
     {
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),

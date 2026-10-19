@@ -8,6 +8,8 @@ export interface BoardFiltersState {
   blockedOnly: boolean;
   search: string;
   tag: string | null;
+  /** Mostra le sotto-task come card nella loro colonna (default: nascoste, aggregate nel parent). */
+  showSubtasks: boolean;
 }
 
 interface FilterBarProps {
@@ -75,6 +77,14 @@ export function FilterBar({
           onClick={() => onChange({ ...filters, blockedOnly: !filters.blockedOnly })}
         >
           {t.filters.blockedOnly}
+        </button>
+        <button
+          type="button"
+          className={`filter-chip${filters.showSubtasks ? " active" : ""}`}
+          aria-pressed={filters.showSubtasks}
+          onClick={() => onChange({ ...filters, showSubtasks: !filters.showSubtasks })}
+        >
+          ↳ {t.filters.showSubtasks}
         </button>
       </div>
 
