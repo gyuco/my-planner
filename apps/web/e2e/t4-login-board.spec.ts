@@ -86,4 +86,26 @@ test.describe("T4 - login e board base", () => {
     await page.getByRole("button", { name: "Show all" }).click();
     await expect(page.locator(".column")).toHaveCount(5);
   });
+
+  test("la sidebar sinistra è comprimibile e il titolo pagina segue il progetto", async ({ page }) => {
+    const project = await createProjectViaApi(`T4 Sidebar ${Date.now()}`);
+
+    await loginViaUi(page);
+    await selectProjectInSidebar(page, project.name);
+    await expect(page).toHaveTitle(`${project.name} · My Planner`);
+
+    // Su desktop il pulsante ☰ comprime/espande la colonna sinistra.
+    const sidebar = page.locator(".sidebar");
+    await expect(sidebar).toBeVisible();
+    await page.getByRole("button", { name: "Toggle sidebar" }).click();
+    await expect(sidebar).toBeHidden();
+
+    // La preferenza sopravvive al reload; la sidebar si riapre dal pulsante.
+    await page.reload();
+    await expect(page.locator(".sidebar")).toBeHidden();
+    await page.getByRole("button", { name: "Toggle sidebar" }).click();
+    await expect(page.locator(".sidebar")).toBeVisible();
+    await selectProjectInSidebar(page, project.name);
+    await expect(page).toHaveTitle(`${project.name} · My Planner`);
+  });
 });

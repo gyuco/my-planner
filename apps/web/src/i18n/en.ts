@@ -28,6 +28,7 @@ export const en = {
     allProjects: "All projects",
     newTask: "+ New task",
     projectsMenu: "Projects menu",
+    toggleSidebar: "Toggle sidebar",
     loadProjectsError: "Unable to load projects",
     loadBoardError: "Unable to load the board",
   },

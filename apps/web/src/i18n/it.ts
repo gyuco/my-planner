@@ -30,6 +30,7 @@ export const it: Dictionary = {
     allProjects: "Tutti i progetti",
     newTask: "+ Nuovo task",
     projectsMenu: "Menu progetti",
+    toggleSidebar: "Mostra/nascondi sidebar",
     loadProjectsError: "Impossibile caricare i progetti",
     loadBoardError: "Impossibile caricare la board",
   },

@@ -323,6 +323,20 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   background: var(--canvas);
 }
 
+/* Su desktop la sidebar è una colonna fissa che può essere nascosta dal
+   pulsante ☰ nella topbar; su mobile resta un overlay (vedi media query). */
+@media (min-width: 701px) {
+  .app-shell.sidebar-collapsed .sidebar { display: none; }
+}
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
 /* --- Sidebar: pannello scuro, profondo, con accento luminoso sull'attivo --- */
 
 .sidebar {
@@ -1644,7 +1658,21 @@ body.dnd-dragging * {
    Mobile
    ========================================================================= */
 
-.sidebar-toggle { display: none; }
+.sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  background: var(--surface-sunken);
+  border-color: var(--line);
+  color: var(--ink-700);
+}
+
+.sidebar-toggle:hover {
+  background: var(--surface);
+  border-color: var(--ink-200);
+}
 .sidebar-backdrop { display: none; }
 
 /* Tablet / laptop stretti: sopra i 700px resta il layout a due pannelli, ma
