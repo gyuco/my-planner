@@ -1043,8 +1043,12 @@ body.dnd-dragging * {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-400);
-  flex: 1;
 }
+
+/* Solo i campi affiancati devono dividersi lo spazio in orizzontale: un
+   `flex: 1` generico sui label allunga i campi in verticale quando il modal
+   occupa tutta l'altezza (mobile). */
+.modal-row label { flex: 1; }
 
 .field-label {
   font-size: 0.72rem;
