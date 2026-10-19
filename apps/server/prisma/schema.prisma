@@ -170,8 +170,9 @@ model Attachment {
   createdAt       DateTime @default(now())
 }
 
-// Log append-only delle azioni che generano notifiche (creazione task, cambio
-// stato, commenti). `id` autoincrementale e' il cursore usato dal client:
+// Log append-only delle azioni sui task (log attivita', vedi
+// activityService.ts); solo creazione task, cambio stato e commenti generano
+// anche notifiche. `id` autoincrementale e' il cursore usato dal client:
 // niente fan-out per utente, il filtro "non le mie azioni" e i permessi di
 // progetto vengono applicati in lettura (vedi notificationService.ts).
 model TaskEvent {
@@ -191,6 +192,7 @@ model TaskEvent {
   createdAt DateTime @default(now())
 
   @@index([projectId, id])
+  @@index([taskId, id])
   @@index([id])
 }
 

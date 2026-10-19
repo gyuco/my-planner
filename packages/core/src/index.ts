@@ -194,8 +194,51 @@ export interface Comment {
   createdAt: string;
 }
 
-/** Eventi che generano una notifica (vedi apps/server/src/services/notificationService.ts). */
-export type TaskEventType = "task.created" | "task.status_changed" | "comment.created";
+/**
+ * Tipi di evento del log attivita' (tabella TaskEvent, vedi
+ * apps/server/src/services/activityService.ts). Solo un sottoinsieme genera
+ * notifiche ed email: vedi `NOTIFICATION_EVENT_TYPES`.
+ */
+export const TASK_EVENT_TYPES = [
+  "task.created",
+  "task.updated",
+  "task.status_changed",
+  "task.deleted",
+  "comment.created",
+  "dependency.added",
+  "dependency.removed",
+  "attachment.added",
+  "attachment.deleted",
+] as const;
+
+export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
+
+/** Eventi che generano una notifica in-app ed email. */
+export const NOTIFICATION_EVENT_TYPES = [
+  "task.created",
+  "task.status_changed",
+  "comment.created",
+] as const satisfies readonly TaskEventType[];
+
+/** Campi del task tracciati da un evento `task.updated`. */
+export type TaskTrackedField =
+  | "title"
+  | "description"
+  | "priority"
+  | "complexity"
+  | "tags"
+  | "dueDate"
+  | "parentId";
+
+/**
+ * Singola modifica di un campo. Per `description` i valori non vengono
+ * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null.
+ */
+export interface TaskFieldChange {
+  field: TaskTrackedField;
+  from: string | null;
+  to: string | null;
+}
 
 /**
  * Notifica restituita da GET /notifications. `taskTitle` e `excerpt` sono
@@ -228,6 +271,30 @@ export interface NotificationsResponse {
 
 export interface MarkNotificationsReadResponse {
   lastSeenEventId: number;
+}
+
+/** Voce del log attivita' (GET /activity): una notifica con i dettagli extra. */
+export interface ActivityLogItem extends NotificationItem {
+  /** Solo per `task.updated`. */
+  changes: TaskFieldChange[];
+  /** Task collegato per `dependency.*` (il task che blocca). */
+  relatedTaskId: string | null;
+  relatedTaskTitle: string | null;
+  /** Nome file per `attachment.*`. */
+  fileName: string | null;
+}
+
+export interface ActivityLogResponse {
+  /** Dal piu' recente al piu' vecchio. */
+  items: ActivityLogItem[];
+  /** True se esistono eventi piu' vecchi dell'ultimo restituito (paginazione con `beforeId`). */
+  hasMore: boolean;
+}
+
+/** Autore che compare nel log, per popolare il filtro "autore". */
+export interface ActivityActor {
+  id: string;
+  name: string;
 }
 
 /** Envelope condiviso per tutti gli errori REST e MCP (vedi API_CONTRACT.md §1). */

@@ -7,6 +7,7 @@ import {
   deleteAttachment,
 } from "../services/attachmentService.js";
 import { assertAttachmentAccess, assertTaskAccess } from "../services/userService.js";
+import { userActor } from "../services/notificationService.js";
 
 /**
  * REST allegati (B11, vedi API_CONTRACT.md §6). Upload multipart, download
@@ -26,7 +27,7 @@ export async function attachmentRoutes(app: FastifyInstance) {
       fileName: file.filename,
       mimeType: file.mimetype,
       buffer,
-    });
+    }, userActor((req as any).authUser));
     return reply.code(201).send(attachment);
   });
 
@@ -48,6 +49,6 @@ export async function attachmentRoutes(app: FastifyInstance) {
   app.delete("/attachments/:attachmentId", { onRequest: [app.authenticate] }, async (req) => {
     const { attachmentId } = req.params as { attachmentId: string };
     await assertAttachmentAccess((req as any).authUser, attachmentId);
-    return deleteAttachment(attachmentId);
+    return deleteAttachment(attachmentId, userActor((req as any).authUser));
   });
 }

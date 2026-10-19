@@ -17,6 +17,7 @@ import { NotificationsBell } from "./components/NotificationsBell";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { ActivityPage } from "./pages/ActivityPage";
 import { displayName, userInitials } from "./lib/user";
 import { LogOutIcon, MenuIcon, PlusIcon, ShieldIcon } from "./components/Icons";
 import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
@@ -115,8 +116,8 @@ export function App() {
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
-  // Vista corrente dell'area principale: la board (default) o la pagina profilo.
-  const [view, setView] = useState<"board" | "profile">("board");
+  // Vista corrente dell'area principale: la board (default), il profilo o il log attivita'.
+  const [view, setView] = useState<"board" | "profile" | "activity">("board");
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
@@ -139,6 +140,10 @@ export function App() {
     }
     if (view === "profile") {
       document.title = `${t.profile.title} · My Planner`;
+      return;
+    }
+    if (view === "activity") {
+      document.title = `${t.activity.title} · My Planner`;
       return;
     }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
@@ -285,7 +290,8 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={selectedProjectId}
+        selectedProjectId={view === "activity" ? null : selectedProjectId}
+        activityActive={view === "activity"}
         isAdmin={isAdmin}
         onSelect={(id) => {
           setSelectedProjectId(id);
@@ -299,6 +305,10 @@ export function App() {
         onOpenStorageSettings={() => setShowStorageSettings(true)}
         onOpenEmailSettings={() => setShowEmailSettings(true)}
         onOpenUsers={() => setShowUsers(true)}
+        onOpenActivity={() => {
+          setView("activity");
+          setSidebarOpen(false);
+        }}
       />
       <div className="app-main">
         <header className="topbar">
@@ -312,7 +322,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -372,7 +382,15 @@ export function App() {
           </div>
         </header>
 
-        {view === "profile" && currentUser ? (
+        {view === "activity" ? (
+          <ActivityPage
+            projects={projects}
+            onOpenTask={(taskId, projectId) => {
+              setOpenTaskId(taskId);
+              setOpenTaskProjectId(projectId);
+            }}
+          />
+        ) : view === "profile" && currentUser ? (
           <ProfilePage
             user={currentUser}
             projects={projects}

@@ -160,14 +160,14 @@ export function createProjectMcpServer(projectId: string) {
     async ({ taskId, ...rest }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return updateTask(taskId, rest);
+        return updateTask(taskId, rest, MCP_ACTOR);
       })
   );
 
   server.tool("delete_task", "Elimina un task del progetto associato al token (cascade)", { taskId: z.string() }, async ({ taskId }) =>
     withErrors(async () => {
       await assertTaskInProject(taskId);
-      return deleteTask(taskId);
+      return deleteTask(taskId, MCP_ACTOR);
     })
   );
 
@@ -192,7 +192,7 @@ export function createProjectMcpServer(projectId: string) {
       withErrors(async () => {
         await assertTaskInProject(taskId);
         await assertTaskInProject(blockedByTaskId);
-        return addDependency(taskId, blockedByTaskId);
+        return addDependency(taskId, blockedByTaskId, MCP_ACTOR);
       })
   );
 
@@ -203,7 +203,7 @@ export function createProjectMcpServer(projectId: string) {
     async ({ taskId, blockedByTaskId }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return removeDependency(taskId, blockedByTaskId);
+        return removeDependency(taskId, blockedByTaskId, MCP_ACTOR);
       })
   );
 
@@ -256,7 +256,7 @@ export function createProjectMcpServer(projectId: string) {
       withErrors(async () => {
         await assertTaskInProject(taskId);
         const buffer = Buffer.from(contentBase64, "base64");
-        return createAttachment(taskId, { fileName, mimeType, buffer });
+        return createAttachment(taskId, { fileName, mimeType, buffer }, MCP_ACTOR);
       })
   );
 
