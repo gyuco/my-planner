@@ -236,6 +236,24 @@ describe("taskService — sotto-task", () => {
     expect(parentOnBoard.subtaskCount).toBe(1);
     expect(parentOnBoard.openSubtaskCount).toBe(1);
   });
+
+  it("subtaskStatusCounts ripartisce le sotto-task per stato (board e dettaglio)", async () => {
+    const project = await setupProject();
+    const parent = await createTask(project.id, { title: "Parent" });
+    const a = await createTask(project.id, { title: "A", parentId: parent.id });
+    const b = await createTask(project.id, { title: "B", parentId: parent.id });
+    await createTask(project.id, { title: "C", parentId: parent.id });
+    await moveTask(a.id, "done");
+    await moveTask(b.id, "in_progress");
+
+    const expected = { draft: 1, todo: 0, in_progress: 1, testing: 0, done: 1 };
+    const board = await getBoard(project.id, {});
+    const parentOnBoard = board.draft.find((t: any) => t.id === parent.id);
+    expect(parentOnBoard.subtaskStatusCounts).toEqual(expected);
+
+    const detail = await getTask(parent.id);
+    expect(detail.subtaskStatusCounts).toEqual(expected);
+  });
 });
 
 describe("taskService — cascade delete", () => {

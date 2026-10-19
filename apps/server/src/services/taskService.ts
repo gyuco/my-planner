@@ -1,7 +1,9 @@
 import {
   ApiErrorException,
+  emptySubtaskStatusCounts,
   FIBONACCI_COMPLEXITY,
   TASK_STATUSES,
+  type SubtaskStatusCounts,
   type TaskComplexity,
   type TaskStatus,
 } from "@my-planner/core";
@@ -78,20 +80,44 @@ function serializeTask(task: any): any {
   return out;
 }
 
+interface SubtaskCounts {
+  total: number;
+  open: number;
+  byStatus: SubtaskStatusCounts;
+}
+
+function countSubtasks(subtasks: { status: string }[]): SubtaskCounts {
+  const counts: SubtaskCounts = { total: 0, open: 0, byStatus: emptySubtaskStatusCounts() };
+  for (const s of subtasks) {
+    counts.total += 1;
+    if (s.status !== "done") counts.open += 1;
+    if (s.status in counts.byStatus) counts.byStatus[s.status as TaskStatus] += 1;
+  }
+  return counts;
+}
+
 async function computeSubtaskCounts(taskIds: string[]) {
-  if (taskIds.length === 0) return new Map<string, { total: number; open: number }>();
+  const map = new Map<string, SubtaskCounts>();
+  if (taskIds.length === 0) return map;
   const subtasks = await prisma.task.findMany({
     where: { parentId: { in: taskIds } },
     select: { parentId: true, status: true },
   });
-  const map = new Map<string, { total: number; open: number }>();
+  const grouped = new Map<string, { status: string }[]>();
   for (const s of subtasks) {
-    const entry = map.get(s.parentId as string) ?? { total: 0, open: 0 };
-    entry.total += 1;
-    if (s.status !== "done") entry.open += 1;
-    map.set(s.parentId as string, entry);
+    const list = grouped.get(s.parentId as string) ?? [];
+    list.push(s);
+    grouped.set(s.parentId as string, list);
   }
+  for (const [parentId, list] of grouped) map.set(parentId, countSubtasks(list));
   return map;
+}
+
+/** Scrive subtaskCount/openSubtaskCount/subtaskStatusCounts sul task serializzato. */
+function applySubtaskCounts(serialized: any, counts: SubtaskCounts | undefined) {
+  serialized.subtaskCount = counts?.total ?? 0;
+  serialized.openSubtaskCount = counts?.open ?? 0;
+  serialized.subtaskStatusCounts = counts?.byStatus ?? emptySubtaskStatusCounts();
 }
 
 async function computeBlockedByOpenCount(taskIds: string[]) {
@@ -266,9 +292,7 @@ export async function listTasks(
   const subtaskMap = await computeSubtaskCounts(tasks.map((t) => t.id));
   return tasks.map((t) => {
     const serialized = serializeTask(t);
-    const counts = subtaskMap.get(t.id);
-    serialized.subtaskCount = counts?.total ?? 0;
-    serialized.openSubtaskCount = counts?.open ?? 0;
+    applySubtaskCounts(serialized, subtaskMap.get(t.id));
     return serialized;
   });
 }
@@ -295,8 +319,7 @@ export async function getTask(taskId: string) {
   serialized.commentsCount = commentsCount;
   serialized.attachmentsCount = attachmentsCount;
   serialized.subtasks = subtasks;
-  serialized.subtaskCount = subtasks.length;
-  serialized.openSubtaskCount = subtasks.filter((s) => s.status !== "done").length;
+  applySubtaskCounts(serialized, countSubtasks(subtasks));
   return serialized;
 }
 
@@ -452,9 +475,7 @@ export async function getBoard(
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
-    const counts = subtaskMap.get(t.id);
-    serialized.subtaskCount = counts?.total ?? 0;
-    serialized.openSubtaskCount = counts?.open ?? 0;
+    applySubtaskCounts(serialized, subtaskMap.get(t.id));
     board[t.status as TaskStatus]?.push(serialized);
   }
   return board;
@@ -491,9 +512,7 @@ export async function getAggregatedBoard(
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
-    const counts = subtaskMap.get(t.id);
-    serialized.subtaskCount = counts?.total ?? 0;
-    serialized.openSubtaskCount = counts?.open ?? 0;
+    applySubtaskCounts(serialized, subtaskMap.get(t.id));
     board[t.status as TaskStatus]?.push(serialized);
   }
   return board;

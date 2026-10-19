@@ -34,7 +34,13 @@ function emptyBoard(): Board {
 }
 
 const EMPTY_BOARD: Board = emptyBoard();
-const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "", tag: null };
+const EMPTY_FILTERS: BoardFiltersState = {
+  priorities: [],
+  blockedOnly: false,
+  search: "",
+  tag: null,
+  showSubtasks: false,
+};
 
 /** Preferenza locale di visibilità della sidebar (desktop). */
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "my-planner-sidebar-collapsed";
@@ -48,18 +54,27 @@ function getStoredSidebarCollapsed(): boolean {
 }
 
 function filterBoard(board: Board, filters: BoardFiltersState): Board {
+  const titles = new Map<string, string>();
+  for (const status of TASK_STATUSES) {
+    for (const t of board[status] as BoardTask[]) titles.set(t.id, t.title);
+  }
   function applyFilters(tasks: BoardTask[]): BoardTask[] {
-    return tasks.filter((t) => {
-      // Le sotto-task non compaiono come card indipendenti sulla board: si
-      // vedono raggruppate sotto il parent (badge + lista nel drawer),
-      // altrimenti un task grande con 13 sotto-task disperderebbe le
-      // colonne. Vedi API_CONTRACT.md §4 e BACKLOG.md (nota 2026-09-23).
-      if (t.parentId) return false;
-      if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
-      if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
-      if (filters.tag && !t.tags.includes(filters.tag)) return false;
-      return true;
-    });
+    return tasks
+      .filter(matches)
+      .map((t) => (t.parentId ? { ...t, parentTitle: titles.get(t.parentId) } : t));
+  }
+  function matches(t: BoardTask): boolean {
+    // Di default le sotto-task non compaiono come card indipendenti sulla
+    // board: si vedono raggruppate sotto il parent (barra per stato + lista
+    // nel drawer), altrimenti un task grande con 13 sotto-task disperderebbe
+    // le colonne. Il filtro "Mostra sotto-task" le rende visibili nella loro
+    // colonna con il badge del parent. Vedi API_CONTRACT.md §4 e BACKLOG.md
+    // (nota 2026-09-23).
+    if (t.parentId && !filters.showSubtasks) return false;
+    if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
+    if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
+    if (filters.tag && !t.tags.includes(filters.tag)) return false;
+    return true;
   }
   return {
     draft: applyFilters(board.draft as BoardTask[]),

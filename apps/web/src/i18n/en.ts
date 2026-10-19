@@ -53,6 +53,7 @@ export const en = {
     allTags: "All tags",
     searchPlaceholder: "Search by title or description...",
     includedProjects: "Included projects:",
+    showSubtasks: "Show subtasks",
   },
   board: {
     draft: "Draft",
@@ -71,6 +72,9 @@ export const en = {
     priorityUrgent: "Urgent",
     blockedTitle: "Task blocked by unresolved dependencies",
     subtasksTitle: "Subtasks completed",
+    subtask: "Subtask",
+    subtaskOf: "Subtask of {title}",
+    statusMismatch: "Status out of sync with subtasks: move to {status}",
   },
   createTask: {
     title: "New task",

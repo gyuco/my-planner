@@ -51,9 +51,10 @@ interface SortableTaskCardProps {
   status: TaskStatus;
   showProject?: boolean;
   onClick?: () => void;
+  onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
 }
 
-function SortableTaskCard({ task, status, showProject, onClick }: SortableTaskCardProps) {
+function SortableTaskCard({ task, status, showProject, onClick, onAlignStatus }: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { status },
@@ -75,6 +76,7 @@ function SortableTaskCard({ task, status, showProject, onClick }: SortableTaskCa
       dragListeners={listeners}
       style={style}
       isDragging={isDragging}
+      onAlignStatus={onAlignStatus ? (next) => onAlignStatus(task, next) : undefined}
     />
   );
 }
@@ -85,9 +87,10 @@ interface ColumnProps {
   tasks: BoardTask[];
   showProject?: boolean;
   onTaskClick?: (task: BoardTask) => void;
+  onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
 }
 
-function Column({ status, label, tasks, showProject, onTaskClick }: ColumnProps) {
+function Column({ status, label, tasks, showProject, onTaskClick, onAlignStatus }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnDroppableId(status), data: { status } });
   const items = tasks.map((t) => t.id);
 
@@ -107,6 +110,7 @@ function Column({ status, label, tasks, showProject, onTaskClick }: ColumnProps)
             status={status}
             showProject={showProject}
             onClick={() => onTaskClick?.(task)}
+            onAlignStatus={onAlignStatus}
           />
         ))}
       </SortableContext>
@@ -221,6 +225,24 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
   function handleDragCancel() {
     document.body.classList.remove("dnd-dragging");
     setActiveTask(null);
+  }
+
+  // Allinea lo stato di un parent a quello suggerito dalle sue sotto-task
+  // (badge ⚠ sulla card): stesso endpoint del drag, in coda alla colonna.
+  async function handleAlignStatus(task: BoardTask, targetStatus: TaskStatus) {
+    const previousBoard = localBoard;
+    const targetIndex = (localBoard[targetStatus] as BoardTask[]).length;
+    setLocalBoard(reorderBoard(localBoard, task.id, targetStatus, targetIndex));
+    setDragError(null);
+    try {
+      await moveTask(task.id, targetStatus);
+      onBoardChange();
+    } catch (err) {
+      setLocalBoard(previousBoard);
+      if (err instanceof ApiRequestError) {
+        setDragError(err.message);
+      }
+    }
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -338,6 +360,7 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
               tasks={localBoard[col.status] as BoardTask[]}
               showProject={showProject}
               onTaskClick={onTaskClick}
+              onAlignStatus={handleAlignStatus}
             />
           ))}
         </div>
