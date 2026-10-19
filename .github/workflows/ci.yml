@@ -1,11 +1,16 @@
 name: CI
 
 on:
+  # La CI gira solo su `master`: i push su `develop` (e sugli altri branch) non
+  # consumano minuti di Actions. Per la pull request viene considerato il
+  # branch di destinazione (base), quindi gira solo sulle PR dirette a master.
   push:
+    branches: [master]
   pull_request:
+    branches: [master]
   # Permette di rilanciare manualmente il workflow (e quindi il deploy) dal
   # tab Actions, utile quando la CI fallisce per cause esterne o per un
-  # deploy di emergenza. Il job di deploy resta limitato a `master`.
+  # deploy di emergenza.
   workflow_dispatch:
 
 env:
