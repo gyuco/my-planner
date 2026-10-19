@@ -336,11 +336,14 @@ export async function updateUser(
 
 export interface UpdateProfileInput {
   email: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 /**
- * Modifica dei dati che l'utente puo' cambiare da solo nella pagina profilo.
- * L'email e' l'identificativo di login; ruolo/progetti restano in mano agli admin.
+ * Modifica dei dati che l'utente puo' cambiare da solo nella pagina profilo:
+ * nome, cognome ed email. L'email e' l'identificativo di login; ruolo e
+ * progetti restano in mano agli admin.
  */
 export async function updateOwnProfile(
   userId: string,
@@ -351,7 +354,10 @@ export async function updateOwnProfile(
 
   const email = validateEmail(input.email);
   await assertEmailAvailable(email, userId);
-  await prisma.user.update({ where: { id: userId }, data: { email } });
+  const data: { email: string; firstName?: string; lastName?: string } = { email };
+  if (input.firstName !== undefined) data.firstName = validateName(input.firstName, "firstName");
+  if (input.lastName !== undefined) data.lastName = validateName(input.lastName, "lastName");
+  await prisma.user.update({ where: { id: userId }, data });
 
   const updated = await getAuthUser(userId);
   if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");

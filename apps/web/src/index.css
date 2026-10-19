@@ -1637,7 +1637,17 @@ body.dnd-dragging * {
   color: var(--ink-700);
 }
 
-.profile-email-label {
+.profile-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.profile-subsection {
+  margin-top: 0.5rem;
+}
+
+.profile-field {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -1648,7 +1658,7 @@ body.dnd-dragging * {
   color: var(--ink-400);
 }
 
-.profile-email-label input {
+.profile-field input {
   padding: 0.6rem 0.75rem;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -1663,7 +1673,7 @@ body.dnd-dragging * {
   transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
 }
 
-.profile-email-label input:focus {
+.profile-field input:focus {
   outline: none;
   border-color: var(--indigo-300);
   box-shadow: var(--shadow-focus);
@@ -2190,6 +2200,7 @@ body.dnd-dragging * {
   .profile-card { padding: 1.25rem; }
   .profile-head { align-items: flex-start; }
   .profile-avatar { width: 52px; height: 52px; font-size: 1rem; }
+  .profile-name-row { grid-template-columns: 1fr; }
 
   .filter-bar { gap: 0.5rem; }
   .filter-chips { gap: 0.35rem; }

@@ -86,7 +86,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 `PATCH /auth/me`
 - Auth: JWT
-- Body: `{ "email": string }` — modifica self-service dell'email, che è anche l'identificativo di login. Non cambia password, ruolo o progetti; l'email deve essere valida e non già usata da un altro utente.
+- Body: `{ "email": string, "firstName"?: string, "lastName"?: string }` — modifica self-service di nome, cognome ed email. L'email è anche l'identificativo di login. Non cambia password, ruolo o progetti; l'email deve essere valida e non già usata da un altro utente.
 - 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida; 409 `CONFLICT` se è già in uso.
 
 ### Gestione utenti (solo `admin`)

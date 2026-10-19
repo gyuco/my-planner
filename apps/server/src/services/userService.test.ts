@@ -151,6 +151,19 @@ describe("userService — ruoli e assegnazioni", () => {
       email: "ada@nuovo.example",
     });
 
+    // Nome e cognome sono modificabili dall'utente dal proprio profilo.
+    const renamed = await updateOwnProfile(admin.id, {
+      email: "ada@nuovo.example",
+      firstName: "  Augusta Ada  ",
+      lastName: "King",
+    });
+    expect(renamed).toMatchObject({
+      id: admin.id,
+      firstName: "Augusta Ada",
+      lastName: "King",
+      email: "ada@nuovo.example",
+    });
+
     // L'email resta obbligatoria e valida.
     await expect(updateOwnProfile(admin.id, { email: "" })).rejects.toMatchObject({
       code: "VALIDATION_ERROR",

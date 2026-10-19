@@ -113,6 +113,8 @@ export const updateUserInputSchema = z.object({
  */
 export const updateProfileInputSchema = z.object({
   email: z.string().trim().min(1).max(200),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
 });
 
 export const storageSettingsInputSchema = z.object({

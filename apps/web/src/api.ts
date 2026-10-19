@@ -92,6 +92,8 @@ export function getMe(): Promise<AuthUser> {
 
 export interface UpdateProfileInput {
   email: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 /** Modifica self-service dell'email (identificativo di login) del profilo. */
