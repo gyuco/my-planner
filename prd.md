@@ -17,7 +17,7 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 - **MCP:** autenticazione separata tramite **token per progetto**. Un token dà accesso a un solo progetto. I token si creano/revocano dalla UI (Impostazioni progetto → Token MCP).
   - `get_aggregated_board` **non è esposto via MCP** (incompatibile con lo scope a singolo progetto del token): resta una funzionalità solo UI/JWT. Via MCP resta `get_board`, scoped al progetto del token.
   - Per lo stesso motivo, anche la **gestione progetti** (creare/rinominare/archiviare/ripristinare) resta solo UI/JWT: non è esposta via MCP.
-  - **Transizioni di stato:** libere in entrambe le direzioni (`draft ↔ in_progress ↔ done`); l'unico vincolo è il blocco per dipendenze non risolte all'ingresso in `in_progress`.
+  - **Transizioni di stato:** libere in entrambe le direzioni (`draft ↔ todo ↔ in_progress ↔ testing ↔ done`); l'unico vincolo è il blocco per dipendenze non risolte all'ingresso in `in_progress`.
   - **Download allegati via MCP:** stesso token MCP del progetto, nessuna autenticazione aggiuntiva.
   - **Archiviazione progetto:** reversibile (azione di ripristino disponibile).
 
@@ -30,7 +30,7 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 
 ### Task
 - Titolo, descrizione in markdown, stato, priorità, complessità, tag, data di scadenza
-- **Stati:** `draft` → `in progress` → `done`
+- **Stati:** `draft` → `todo` → `in progress` → `testing` → `done`
 - **Priorità:** `low` / `medium` / `high` / `urgent`
 - **Complessità:** Fibonacci — `1, 2, 3, 5, 8, 13, 21`
 - **Dipendenze:** relazioni "bloccata da" / "blocca" tra task
@@ -41,7 +41,7 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 - **Eliminazione:** cancellare un task elimina in cascata commenti, allegati e le dipendenze che lo coinvolgono
 
 ### Board Kanban
-- Board per singolo progetto: tre colonne (`draft`/`in progress`/`done`), drag & drop, ordinamento manuale
+- Board per singolo progetto: cinque colonne (`draft`/`todo`/`in progress`/`testing`/`done`), configurabili localmente, drag & drop, ordinamento manuale
 - **Vista aggregata multi-progetto:** board unica su tutti i progetti (o un sottoinsieme selezionato), ogni card etichettata col progetto di appartenenza
 - Filtri per priorità, tag, progetto e ricerca testuale (su titolo e descrizione, case-insensitive)
 
@@ -87,13 +87,13 @@ Tool esposti, con parità funzionale rispetto alla UI:
 ## 7. Workflow / agenti
 - **analyst** — raffina requisiti, scompone feature in task con priorità e complessità
 - **architect** — decisioni di design tecnico, schema DB, contratti API/MCP
-- **planner** — riceve ogni cambio di stato (`draft → in progress → done`), verifica dipendenze/blocchi e mantiene coerente il workflow
+- **planner** — riceve ogni cambio di stato (`draft → todo → in progress → testing → done`), verifica dipendenze/blocchi e mantiene coerente il workflow
 - **coder** — implementa feature/fix
 - **reviewer** — code review su correttezza, sicurezza, coerenza col PRD
 - **dev-ops** — CI/CD, Docker, migrazioni Prisma
 
 ## 8. Criteri di accettazione
-1. Creo un progetto e vedo la board con le colonne `draft / in progress / done`
+1. Creo un progetto e vedo la board con le colonne `draft / todo / in progress / testing / done`
 2. Creo un task con titolo, descrizione, priorità, complessità Fibonacci, tag e scadenza
 3. Dichiaro che A è bloccato da B; l'app impedisce/segnala chiaramente lo spostamento di A in `in progress` finché B non è `done`
 4. Sposto i task tra colonne in drag & drop e lo stato persiste dopo un reload

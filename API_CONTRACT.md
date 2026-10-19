@@ -54,7 +54,7 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `VALIDATION_ERROR` | 400 | Body/query non validi (zod) |
 | `DEPENDENCY_BLOCKED` | 409 | Tentativo di move a `in_progress` con dipendenze non `done` |
 | `CIRCULAR_DEPENDENCY` | 409 | Dipendenza creerebbe un ciclo (diretto o indiretto) |
-| `INVALID_STATUS_TRANSITION` | 409 | Riservato per usi futuri — **v1 non lo emette**: tutte le transizioni `draft ↔ in_progress ↔ done` sono ammesse in entrambe le direzioni (si può riaprire un task tornando da `done` a `in_progress`), l'unico vincolo è `DEPENDENCY_BLOCKED` per entrare in `in_progress` |
+| `INVALID_STATUS_TRANSITION` | 409 | Riservato per usi futuri — **v1 non lo emette**: tutte le transizioni `draft ↔ todo ↔ in_progress ↔ testing ↔ done` sono ammesse in entrambe le direzioni (si può riaprire un task tornando da `done` a `in_progress`), l'unico vincolo è `DEPENDENCY_BLOCKED` per entrare in `in_progress` |
 | `ATTACHMENT_TOO_LARGE` | 413 | File > 20MB |
 | `ATTACHMENT_TYPE_NOT_ALLOWED` | 415 | Tipo file non ammesso |
 | `CONFLICT` | 409 | Altri conflitti generici (es. nome progetto duplicato, se applicabile) |
@@ -217,7 +217,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 - 400 `VALIDATION_ERROR` se `parentId` creerebbe un annidamento a più livelli, un self-parenting, o se il task ha già proprie sotto-task (non può diventare a sua volta una sotto-task)
 
 ### `POST /tasks/:taskId/move`
-- Body: `{ "status": "draft"|"in_progress"|"done", "position"?: number }`
+- Body: `{ "status": "draft"|"todo"|"in_progress"|"testing"|"done", "position"?: number }`
 - `position` opzionale: indice manuale nella colonna target (drag&drop); se omesso, il task va in coda alla colonna.
 - 200: `Task` aggiornato
 - 409 `DEPENDENCY_BLOCKED` se `status === "in_progress"` e ci sono dipendenze non `done`:
@@ -269,7 +269,9 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 ```json
 {
   "draft": [Task],
+  "todo": [Task],
   "in_progress": [Task],
+  "testing": [Task],
   "done": [Task]
 }
 ```
@@ -280,7 +282,7 @@ Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il 
 - Query: `projectIds?` (CSV, se omesso = tutti i progetti non archiviati), `priority?`, `tag?`, `search?`
 - 200: stessa forma di sopra, con in più `projectId`/`projectName` su ogni card:
 ```json
-{ "draft": [{ "...task", "projectId": "...", "projectName": "..." }], "in_progress": [...], "done": [...] }
+{ "draft": [{ "...task", "projectId": "...", "projectName": "..." }], "todo": [...], "in_progress": [...], "testing": [...], "done": [...] }
 ```
 
 ---
@@ -338,7 +340,7 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 ### Task
 
 **`list_tasks`**
-- Input: `{ status: z.enum(["draft","in_progress","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional() }`
+- Input: `{ status: z.enum(["draft","todo","in_progress","testing","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional() }`
 - Output: `Task[]`
 
 **`get_task`**
@@ -381,7 +383,7 @@ z.object({
 - Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR` (ha ancora sotto-task: eliminale o riassegnale prima)
 
 **`move_task`**
-- Input: `{ taskId: z.string(), status: z.enum(["draft","in_progress","done"]), position: z.number().int().nonnegative().optional() }`
+- Input: `{ taskId: z.string(), status: z.enum(["draft","todo","in_progress","testing","done"]), position: z.number().int().nonnegative().optional() }`
 - Output: `Task`
 - Errori: `DEPENDENCY_BLOCKED` (con `message` che elenca i blocker non risolti, identico a REST), `NOT_FOUND`, `FORBIDDEN`
 
@@ -432,7 +434,7 @@ z.object({
 
 **`get_board`**
 - Input: `{ priority: z.enum([...]).optional(), tag: z.string().optional(), search: z.string().optional() }`
-- Output: `{ draft: Task[], in_progress: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
+- Output: `{ draft: Task[], todo: Task[], in_progress: Task[], testing: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
 - **Nessun `get_aggregated_board` via MCP** (per costruzione: il token è scoped a un progetto).
 
 ---

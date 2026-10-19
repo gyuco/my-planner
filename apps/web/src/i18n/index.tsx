@@ -8,9 +8,10 @@ import {
   type Locale,
 } from "./config";
 import { en, type Dictionary } from "./en";
+import { es } from "./es";
 import { it } from "./it";
 
-const dictionaries: Record<Locale, Dictionary> = { en, it };
+const dictionaries: Record<Locale, Dictionary> = { en, it, es };
 
 interface LanguageContextValue {
   locale: Locale;
@@ -34,9 +35,10 @@ export function apiErrorMessage(status: number): string {
 }
 
 export function apiDownloadErrorMessage(status: number): string {
-  return getApiLocale() === "it"
-    ? `Errore ${status} durante il download`
-    : `Error ${status} during download`;
+  const locale = getApiLocale();
+  if (locale === "it") return `Errore ${status} durante il download`;
+  if (locale === "es") return `Error ${status} durante la descarga`;
+  return `Error ${status} during download`;
 }
 
 export function apiSessionExpiredMessage(): string {

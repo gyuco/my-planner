@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
+import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
 import {
@@ -21,7 +21,6 @@ import {
 import { useI18n } from "../i18n";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
-const STATUSES: TaskStatus[] = ["draft", "in_progress", "done"];
 
 interface TaskDrawerProps {
   taskId: string;
@@ -42,7 +41,9 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
   const { t, formatDateTime } = useI18n();
   const STATUS_LABEL: Record<TaskStatus, string> = {
     draft: t.board.draft,
+    todo: t.board.todo,
     in_progress: t.board.inProgress,
+    testing: t.board.testing,
     done: t.board.done,
   };
   const [task, setTask] = useState<Task | null>(null);
@@ -295,7 +296,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                   onChange={(e) => handleChangeStatus(e.target.value as TaskStatus)}
                   aria-label={t.taskDrawer.changeStatusAria}
                 >
-                  {STATUSES.map((s) => (
+                  {TASK_STATUSES.map((s) => (
                     <option key={s} value={s}>
                       {STATUS_LABEL[s]}
                     </option>

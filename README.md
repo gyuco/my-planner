@@ -186,7 +186,7 @@ I token si generano/revocano dalla UI, uno per progetto.
 Il Worker CF invia ogni giorno alle 06:00 UTC (`apps/server/wrangler.toml`
 `[triggers]`) un riepilogo via email su tutti i progetti non archiviati
 (`apps/server/src/cf/standup.ts`): task completati nelle ultime 24h, task
-`in_progress` (con giorni di stallo) e task `draft` a priorità `high`/`urgent`.
+`in_progress` (con giorni di stallo) e task `draft`/`todo` a priorità `high`/`urgent`.
 L'invio usa un client SMTP minimale su TCP socket (`apps/server/src/cf/email.ts`,
 API `cloudflare:sockets`) verso `smtp.gmail.com:465` (TLS implicita), non l'API
 Gmail: autenticazione con una **App Password**, non con la password
@@ -222,7 +222,7 @@ cron va aggiornata a mano ai cambi d'ora.
 ## Agenti
 
 Definiti in `.claude/agents/`: `analyst`, `architect`, `planner`, `coder`, `reviewer`, `dev-ops`.
-Il `planner` è notificato di ogni cambio di stato dei task (`draft → in_progress → done`) e verifica le dipendenze bloccanti.
+Il `planner` è notificato di ogni cambio di stato dei task (`draft → todo → in_progress → testing → done`) e verifica le dipendenze bloccanti.
 
 ## Inizializzazione di nuovi progetti
 

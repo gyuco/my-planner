@@ -1,4 +1,10 @@
-import { ApiErrorException, FIBONACCI_COMPLEXITY, type TaskComplexity } from "@my-planner/core";
+import {
+  ApiErrorException,
+  FIBONACCI_COMPLEXITY,
+  TASK_STATUSES,
+  type TaskComplexity,
+  type TaskStatus,
+} from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 
@@ -10,8 +16,12 @@ import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
  * stesso envelope.
  */
 
-type TaskStatus = "draft" | "in_progress" | "done";
 type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+/** Board vuota con tutte le colonne previste, nell'ordine di `TASK_STATUSES`. */
+function emptyBoard(): Record<TaskStatus, any[]> {
+  return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Record<TaskStatus, any[]>;
+}
 
 function tagsToArray(tags: string): string[] {
   return tags
@@ -379,14 +389,14 @@ export async function getBoard(
     computeSubtaskCounts(tasks.map((t) => t.id)),
   ]);
 
-  const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
+  const board = emptyBoard();
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     const counts = subtaskMap.get(t.id);
     serialized.subtaskCount = counts?.total ?? 0;
     serialized.openSubtaskCount = counts?.open ?? 0;
-    board[t.status as TaskStatus].push(serialized);
+    board[t.status as TaskStatus]?.push(serialized);
   }
   return board;
 }
@@ -418,14 +428,14 @@ export async function getAggregatedBoard(
     computeSubtaskCounts(tasks.map((t) => t.id)),
   ]);
 
-  const board: Record<TaskStatus, any[]> = { draft: [], in_progress: [], done: [] };
+  const board = emptyBoard();
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     const counts = subtaskMap.get(t.id);
     serialized.subtaskCount = counts?.total ?? 0;
     serialized.openSubtaskCount = counts?.open ?? 0;
-    board[t.status as TaskStatus].push(serialized);
+    board[t.status as TaskStatus]?.push(serialized);
   }
   return board;
 }

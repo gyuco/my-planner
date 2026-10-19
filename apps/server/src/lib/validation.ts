@@ -6,7 +6,7 @@ import { z } from "zod";
  * restituiscano lo stesso VALIDATION_ERROR sugli stessi input malformati.
  */
 
-export const taskStatusSchema = z.enum(["draft", "in_progress", "done"]);
+export const taskStatusSchema = z.enum(["draft", "todo", "in_progress", "testing", "done"]);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 
 export const complexitySchema = z

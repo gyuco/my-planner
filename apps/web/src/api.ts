@@ -5,6 +5,7 @@ import type {
   ProjectToken,
   Task,
   TaskPriority,
+  TaskStatus,
   TaskComplexity,
   TaskDependency,
   Comment,
@@ -242,7 +243,7 @@ export function createSubtasks(parentId: string, subtasks: CreateSubtaskInput[])
 
 export function moveTask(
   taskId: string,
-  status: "draft" | "in_progress" | "done",
+  status: TaskStatus,
   position?: number,
 ): Promise<Task> {
   return apiFetch(`/tasks/${taskId}/move`, {

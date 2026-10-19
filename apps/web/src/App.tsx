@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Board, Project } from "@my-planner/core";
+import { TASK_STATUSES } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
 import { CreateTaskModal } from "./components/CreateTaskModal";
@@ -23,8 +24,23 @@ import {
 } from "./api";
 import { useI18n } from "./i18n";
 
-const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
+function emptyBoard(): Board {
+  return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Board;
+}
+
+const EMPTY_BOARD: Board = emptyBoard();
 const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "", tag: null };
+
+/** Preferenza locale di visibilità della sidebar (desktop). */
+const SIDEBAR_COLLAPSED_STORAGE_KEY = "my-planner-sidebar-collapsed";
+
+function getStoredSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function filterBoard(board: Board, filters: BoardFiltersState): Board {
   function applyFilters(tasks: BoardTask[]): BoardTask[] {
@@ -42,14 +58,16 @@ function filterBoard(board: Board, filters: BoardFiltersState): Board {
   }
   return {
     draft: applyFilters(board.draft as BoardTask[]),
+    todo: applyFilters(board.todo as BoardTask[]),
     in_progress: applyFilters(board.in_progress as BoardTask[]),
+    testing: applyFilters(board.testing as BoardTask[]),
     done: applyFilters(board.done as BoardTask[]),
   };
 }
 
 function collectTags(board: Board): string[] {
   const set = new Set<string>();
-  for (const status of ["draft", "in_progress", "done"] as const) {
+  for (const status of TASK_STATUSES) {
     for (const t of board[status] as BoardTask[]) {
       for (const tag of t.tags) set.add(tag);
     }
@@ -75,10 +93,36 @@ export function App() {
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
   const isAdmin = currentUser?.role === "admin";
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, sidebarCollapsed ? "1" : "0");
+    } catch {
+      /* ignore (storage non disponibile) */
+    }
+  }, [sidebarCollapsed]);
+
+  // Titolo della scheda del browser: nome progetto corrente (o "Tutti i
+  // progetti") + brand, aggiornato quando si cambia vista o lingua.
+  useEffect(() => {
+    if (!loggedIn) {
+      document.title = "My Planner";
+      return;
+    }
+    const currentProject = projects.find((p) => p.id === selectedProjectId);
+    if (selectedProjectId === "all") {
+      document.title = `${t.app.allProjects} · My Planner`;
+    } else if (currentProject) {
+      document.title = `${currentProject.name} · My Planner`;
+    } else {
+      document.title = "My Planner";
+    }
+  }, [loggedIn, projects, selectedProjectId, t]);
 
   const handleLogout = useCallback(() => {
     clearToken();
@@ -194,8 +238,22 @@ export function App() {
 
   const settingsProject = projects.find((p) => p.id === settingsProjectId) ?? null;
 
+  function handleToggleSidebar() {
+    // Su mobile la sidebar è un overlay (apri/chiudi); su desktop è una
+    // colonna fissa che può essere compressa per liberare spazio alla board.
+    if (window.matchMedia("(max-width: 700px)").matches) {
+      setSidebarOpen((v) => !v);
+    } else {
+      setSidebarCollapsed((v) => !v);
+    }
+  }
+
   return (
-    <div className={`app-shell${sidebarOpen ? " sidebar-open" : ""}`}>
+    <div
+      className={`app-shell${sidebarOpen ? " sidebar-open" : ""}${
+        sidebarCollapsed ? " sidebar-collapsed" : ""
+      }`}
+    >
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
@@ -214,15 +272,17 @@ export function App() {
       />
       <div className="app-main">
         <header className="topbar">
-          <button
-            className="icon-button sidebar-toggle"
-            onClick={() => setSidebarOpen((v) => !v)}
-            aria-label={t.app.projectsMenu}
-            title={t.app.projectsMenu}
-          >
-            ☰
-          </button>
-          <h1>{selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+          <div className="topbar-title">
+            <button
+              className="icon-button sidebar-toggle"
+              onClick={handleToggleSidebar}
+              aria-label={t.app.toggleSidebar}
+              title={t.app.toggleSidebar}
+            >
+              ☰
+            </button>
+            <h1>{selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+          </div>
           <div className="topbar-actions">
             {currentProject && (
               <button onClick={() => setShowCreateTask(true)}>{t.app.newTask}</button>
