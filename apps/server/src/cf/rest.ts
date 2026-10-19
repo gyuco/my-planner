@@ -18,6 +18,7 @@ import {
   listProjectsForUser,
   listUsers,
   restrictProjectIds,
+  updateOwnProfile,
   updateUser,
 } from "../services/userService.js";
 import {
@@ -62,6 +63,7 @@ import {
   storageSettingsInputSchema,
   createUserInputSchema,
   updateUserInputSchema,
+  updateProfileInputSchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
@@ -159,6 +161,11 @@ export function buildRestApp() {
 
   // --- Auth / utente corrente ---------------------------------------------
   app.get("/auth/me", (c) => c.json(c.get("user")));
+
+  app.patch("/auth/me", async (c) => {
+    const input = updateProfileInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await updateOwnProfile(c.get("user").id, input));
+  });
 
   // --- Gestione utenti (admin) ---------------------------------------------
   app.get("/users", async (c) => c.json(await listUsers()));

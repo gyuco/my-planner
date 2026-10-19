@@ -2,7 +2,8 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { apiError } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { getAuthUser, normalizeRole } from "../services/userService.js";
+import { updateProfileInputSchema } from "../lib/validation.js";
+import { getAuthUser, normalizeRole, updateOwnProfile } from "../services/userService.js";
 
 const JWT_EXPIRES_IN = "30d";
 
@@ -48,7 +49,16 @@ export async function authRoutes(app: FastifyInstance) {
     const authUser = await getAuthUser(user.id);
     return {
       token,
-      user: authUser ?? { id: user.id, username: user.username, role: normalizeRole(user.role), projectIds: [] },
+      user:
+        authUser ?? {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName ?? "",
+          lastName: user.lastName ?? "",
+          email: user.email ?? null,
+          role: normalizeRole(user.role),
+          projectIds: [],
+        },
     };
   });
 
@@ -56,5 +66,12 @@ export async function authRoutes(app: FastifyInstance) {
   // funzioni admin e per riflettere subito eventuali cambi di ruolo/progetti.
   app.get("/auth/me", { onRequest: [app.authenticate] }, async (req) => {
     return (req as any).authUser;
+  });
+
+  // Modifica self-service dei dati del profilo (oggi solo l'email). Restituisce
+  // l'AuthUser aggiornato così la UI può riusarlo senza un altro GET /auth/me.
+  app.patch("/auth/me", { onRequest: [app.authenticate] }, async (req) => {
+    const input = updateProfileInputSchema.parse(req.body ?? {});
+    return updateOwnProfile((req as any).authUser.id, input);
   });
 }

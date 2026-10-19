@@ -22,6 +22,14 @@ model User {
   id           String @id @default(cuid())
   username     String @unique
   passwordHash String
+  // Dati anagrafici mostrati nella pagina profilo. I default vuoti mantengono
+  // validi gli utenti creati prima dell'introduzione del profilo (la UI fa
+  // fallback sullo username quando nome/cognome non sono stati compilati).
+  firstName    String @default("")
+  lastName     String @default("")
+  // Email personale modificabile dall'utente nella pagina profilo. Non e'
+  // usata per il login (che resta su username/password).
+  email        String?
   // Ruolo applicativo: "admin" vede/modifica tutto, "manager" accede solo ai
   // progetti associati tramite UserProject. Default "admin" perche' il primo
   // utente creato al bootstrap e gli utenti pre-ruoli sono amministratori.

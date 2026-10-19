@@ -7,6 +7,7 @@ import {
   getAuthUser,
   listProjectsForUser,
   listUsers,
+  updateOwnProfile,
   updateUser,
 } from "./userService.js";
 
@@ -128,5 +129,35 @@ describe("userService — ruoli e assegnazioni", () => {
         projectIds: ["progetto-inesistente"],
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("salva nome, cognome ed email e aggiorna l'email dal profilo", async () => {
+    const admin = await createUser({
+      username: "admin",
+      password: "password123",
+      role: "admin",
+      firstName: "  Ada  ",
+      lastName: "Lovelace",
+      email: "Ada@Example.com",
+    });
+    expect(admin.firstName).toBe("Ada");
+    expect(admin.lastName).toBe("Lovelace");
+    expect(admin.email).toBe("ada@example.com");
+
+    const updated = await updateOwnProfile(admin.id, { email: "ada@nuovo.example" });
+    expect(updated).toMatchObject({
+      id: admin.id,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@nuovo.example",
+    });
+
+    // Email vuota = rimozione.
+    const cleared = await updateOwnProfile(admin.id, { email: "" });
+    expect(cleared.email).toBeNull();
+
+    await expect(updateOwnProfile(admin.id, { email: "non-una-email" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
   });
 });

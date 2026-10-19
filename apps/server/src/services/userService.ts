@@ -47,6 +47,9 @@ export async function getAuthUser(userId: string): Promise<AuthUser | null> {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
+    email: user.email ?? null,
     role,
     projectIds: role === "admin" ? [] : user.projects.map((p) => p.projectId),
   };
@@ -112,6 +115,9 @@ function serializeAccount(user: any): UserAccount {
   return {
     id: user.id,
     username: user.username,
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
+    email: user.email ?? null,
     role,
     createdAt: new Date(user.createdAt).toISOString(),
     projectIds: user.projects.map((p: any) => p.projectId),
@@ -169,6 +175,34 @@ function validateRole(role: string): UserRole {
   return role;
 }
 
+const MAX_NAME_LENGTH = 100;
+const MAX_EMAIL_LENGTH = 200;
+
+function validateName(value: string | undefined | null, field: "firstName" | "lastName"): string {
+  const trimmed = (value ?? "").trim();
+  if (trimmed.length > MAX_NAME_LENGTH) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      `${field} deve avere al massimo ${MAX_NAME_LENGTH} caratteri`,
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Normalizza e valida l'email del profilo. Stringa vuota/null = rimuove
+ * l'email. Volutamente permissiva sul formato (una sola @ e un punto nel
+ * dominio) ma abbastanza stretta da intercettare gli errori di battitura.
+ */
+function validateEmail(value: string | null | undefined): string | null {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > MAX_EMAIL_LENGTH || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    throw new ApiErrorException("VALIDATION_ERROR", "email non valida");
+  }
+  return trimmed;
+}
+
 async function countAdmins(): Promise<number> {
   return prisma.user.count({ where: { role: "admin" } });
 }
@@ -185,6 +219,9 @@ export interface CreateUserInput {
   username: string;
   password: string;
   role: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
   projectIds?: string[];
 }
 
@@ -192,6 +229,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
   const username = validateUsername(input.username);
   const password = validatePassword(input.password);
   const role = validateRole(input.role);
+  const firstName = validateName(input.firstName, "firstName");
+  const lastName = validateName(input.lastName, "lastName");
+  const email = validateEmail(input.email);
 
   let projectIds: string[] = [];
   if (role === "manager") {
@@ -216,6 +256,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
         username,
         passwordHash,
         role,
+        firstName,
+        lastName,
+        email,
         projects:
           projectIds.length > 0
             ? { create: projectIds.map((projectId) => ({ projectId })) }
@@ -236,6 +279,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
 export interface UpdateUserInput {
   role?: string;
   password?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
   projectIds?: string[];
 }
 
@@ -275,6 +321,15 @@ export async function updateUser(
   if (input.password !== undefined) {
     data.passwordHash = await bcrypt.hash(validatePassword(input.password), 10);
   }
+  if (input.firstName !== undefined) {
+    data.firstName = validateName(input.firstName, "firstName");
+  }
+  if (input.lastName !== undefined) {
+    data.lastName = validateName(input.lastName, "lastName");
+  }
+  if (input.email !== undefined) {
+    data.email = validateEmail(input.email);
+  }
   data.projects =
     nextRole === "manager"
       ? {
@@ -285,6 +340,30 @@ export async function updateUser(
 
   await prisma.user.update({ where: { id: userId }, data });
   return serializeAccount(await getUserWithProjects(userId));
+}
+
+export interface UpdateProfileInput {
+  email?: string | null;
+}
+
+/**
+ * Modifica dei dati che l'utente puo' cambiare da solo nella pagina profilo.
+ * Oggi solo l'email; ruolo/progetti restano in mano agli admin.
+ */
+export async function updateOwnProfile(
+  userId: string,
+  input: UpdateProfileInput,
+): Promise<AuthUser> {
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existing) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+
+  if (input.email !== undefined) {
+    await prisma.user.update({ where: { id: userId }, data: { email: validateEmail(input.email) } });
+  }
+
+  const updated = await getAuthUser(userId);
+  if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+  return updated;
 }
 
 export async function deleteUser(userId: string, actorId: string): Promise<{ id: string; deleted: true }> {

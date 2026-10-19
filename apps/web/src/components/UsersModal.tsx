@@ -9,6 +9,7 @@ import {
   updateUser,
 } from "../api";
 import { useI18n } from "../i18n";
+import { displayName } from "../lib/user";
 
 interface UsersModalProps {
   currentUserId: string;
@@ -19,6 +20,9 @@ interface UsersModalProps {
 
 interface UserFormState {
   username: string;
+  firstName: string;
+  lastName: string;
+  email: string;
   password: string;
   role: UserRole;
   projectIds: string[];
@@ -26,6 +30,9 @@ interface UserFormState {
 
 const EMPTY_FORM: UserFormState = {
   username: "",
+  firstName: "",
+  lastName: "",
+  email: "",
   password: "",
   role: "manager",
   projectIds: [],
@@ -75,6 +82,9 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
     setError(null);
     setForm({
       username: user.username,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email ?? "",
       password: "",
       role: user.role,
       projectIds: [...user.projectIds],
@@ -111,6 +121,9 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
         await updateUser(editing.id, {
           role: form.role,
           projectIds: form.role === "manager" ? form.projectIds : [],
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim() ? form.email.trim() : null,
           password: form.password ? form.password : undefined,
         });
       } else {
@@ -118,6 +131,9 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
           username: form.username.trim(),
           password: form.password,
           role: form.role,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim() ? form.email.trim() : null,
           projectIds: form.role === "manager" ? form.projectIds : undefined,
         });
       }
@@ -177,6 +193,36 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
                 autoFocus={!editing}
                 disabled={!!editing}
                 maxLength={100}
+                autoComplete="off"
+              />
+            </label>
+            <div className="modal-row">
+              <label>
+                {t.users.firstName}
+                <input
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  maxLength={100}
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                {t.users.lastName}
+                <input
+                  value={form.lastName}
+                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  maxLength={100}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
+            <label>
+              {t.users.email}
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                maxLength={200}
                 autoComplete="off"
               />
             </label>
@@ -250,7 +296,8 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
               <div key={user.id} className="user-row">
                 <div className="user-row-main">
                   <div className="user-row-name">
-                    <strong>{user.username}</strong>
+                    <strong>{displayName(user)}</strong>
+                    <span className="user-row-username">@{user.username}</span>
                     {user.id === currentUserId && (
                       <span className="user-you">{t.users.currentUser}</span>
                     )}

@@ -18,6 +18,9 @@ export type UserRole = "admin" | "manager";
 export interface User {
   id: string;
   username: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
   role: UserRole;
   createdAt: string;
 }
@@ -29,6 +32,9 @@ export interface User {
 export interface AuthUser {
   id: string;
   username: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
   role: UserRole;
   projectIds: string[];
 }
@@ -37,6 +43,9 @@ export interface AuthUser {
 export interface UserAccount {
   id: string;
   username: string;
+  firstName: string;
+  lastName: string;
+  email: string | null;
   role: UserRole;
   createdAt: string;
   projectIds: string[];

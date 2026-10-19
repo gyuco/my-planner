@@ -52,6 +52,14 @@ export async function loginUser(env: CfEnv, body: unknown) {
   return {
     token,
     user:
-      authUser ?? { id: user.id, username: user.username, role: normalizeRole(user.role), projectIds: [] },
+      authUser ?? {
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        email: user.email ?? null,
+        role: normalizeRole(user.role),
+        projectIds: [],
+      },
   };
 }

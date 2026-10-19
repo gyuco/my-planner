@@ -90,18 +90,33 @@ export function getMe(): Promise<AuthUser> {
   return apiFetch("/auth/me");
 }
 
+export interface UpdateProfileInput {
+  email: string | null;
+}
+
+/** Modifica self-service dell'email del profilo; restituisce l'utente aggiornato. */
+export function updateMyProfile(input: UpdateProfileInput): Promise<AuthUser> {
+  return apiFetch("/auth/me", { method: "PATCH", body: JSON.stringify(input) });
+}
+
 // --- Gestione utenti (solo admin) -------------------------------------------
 
 export interface CreateUserInput {
   username: string;
   password: string;
   role: UserRole;
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
   projectIds?: string[];
 }
 
 export interface UpdateUserInput {
   role?: UserRole;
   password?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string | null;
   projectIds?: string[];
 }
 

@@ -14,6 +14,8 @@ import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { displayName } from "./lib/user";
 import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
 import {
   getAggregatedBoard,
@@ -94,6 +96,8 @@ export function App() {
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
+  // Vista corrente dell'area principale: la board (default) o la pagina profilo.
+  const [view, setView] = useState<"board" | "profile">("board");
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
@@ -114,6 +118,10 @@ export function App() {
       document.title = "My Planner";
       return;
     }
+    if (view === "profile") {
+      document.title = `${t.profile.title} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (selectedProjectId === "all") {
       document.title = `${t.app.allProjects} · My Planner`;
@@ -122,7 +130,7 @@ export function App() {
     } else {
       document.title = "My Planner";
     }
-  }, [loggedIn, projects, selectedProjectId, t]);
+  }, [loggedIn, projects, selectedProjectId, view, t]);
 
   const handleLogout = useCallback(() => {
     clearToken();
@@ -132,6 +140,7 @@ export function App() {
     setSelectedProjectId(null);
     setBoard(EMPTY_BOARD);
     setShowUsers(false);
+    setView("board");
   }, []);
 
   // Rilegge ruolo e progetti assegnati dal server: dopo un cambio fatto da un
@@ -261,6 +270,7 @@ export function App() {
         isAdmin={isAdmin}
         onSelect={(id) => {
           setSelectedProjectId(id);
+          setView("board");
           setSidebarOpen(false);
         }}
         onCreateProject={() => setShowCreateProject(true)}
@@ -281,36 +291,65 @@ export function App() {
             >
               ☰
             </button>
-            <h1>{selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
-            {currentProject && (
+            {view === "board" && currentProject && (
               <button onClick={() => setShowCreateTask(true)}>{t.app.newTask}</button>
             )}
             <LanguageSwitcher />
+            {currentUser && (
+              <button
+                className={`topbar-profile${view === "profile" ? " active" : ""}`}
+                onClick={() => {
+                  setView((v) => (v === "profile" ? "board" : "profile"));
+                  setSidebarOpen(false);
+                }}
+                title={t.profile.open}
+              >
+                <span className="topbar-profile-name">{displayName(currentUser)}</span>
+                <span className={`role-badge role-${currentUser.role}`}>
+                  {currentUser.role === "admin" ? t.users.roleAdmin : t.users.roleManager}
+                </span>
+              </button>
+            )}
             <button onClick={handleLogout}>Logout</button>
           </div>
         </header>
 
-        <FilterBar
-          filters={filters}
-          onChange={setFilters}
-          availableTags={availableTags}
-          projects={selectedProjectId === "all" ? projects : undefined}
-          selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
-          onSelectedProjectIdsChange={
-            selectedProjectId === "all" ? setAggregatedProjectIds : undefined
-          }
-        />
+        {view === "profile" && currentUser ? (
+          <ProfilePage
+            user={currentUser}
+            projects={projects}
+            onBack={() => setView("board")}
+            onUserUpdated={(user) => {
+              setCurrentUser(user);
+              saveUser(user);
+            }}
+          />
+        ) : (
+          <>
+            <FilterBar
+              filters={filters}
+              onChange={setFilters}
+              availableTags={availableTags}
+              projects={selectedProjectId === "all" ? projects : undefined}
+              selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
+              onSelectedProjectIdsChange={
+                selectedProjectId === "all" ? setAggregatedProjectIds : undefined
+              }
+            />
 
-        {loadError && <div className="board-error">{loadError}</div>}
+            {loadError && <div className="board-error">{loadError}</div>}
 
-        <KanbanBoard
-          board={filteredBoard}
-          showProject={selectedProjectId === "all"}
-          onBoardChange={loadBoard}
-          onTaskClick={handleTaskClick}
-        />
+            <KanbanBoard
+              board={filteredBoard}
+              showProject={selectedProjectId === "all"}
+              onBoardChange={loadBoard}
+              onTaskClick={handleTaskClick}
+            />
+          </>
+        )}
       </div>
 
       {showCreateTask && currentProject && (

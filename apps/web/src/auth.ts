@@ -27,6 +27,9 @@ export function getStoredUser(): AuthUser | null {
     return {
       id: parsed.id,
       username: parsed.username,
+      firstName: typeof parsed.firstName === "string" ? parsed.firstName : "",
+      lastName: typeof parsed.lastName === "string" ? parsed.lastName : "",
+      email: typeof parsed.email === "string" ? parsed.email : null,
       role: parsed.role,
       projectIds: Array.isArray(parsed.projectIds) ? parsed.projectIds : [],
     };

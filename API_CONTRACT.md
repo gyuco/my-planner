@@ -77,24 +77,29 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 `POST /auth/login`
 - Body: `{ "username": string, "password": string }`
-- 200: `{ "token": "<jwt>", "user": { "id", "username", "role": "admin"|"manager", "projectIds": [] } }`
+- 200: `{ "token": "<jwt>", "user": { "id", "username", "firstName", "lastName", "email", "role": "admin"|"manager", "projectIds": [] } }`
 - 401 `UNAUTHORIZED` con credenziali non valide.
 
 `GET /auth/me`
 - Auth: JWT
-- 200: `{ "id", "username", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+- 200: `{ "id", "username", "firstName", "lastName", "email", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+
+`PATCH /auth/me`
+- Auth: JWT
+- Body: `{ "email": string | null }` — modifica self-service dell'email del profilo (stringa vuota o `null` la rimuove). Non cambia username, password, ruolo o progetti.
+- 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida.
 
 ### Gestione utenti (solo `admin`)
 `GET /users`
-- 200: lista di `{ id, username, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
+- 200: lista di `{ id, username, firstName, lastName, email, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
 
 `POST /users`
-- Body: `{ "username": string, "password": string (min 8), "role": "admin"|"manager", "projectIds"?: string[] }`
+- Body: `{ "username": string, "password": string (min 8), "firstName"?: string, "lastName"?: string, "email"?: string | null, "role": "admin"|"manager", "projectIds"?: string[] }`
 - Un `manager` deve avere almeno un progetto; per un `admin` `projectIds` è ignorato (accesso implicito a tutti).
 - 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se lo username esiste.
 
 `PATCH /users/:userId`
-- Body: `{ "role"?: "admin"|"manager", "password"?: string, "projectIds"?: string[] }`
+- Body: `{ "role"?: "admin"|"manager", "password"?: string, "firstName"?: string, "lastName"?: string, "email"?: string | null, "projectIds"?: string[] }`
 - Cambiare `role`/`projectIds` aggiorna subito i permessi dell'utente. Non è possibile rimuovere l'ultimo admin né il ruolo admin al proprio utente.
 - 200: utente aggiornato.
 
