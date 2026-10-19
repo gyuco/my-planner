@@ -138,6 +138,26 @@ model StorageSettings {
   updatedAt        DateTime @updatedAt
 }
 
+// Singleton (id sempre "singleton"): configurazione SMTP per le email di
+// notifica, modificabile dalla UI admin. La password non e' mai salvata in
+// chiaro: `passwordEnc` e' cifrata AES-GCM con una chiave derivata da
+// SETTINGS_ENCRYPTION_KEY (fallback JWT_SECRET), vedi lib/secretBox.ts.
+// Riga assente / `enabled` false / campi incompleti => nessuna email inviata.
+model EmailSettings {
+  id          String   @id @default("singleton")
+  enabled     Boolean  @default(false)
+  host        String?
+  port        Int      @default(465)
+  security    String   @default("tls") // tls | starttls | none
+  username    String?
+  passwordEnc String?
+  fromAddress String?
+  fromName    String   @default("my-planner")
+  // URL pubblico della web app, usato per il link nelle email (opzionale).
+  appUrl      String?
+  updatedAt   DateTime @updatedAt
+}
+
 model Attachment {
   id              String @id @default(cuid())
   taskId          String

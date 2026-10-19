@@ -5,6 +5,8 @@ JWT_SECRET=local-dev-secret-change-me-0123456789abcdef
 BOOTSTRAP_EMAIL=admin@example.com
 BOOTSTRAP_PASSWORD=admin-password
 MCP_HTTP_BASE_URL=http://localhost:8787
+# Opzionale: chiave per cifrare la password SMTP delle notifiche (fallback JWT_SECRET)
+SETTINGS_ENCRYPTION_KEY=
 # Standup giornaliero (vedi README: Account Google -> Sicurezza -> Password per le app)
 GMAIL_USER=tuo-indirizzo@gmail.com
 GMAIL_APP_PASSWORD=xxxxxxxxxxxxxxxx

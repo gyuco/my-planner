@@ -23,6 +23,7 @@ setAttachmentStorageFactory(async () =>
  * Lascia lo schema intatto (creato una volta da globalSetup via migrate deploy).
  */
 export async function cleanDatabase() {
+  await prisma.emailSettings.deleteMany();
   await prisma.notificationState.deleteMany();
   await prisma.taskEvent.deleteMany();
   await prisma.userProject.deleteMany();

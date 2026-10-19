@@ -8,6 +8,12 @@ DATABASE_URL="file:./dev.db"
 # impostato (nessun fallback insicuro). Usa un valore lungo e casuale in
 # produzione, es. `openssl rand -hex 32`.
 JWT_SECRET="change-me-in-production"
+
+# Opzionale: chiave per cifrare i segreti salvati in DB (password SMTP delle
+# notifiche email, vedi "Notifiche email" nella UI admin). Se assente si usa
+# JWT_SECRET; con una chiave dedicata, ruotare JWT_SECRET non obbliga a
+# reinserire la password SMTP. Es. `openssl rand -hex 32`.
+SETTINGS_ENCRYPTION_KEY=
 PORT=3000
 MCP_HTTP_PORT=3100
 
@@ -45,6 +51,8 @@ si passano come vars in `wrangler.toml` e i valori sensibili come secrets:
 npx --workspace apps/server wrangler secret put JWT_SECRET
 npx --workspace apps/server wrangler secret put BOOTSTRAP_EMAIL
 npx --workspace apps/server wrangler secret put BOOTSTRAP_PASSWORD
+# opzionale, vedi SETTINGS_ENCRYPTION_KEY sopra
+npx --workspace apps/server wrangler secret put SETTINGS_ENCRYPTION_KEY
 ```
 
 In sviluppo locale (`wrangler dev`) si usa `apps/server/.dev.vars` (vedi

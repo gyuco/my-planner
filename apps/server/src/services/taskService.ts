@@ -13,6 +13,7 @@ import {
   type Actor,
   type RecordTaskEventInput,
 } from "./notificationService.js";
+import { queueTaskEventEmail } from "./emailNotificationService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -28,6 +29,8 @@ type TaskPriority = "low" | "medium" | "high" | "urgent";
  * Scrive l'evento di notifica senza far fallire l'azione principale: un
  * problema sul log non deve impedire di creare/spostare un task o commentare.
  * Gli eventi sono best-effort per definizione (non sono dati di dominio).
+ * Stesso discorso per l'email: senza config SMTP non parte nulla, e l'invio
+ * gira in background, quindi non rallenta né fa fallire la risposta.
  */
 async function emitEvent(input: RecordTaskEventInput): Promise<void> {
   try {
@@ -35,6 +38,12 @@ async function emitEvent(input: RecordTaskEventInput): Promise<void> {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[my-planner] impossibile registrare l'evento di notifica", err);
+  }
+  try {
+    await queueTaskEventEmail(input);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[my-planner] impossibile accodare l'email di notifica", err);
   }
 }
 

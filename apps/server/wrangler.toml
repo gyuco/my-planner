@@ -21,7 +21,7 @@ bucket_name = "my-planner-attachments"
 
 # ---- Var statiche ------------------------------------------------------------
 # JWT_SECRET, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, GMAIL_USER,
-# GMAIL_APP_PASSWORD vanno impostate come secrets (`wrangler secret put`)
+# GMAIL_APP_PASSWORD (e opzionale SETTINGS_ENCRYPTION_KEY) vanno impostate come secrets (`wrangler secret put`)
 # o vars in produzione.
 [vars]
 MCP_HTTP_BASE_URL = "https://my-planner.giuseppe-concas.workers.dev"

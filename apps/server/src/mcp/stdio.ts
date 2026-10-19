@@ -6,6 +6,7 @@ import { resolveProjectFromToken } from "./auth.js";
 // storage allegati (local/S3) sul provider condiviso.
 import { initNodePrisma } from "../lib/prisma.node.js";
 import "../lib/attachmentStorage/index.js";
+import "../lib/email/index.js";
 
 /**
  * Entry point MCP via stdio, per uso locale con Claude Code/Desktop.
