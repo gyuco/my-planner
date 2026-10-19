@@ -155,6 +155,12 @@ jobs:
       - run: npm ci
         if: steps.check.outputs.found == 'true'
 
+      # Altrimenti `@prisma/client` non è inizializzato e i backend e2e
+      # falliscono all'avvio (vedi anche gli altri job, che lo generano).
+      - name: Prisma generate (apps/server)
+        if: steps.check.outputs.found == 'true'
+        run: npm run --workspace apps/server prisma:generate
+
       - name: Install Playwright browsers
         if: steps.check.outputs.found == 'true'
         run: npx --workspace apps/web playwright install --with-deps
