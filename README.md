@@ -16,9 +16,12 @@ packages/core Tipi condivisi tra server e web
 
 ## Setup locale
 
+Istruzioni complete e troubleshooting: [LOCALE_DEV.md](./LOCALE_DEV.md).
+
 ```bash
 npm install
-cp config.example.md .env   # poi modifica i valori (vedi config.example.md)
+# il .env va in apps/server/ (dotenv lo carica dalla cwd del workspace), non nella root:
+cp config.example.md apps/server/.env   # poi modifica i valori (vedi config.example.md)
 npm run --workspace apps/server prisma:migrate
 npm run dev
 ```
@@ -143,10 +146,11 @@ e `apps/server/migrations/` (D1/Worker). Vanno aggiornate entrambe.
   Cambiare `JWT_SECRET` invalida le sessioni attive; cambiare `BOOTSTRAP_*` **non** aggiorna
   l'utente già creato (il bootstrap gira solo se la tabella `User` è vuota).
 
-**Reset login (utente unico)**
-1. Elimina l'utente: `npx --workspace apps/server wrangler d1 execute DB --remote --command "DELETE FROM User;"`
+**Reset login (bootstrap del primo admin)**
+1. Elimina gli utenti: `npx --workspace apps/server wrangler d1 execute DB --remote --command "DELETE FROM User;"`
 2. Imposta nuovi `BOOTSTRAP_USERNAME`/`BOOTSTRAP_PASSWORD` (secrets).
-3. Fai una richiesta qualsiasi al Worker (es. `GET /health`): l'utente viene ricreato.
+3. Fai una richiesta qualsiasi al Worker (es. `GET /health`): il primo admin viene ricreato.
+   Gli altri utenti si gestiscono dalla UI **Utenti** (solo admin).
 
 **Rollback**
 - Worker: `npx --workspace apps/server wrangler rollback` (o redeploy del commit precedente).

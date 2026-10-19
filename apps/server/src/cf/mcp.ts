@@ -36,8 +36,35 @@ async function resolveTokenOrReject(request: Request): Promise<string | Response
   }
 }
 
-/** Handler MCP Streamable HTTP (POST/GET/DELETE) per /mcp. */
+/**
+ * Lo stream SSE server->client (GET /mcp) non e' supportato su Workers.
+ *
+ * Il transport gira stateless (`sessionIdGenerator: undefined`) e qui viene
+ * creato un server+transport nuovo per ogni richiesta, quindi lo stream aperto
+ * da un GET non potrebbe mai ricevere messaggi: il transport restituisce uno
+ * ReadableStream che non emette e non si chiude mai, e workerd lo classifica
+ * come "code had hung and would never generate a response" — la richiesta
+ * viene uccisa e il client ritenta in loop (visto in produzione: un GET al
+ * secondo dal client MCP, tutti falliti).
+ *
+ * Lo spec MCP prevede esattamente il 405 quando il server non offre lo stream
+ * su quell'endpoint; il client resta sul POST, che copre tutti i tool.
+ */
+function sseNotSupported(): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      error: { code: -32000, message: "Method not allowed: SSE stream non supportato su Workers, usare POST." },
+      id: null,
+    }),
+    { status: 405, headers: { Allow: "POST, DELETE", "Content-Type": "application/json" } }
+  );
+}
+
+/** Handler MCP Streamable HTTP (POST/DELETE) per /mcp. */
 export async function handleMcpRequest(request: Request, _env: CfEnv): Promise<Response> {
+  if (request.method === "GET") return sseNotSupported();
+
   const projectIdOrResponse = await resolveTokenOrReject(request);
   if (projectIdOrResponse instanceof Response) return projectIdOrResponse;
 

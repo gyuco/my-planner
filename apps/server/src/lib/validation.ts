@@ -87,6 +87,21 @@ export const projectTokenInputSchema = z.object({
   label: z.string().optional(),
 });
 
+export const userRoleSchema = z.enum(["admin", "manager"]);
+
+export const createUserInputSchema = z.object({
+  username: z.string().trim().min(1).max(100),
+  password: z.string().min(8).max(200),
+  role: userRoleSchema,
+  projectIds: z.array(z.string().min(1)).optional(),
+});
+
+export const updateUserInputSchema = z.object({
+  role: userRoleSchema.optional(),
+  password: z.string().min(8).max(200).optional(),
+  projectIds: z.array(z.string().min(1)).optional(),
+});
+
 export const storageSettingsInputSchema = z.object({
   backend: z.enum(["local", "s3"]),
   localDir: z.string().min(1).optional(),

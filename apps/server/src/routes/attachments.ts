@@ -6,6 +6,7 @@ import {
   getAttachmentForDownload,
   deleteAttachment,
 } from "../services/attachmentService.js";
+import { assertAttachmentAccess, assertTaskAccess } from "../services/userService.js";
 
 /**
  * REST allegati (B11, vedi API_CONTRACT.md §6). Upload multipart, download
@@ -15,6 +16,7 @@ import {
 export async function attachmentRoutes(app: FastifyInstance) {
   app.post("/tasks/:taskId/attachments", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { taskId } = req.params as { taskId: string };
+    await assertTaskAccess((req as any).authUser, taskId);
     const file = await (req as any).file();
     if (!file) {
       return reply.code(400).send(apiError("VALIDATION_ERROR", "Campo file 'file' mancante nel form multipart"));
@@ -30,11 +32,13 @@ export async function attachmentRoutes(app: FastifyInstance) {
 
   app.get("/tasks/:taskId/attachments", { onRequest: [app.authenticate] }, async (req) => {
     const { taskId } = req.params as { taskId: string };
+    await assertTaskAccess((req as any).authUser, taskId);
     return listAttachments(taskId);
   });
 
   app.get("/attachments/:attachmentId/download", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { attachmentId } = req.params as { attachmentId: string };
+    await assertAttachmentAccess((req as any).authUser, attachmentId);
     const { attachment, stream } = await getAttachmentForDownload(attachmentId);
     reply.header("Content-Disposition", `attachment; filename="${attachment.fileName}"`);
     reply.header("Content-Type", attachment.mimeType);
@@ -43,6 +47,7 @@ export async function attachmentRoutes(app: FastifyInstance) {
 
   app.delete("/attachments/:attachmentId", { onRequest: [app.authenticate] }, async (req) => {
     const { attachmentId } = req.params as { attachmentId: string };
+    await assertAttachmentAccess((req as any).authUser, attachmentId);
     return deleteAttachment(attachmentId);
   });
 }

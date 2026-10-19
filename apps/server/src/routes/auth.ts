@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { apiError } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { getAuthUser, normalizeRole } from "../services/userService.js";
 
 const JWT_EXPIRES_IN = "30d";
 
@@ -10,6 +11,9 @@ const JWT_EXPIRES_IN = "30d";
  * BOOTSTRAP_USERNAME/BOOTSTRAP_PASSWORD da env (vedi prd.md sezione 3 e
  * BACKLOG.md B4). Nessuna registrazione self-service: se le env mancano,
  * logga un warning chiaro e non crea utenti fittizi.
+ *
+ * Il primo utente e' sempre amministratore: da li' in poi puo' creare gli
+ * altri utenti (admin o manager) dalla UI di gestione utenti.
  */
 export async function bootstrapUser(app: FastifyInstance) {
   const count = await prisma.user.count();
@@ -26,7 +30,7 @@ export async function bootstrapUser(app: FastifyInstance) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await prisma.user.create({ data: { username, passwordHash } });
+  await prisma.user.create({ data: { username, passwordHash, role: "admin" } });
   app.log.info(`Utente unico "${username}" creato al bootstrap.`);
 }
 
@@ -41,6 +45,16 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send(apiError("UNAUTHORIZED", "Credenziali non valide"));
     }
     const token = app.jwt.sign({ sub: user.id, username: user.username }, { expiresIn: JWT_EXPIRES_IN });
-    return { token };
+    const authUser = await getAuthUser(user.id);
+    return {
+      token,
+      user: authUser ?? { id: user.id, username: user.username, role: normalizeRole(user.role), projectIds: [] },
+    };
+  });
+
+  // Dati aggiornati dell'utente corrente: il frontend li usa per nascondere le
+  // funzioni admin e per riflettere subito eventuali cambi di ruolo/progetti.
+  app.get("/auth/me", { onRequest: [app.authenticate] }, async (req) => {
+    return (req as any).authUser;
   });
 }

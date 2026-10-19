@@ -84,7 +84,23 @@ function toBase64(input: string): string {
   return btoa(binary);
 }
 
-export async function sendStandupEmail(env: CfEnv, subject: string, bodyText: string): Promise<void> {
+// Header RFC 2047 (encoded-word): l'oggetto contiene accenti/trattini lunghi,
+// che in un header raw arriverebbero come mojibake.
+function encodeHeader(value: string): string {
+  // eslint-disable-next-line no-control-regex
+  return /^[\x20-\x7e]*$/.test(value) ? value : `=?UTF-8?B?${toBase64(value)}?=`;
+}
+
+// Le righe base64 vanno spezzate: SMTP ammette al massimo 998 caratteri per
+// riga, e il limite convenzionale MIME e' 76.
+function base64Lines(input: string): string[] {
+  const encoded = toBase64(input);
+  const lines: string[] = [];
+  for (let i = 0; i < encoded.length; i += 76) lines.push(encoded.slice(i, i + 76));
+  return lines;
+}
+
+export async function sendStandupEmail(env: CfEnv, subject: string, bodyText: string, bodyHtml?: string): Promise<void> {
   const socket = connect({ hostname: "smtp.gmail.com", port: 465 }, { secureTransport: "on", allowHalfOpen: false });
   const conn = new SmtpConnection(socket);
   try {
@@ -97,17 +113,48 @@ export async function sendStandupEmail(env: CfEnv, subject: string, bodyText: st
     expect(await conn.send(`RCPT TO:<${env.STANDUP_RECIPIENT}>`), 2, "RCPT TO");
     expect(await conn.send("DATA"), 3, "DATA");
 
-    // Dot-stuffing: una riga che inizia con "." va raddoppiata per non essere
-    // scambiata per il terminatore "<CRLF>.<CRLF>".
-    const message = [
-      `From: ${env.GMAIL_USER}`,
+    // Corpo in base64: niente dot-stuffing da gestire (nessuna riga puo'
+    // iniziare con ".") e nessun problema con gli accenti su 8 bit.
+    const headers = [
+      `From: my-planner <${env.GMAIL_USER}>`,
       `To: ${env.STANDUP_RECIPIENT}`,
-      `Subject: ${subject}`,
-      "Content-Type: text/plain; charset=UTF-8",
-      "",
-      ...bodyText.split("\n").map((line) => (line.startsWith(".") ? "." + line : line)),
-      ".",
-    ].join(CRLF);
+      `Subject: ${encodeHeader(subject)}`,
+      `Date: ${new Date().toUTCString()}`,
+      "MIME-Version: 1.0",
+    ];
+
+    let lines: string[];
+    if (bodyHtml) {
+      // multipart/alternative: i client che non renderizzano HTML mostrano il
+      // testo, che va messo per primo (l'ultima parte e' quella preferita).
+      const boundary = `=_my_planner_${crypto.randomUUID().replace(/-/g, "")}`;
+      lines = [
+        ...headers,
+        `Content-Type: multipart/alternative; boundary="${boundary}"`,
+        "",
+        `--${boundary}`,
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        ...base64Lines(bodyText),
+        `--${boundary}`,
+        "Content-Type: text/html; charset=UTF-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        ...base64Lines(bodyHtml),
+        `--${boundary}--`,
+      ];
+    } else {
+      lines = [
+        ...headers,
+        "Content-Type: text/plain; charset=UTF-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        ...base64Lines(bodyText),
+      ];
+    }
+
+    const message = [...lines, "."].join(CRLF);
 
     expect(await conn.send(message), 2, "invio corpo email");
     await conn.send("QUIT");

@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { ApiErrorException } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { getAuthUser, normalizeRole } from "../services/userService.js";
 import type { CfEnv } from "./env.js";
 import { signAccessToken } from "./jwt.js";
 
@@ -25,8 +26,16 @@ export async function bootstrapUserOnWorker(env: CfEnv) {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await prisma.user.create({ data: { username, passwordHash } });
-  console.info(`Utente unico "${username}" creato al bootstrap.`);
+  try {
+    await prisma.user.create({ data: { username, passwordHash, role: "admin" } });
+    console.info(`Utente unico "${username}" creato al bootstrap.`);
+  } catch (err) {
+    // Il bootstrap non è più memoizzato come promise condivisa (vedi cf/index.ts),
+    // quindi due richieste concorrenti su un isolate freddo possono provare a
+    // creare lo stesso utente: `username` è @unique, una delle due fallisce e va
+    // ignorata solo se l'utente ora esiste davvero.
+    if ((await prisma.user.count()) === 0) throw err;
+  }
 }
 
 export async function loginUser(env: CfEnv, body: unknown) {
@@ -39,5 +48,10 @@ export async function loginUser(env: CfEnv, body: unknown) {
     throw new ApiErrorException("UNAUTHORIZED", "Credenziali non valide");
   }
   const token = await signAccessToken(env, { sub: user.id, username: user.username });
-  return { token };
+  const authUser = await getAuthUser(user.id);
+  return {
+    token,
+    user:
+      authUser ?? { id: user.id, username: user.username, role: normalizeRole(user.role), projectIds: [] },
+  };
 }

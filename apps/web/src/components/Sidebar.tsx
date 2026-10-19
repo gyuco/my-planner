@@ -4,32 +4,38 @@ import { useI18n } from "../i18n";
 interface SidebarProps {
   projects: Project[];
   selectedProjectId: string | "all" | null;
+  isAdmin: boolean;
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
   onOpenSettings: (projectId: string) => void;
   onRefreshProject: (projectId: string) => void;
   onOpenArchived: () => void;
   onOpenStorageSettings: () => void;
+  onOpenUsers: () => void;
 }
 
 export function Sidebar({
   projects,
   selectedProjectId,
+  isAdmin,
   onSelect,
   onCreateProject,
   onOpenSettings,
   onRefreshProject,
   onOpenArchived,
   onOpenStorageSettings,
+  onOpenUsers,
 }: SidebarProps) {
   const { t } = useI18n();
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
         <span>{t.sidebar.projects}</span>
-        <button className="icon-button" onClick={onCreateProject} title={t.sidebar.newProjectTitle}>
-          +
-        </button>
+        {isAdmin && (
+          <button className="icon-button" onClick={onCreateProject} title={t.sidebar.newProjectTitle}>
+            +
+          </button>
+        )}
       </div>
       <nav className="sidebar-nav">
         <button
@@ -69,12 +75,19 @@ export function Sidebar({
         ))}
       </nav>
       <div className="sidebar-footer">
+        {isAdmin && (
+          <button className="sidebar-item" onClick={onOpenUsers}>
+            {t.sidebar.users}
+          </button>
+        )}
         <button className="sidebar-item" onClick={onOpenArchived}>
           {t.sidebar.archivedProjects}
         </button>
-        <button className="sidebar-item" onClick={onOpenStorageSettings}>
-          {t.sidebar.storageSettings}
-        </button>
+        {isAdmin && (
+          <button className="sidebar-item" onClick={onOpenStorageSettings}>
+            {t.sidebar.storageSettings}
+          </button>
+        )}
       </div>
     </aside>
   );

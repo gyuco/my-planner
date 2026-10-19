@@ -3,16 +3,19 @@ import { apiError } from "@my-planner/core";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
-import { listProjects, createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
+import { createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
+import { assertProjectAccess, listProjectsForUser } from "../services/userService.js";
 import { projectNameInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 
 export async function projectRoutes(app: FastifyInstance) {
   app.get("/projects", { onRequest: [app.authenticate] }, async (req) => {
     const { includeArchived } = req.query as { includeArchived?: string };
-    return listProjects(includeArchived === "true");
+    return listProjectsForUser((req as any).authUser, includeArchived === "true");
   });
 
-  app.post("/projects", { onRequest: [app.authenticate] }, async (req, reply) => {
+  // La creazione di progetti e' globale: riservata agli admin, che poi li
+  // assegnano ai manager dalla gestione utenti.
+  app.post("/projects", { onRequest: [app.authenticate, app.requireAdmin] }, async (req, reply) => {
     const { name } = projectNameInputSchema.parse(req.body ?? {});
     const project = await createProject(name);
     return reply.code(201).send(project);
@@ -20,17 +23,20 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.patch("/projects/:projectId", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     const { name } = projectNameInputSchema.parse(req.body ?? {});
     return renameProject(projectId, name);
   });
 
   app.post("/projects/:projectId/archive", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     return archiveProject(projectId);
   });
 
   app.post("/projects/:projectId/unarchive", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     return unarchiveProject(projectId);
   });
 
@@ -38,6 +44,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/tokens", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     const { label } = projectTokenInputSchema.parse(req.body ?? {});
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return reply.code(404).send(apiError("NOT_FOUND", "Progetto non trovato"));
@@ -58,6 +65,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.get("/projects/:projectId/tokens", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     const tokens = await prisma.projectToken.findMany({ where: { projectId } });
     return tokens.map((t) => ({
       id: t.id,
@@ -70,6 +78,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.delete("/projects/:projectId/tokens/:tokenId", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId, tokenId } = req.params as { projectId: string; tokenId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
     const token = await prisma.projectToken.findUnique({ where: { id: tokenId } });
     if (!token || token.projectId !== projectId) {
       return reply.code(404).send(apiError("NOT_FOUND", "Token non trovato"));

@@ -1,4 +1,5 @@
 import type {
+  AuthUser,
   Board,
   Project,
   ProjectToken,
@@ -9,6 +10,8 @@ import type {
   Comment,
   Attachment,
   StorageSettings,
+  UserAccount,
+  UserRole,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -78,6 +81,43 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+// --- Autenticazione / utente corrente ---------------------------------------
+
+export function getMe(): Promise<AuthUser> {
+  return apiFetch("/auth/me");
+}
+
+// --- Gestione utenti (solo admin) -------------------------------------------
+
+export interface CreateUserInput {
+  username: string;
+  password: string;
+  role: UserRole;
+  projectIds?: string[];
+}
+
+export interface UpdateUserInput {
+  role?: UserRole;
+  password?: string;
+  projectIds?: string[];
+}
+
+export function listUsers(): Promise<UserAccount[]> {
+  return apiFetch("/users");
+}
+
+export function createUser(input: CreateUserInput): Promise<UserAccount> {
+  return apiFetch("/users", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateUser(userId: string, input: UpdateUserInput): Promise<UserAccount> {
+  return apiFetch(`/users/${userId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteUser(userId: string): Promise<{ id: string; deleted: true }> {
+  return apiFetch(`/users/${userId}`, { method: "DELETE" });
 }
 
 // --- Progetti --------------------------------------------------------------

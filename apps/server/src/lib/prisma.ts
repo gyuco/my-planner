@@ -13,9 +13,26 @@ import type { PrismaClient } from "@prisma/client";
  */
 let current: PrismaClient | null = null;
 let factory: (() => PrismaClient) | null = null;
+let resolver: (() => PrismaClient | null) | null = null;
 
 export function setPrismaClient(client: PrismaClient | null) {
   current = client;
+}
+
+/**
+ * Resolver per-richiesta, usato dal runtime Workers (src/cf/db.ts).
+ *
+ * Su workerd ogni continuation di promise resta legata all'I/O context della
+ * richiesta che l'ha creata: un client (e la sua coda di serializzazione)
+ * condiviso tra richieste fa si' che una richiesta si accodi dietro una
+ * promise di un'altra richiesta gia' terminata, che non si risolvera' mai —
+ * il Worker va in hang ("code had hung and would never generate a response")
+ * e l'isolate resta avvelenato. Il Worker registra quindi un resolver che
+ * restituisce il client della richiesta in corso; su Node resta null e si usa
+ * il client iniettato con setPrismaClient().
+ */
+export function setPrismaResolver(r: (() => PrismaClient | null) | null) {
+  resolver = r;
 }
 
 /** Factory di default (Node): usata quando nessun client e' stato iniettato. */
@@ -24,6 +41,8 @@ export function setDefaultPrismaFactory(f: (() => PrismaClient) | null) {
 }
 
 export function getPrisma(): PrismaClient {
+  const scoped = resolver?.();
+  if (scoped) return scoped;
   if (!current) {
     if (!factory) throw new Error("Prisma client non inizializzato: chiamare setPrismaClient()");
     current = factory();

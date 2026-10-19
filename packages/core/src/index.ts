@@ -5,11 +5,36 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export const FIBONACCI_COMPLEXITY = [1, 2, 3, 5, 8, 13, 21] as const;
 export type TaskComplexity = (typeof FIBONACCI_COMPLEXITY)[number];
 
+/** Ruolo applicativo: l'admin accede a tutto, il manager solo ai progetti assegnati. */
+export type UserRole = "admin" | "manager";
+
+/** Utente di base (senza relazioni). Per la UI di gestione vedi `UserAccount`. */
 export interface User {
   id: string;
   username: string;
-  passwordHash: string;
+  role: UserRole;
   createdAt: string;
+}
+
+/**
+ * Utente autenticato restituito da login/`GET /auth/me`. `projectIds` e'
+ * sempre vuoto per gli admin, che hanno accesso implicito a tutti i progetti.
+ */
+export interface AuthUser {
+  id: string;
+  username: string;
+  role: UserRole;
+  projectIds: string[];
+}
+
+/** Utente completo per la gestione admin (nessun hash password esposto). */
+export interface UserAccount {
+  id: string;
+  username: string;
+  role: UserRole;
+  createdAt: string;
+  projectIds: string[];
+  projects: Array<{ id: string; name: string }>;
 }
 
 export interface Project {

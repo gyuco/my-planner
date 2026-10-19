@@ -22,7 +22,25 @@ model User {
   id           String @id @default(cuid())
   username     String @unique
   passwordHash String
+  // Ruolo applicativo: "admin" vede/modifica tutto, "manager" accede solo ai
+  // progetti associati tramite UserProject. Default "admin" perche' il primo
+  // utente creato al bootstrap e gli utenti pre-ruoli sono amministratori.
+  role         String @default("admin")
   createdAt    DateTime @default(now())
+
+  projects UserProject[]
+}
+
+// Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
+// usata: il ruolo admin ha accesso implicito a tutti i progetti.
+model UserProject {
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@index([projectId])
 }
 
 model Project {
@@ -31,8 +49,9 @@ model Project {
   archived  Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  tasks  Task[]
-  tokens ProjectToken[]
+  tasks   Task[]
+  tokens  ProjectToken[]
+  members UserProject[]
 }
 
 model ProjectToken {

@@ -23,6 +23,7 @@ setAttachmentStorageFactory(async () =>
  * Lascia lo schema intatto (creato una volta da globalSetup via migrate deploy).
  */
 export async function cleanDatabase() {
+  await prisma.userProject.deleteMany();
   await prisma.taskDependency.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.attachment.deleteMany();

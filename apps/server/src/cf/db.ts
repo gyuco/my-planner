@@ -1,13 +1,14 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient } from "../../prisma/d1client/wasm.js";
 import { PrismaD1 } from "@prisma/adapter-d1";
-import { setPrismaClient } from "../lib/prisma.js";
+import { setPrismaResolver } from "../lib/prisma.js";
 import type { CfEnv } from "./env.js";
 
 /**
  * Factory del client Prisma sul runtime Workers (CF2): usa il client D1
  * generato (driverAdapters + engineType client/WASM) con l'adapter D1 sul
- * binding `env.DB`. Il client è condiviso via `setPrismaClient` come su Node,
- * cosi' i service layer restano identici (stessa business logic).
+ * binding `env.DB`. Il client viene esposto ai service layer tramite il
+ * resolver di lib/prisma.ts, cosi' la business logic resta identica a Node.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,11 +16,14 @@ type AnyFn = (...args: any[]) => any;
 
 /**
  * Il query compiler WASM di Prisma non è rientrante: eseguire due query in
- * parallelo sullo stesso client (come fa il service layer con Promise.all o
- * richieste HTTP concorrenti) manda in hang il Worker ("code had hung").
- * Serializziamo quindi tutte le chiamate al client in un unico chain. Per
- * un'app single-user il costo è trascurabile; `$transaction([...])` viene
- * mappato su un Promise.all delle query già accodate.
+ * parallelo sullo stesso client (come fa il service layer con Promise.all)
+ * manda in hang il Worker ("code had hung"). Serializziamo quindi tutte le
+ * chiamate al client in un unico chain. `$transaction([...])` viene mappato
+ * su un Promise.all delle query già accodate.
+ *
+ * ATTENZIONE: il chain non deve mai essere condiviso tra richieste diverse —
+ * vedi il commento su setPrismaResolver in lib/prisma.ts. Per questo vive
+ * nella closure di un client creato per singola richiesta, non in un modulo.
  */
 function serializeClient<T extends object>(client: T): T {
   let chain: Promise<unknown> = Promise.resolve();
@@ -57,14 +61,24 @@ function serializeClient<T extends object>(client: T): T {
   return wrap(client, client) as T;
 }
 
-let cached: ReturnType<typeof serializeClient<PrismaClient>> | null = null;
+/**
+ * Scope della richiesta in corso. `prisma` (lib/prisma.ts) legge da qui, quindi
+ * ogni richiesta lavora sul proprio client e sulla propria coda: nessuna
+ * promise viene mai attraversata tra I/O context diversi.
+ */
+const requestScope = new AsyncLocalStorage<PrismaClient>();
 
-export function initD1Prisma(env: Pick<CfEnv, "DB">): PrismaClient {
-  if (!cached) {
-    const adapter = new PrismaD1(env.DB);
-    const client = new PrismaClient({ adapter });
-    cached = serializeClient(client);
-    setPrismaClient(cached as unknown as Parameters<typeof setPrismaClient>[0]);
-  }
-  return cached as unknown as PrismaClient;
+setPrismaResolver(() => requestScope.getStore() ?? null);
+
+function createRequestPrisma(env: Pick<CfEnv, "DB">): PrismaClient {
+  const adapter = new PrismaD1(env.DB);
+  return serializeClient(new PrismaClient({ adapter })) as unknown as PrismaClient;
+}
+
+/**
+ * Esegue `fn` con un client Prisma/D1 dedicato alla richiesta corrente.
+ * Va usato per ogni invocazione del Worker (fetch e scheduled).
+ */
+export function withRequestPrisma<T>(env: Pick<CfEnv, "DB">, fn: () => Promise<T>): Promise<T> {
+  return requestScope.run(createRequestPrisma(env), fn);
 }

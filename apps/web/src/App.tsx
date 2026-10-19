@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Board, Project } from "@my-planner/core";
+import type { AuthUser, Board, Project } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
 import { CreateTaskModal } from "./components/CreateTaskModal";
@@ -7,13 +7,20 @@ import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
 import { StorageSettingsModal } from "./components/StorageSettingsModal";
+import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
-import { clearToken, hasValidToken } from "./auth";
-import { getAggregatedBoard, getProjectBoard, listProjects, setUnauthorizedHandler } from "./api";
+import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
+import {
+  getAggregatedBoard,
+  getMe,
+  getProjectBoard,
+  listProjects,
+  setUnauthorizedHandler,
+} from "./api";
 import { useI18n } from "./i18n";
 
 const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
@@ -53,6 +60,7 @@ function collectTags(board: Board): string[] {
 export function App() {
   const { t } = useI18n();
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | "all" | null>(null);
   const [board, setBoard] = useState<Board>(EMPTY_BOARD);
@@ -62,6 +70,7 @@ export function App() {
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [showUsers, setShowUsers] = useState(false);
   const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
@@ -69,18 +78,38 @@ export function App() {
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
+  const isAdmin = currentUser?.role === "admin";
+
   const handleLogout = useCallback(() => {
     clearToken();
     setLoggedIn(false);
+    setCurrentUser(null);
     setProjects([]);
     setSelectedProjectId(null);
     setBoard(EMPTY_BOARD);
+    setShowUsers(false);
+  }, []);
+
+  // Rilegge ruolo e progetti assegnati dal server: dopo un cambio fatto da un
+  // admin (o al reload) la UI riflette subito i permessi correnti.
+  const refreshSession = useCallback(async () => {
+    try {
+      const user = await getMe();
+      setCurrentUser(user);
+      saveUser(user);
+    } catch {
+      /* 401 gia' gestito da apiFetch */
+    }
   }, []);
 
   useEffect(() => {
     setUnauthorizedHandler(handleLogout);
     return () => setUnauthorizedHandler(null);
   }, [handleLogout]);
+
+  useEffect(() => {
+    if (loggedIn) refreshSession();
+  }, [loggedIn, refreshSession]);
 
   const loadProjects = useCallback(async () => {
     try {
@@ -171,6 +200,7 @@ export function App() {
       <Sidebar
         projects={projects}
         selectedProjectId={selectedProjectId}
+        isAdmin={isAdmin}
         onSelect={(id) => {
           setSelectedProjectId(id);
           setSidebarOpen(false);
@@ -180,6 +210,7 @@ export function App() {
         onRefreshProject={refreshProject}
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
+        onOpenUsers={() => setShowUsers(true)}
       />
       <div className="app-main">
         <header className="topbar">
@@ -230,7 +261,7 @@ export function App() {
         />
       )}
 
-      {showCreateProject && (
+      {showCreateProject && isAdmin && (
         <CreateProjectModal
           onClose={() => setShowCreateProject(false)}
           onCreated={loadProjects}
@@ -262,8 +293,20 @@ export function App() {
         <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} />
       )}
 
-      {showStorageSettings && (
+      {showStorageSettings && isAdmin && (
         <StorageSettingsModal onClose={() => setShowStorageSettings(false)} />
+      )}
+
+      {showUsers && currentUser && isAdmin && (
+        <UsersModal
+          currentUserId={currentUser.id}
+          projects={projects}
+          onClose={() => setShowUsers(false)}
+          onChanged={() => {
+            refreshSession();
+            loadProjects();
+          }}
+        />
       )}
     </div>
   );

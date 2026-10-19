@@ -70,9 +70,41 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### REST — JWT
 - Header: `Authorization: Bearer <jwt>`
-- Tutte le route tranne `POST /auth/login` richiedono JWT valido (già implementato in `index.ts` via `app.authenticate`).
-- Claim: `{ sub: userId, username }`. Scadenza 30gg (`expiresIn: "30d"` da impostare in `app.jwt.sign`, attualmente mancante nel codice esistente — **gap da correggere in B4**: `routes/auth.ts` firma il JWT senza `expiresIn`).
-- Errore: token mancante/non valido/scaduto → `401 { error: { code: "UNAUTHORIZED", message: "..." } }`.
+- Tutte le route tranne `POST /auth/login` richiedono JWT valido (`app.authenticate` su Fastify, middleware Hono sul Worker).
+- Claim: `{ sub: userId, username }`. Scadenza 30gg. Ruolo e progetti associati **non** sono nel JWT: vengono riletti dal DB ad ogni richiesta, così un cambio di ruolo/assegnazioni è immediato.
+- Ruoli: `admin` (accesso a tutti i progetti, gestione utenti e impostazioni globali) e `manager` (accesso solo ai progetti in `UserProject`). Il primo utente creato al bootstrap è sempre `admin`.
+- Errore: token mancante/non valido/scaduto → `401 { error: { code: "UNAUTHORIZED", message: "..." } }`; accesso a una risorsa di un progetto non assegnato → `403 FORBIDDEN`.
+
+`POST /auth/login`
+- Body: `{ "username": string, "password": string }`
+- 200: `{ "token": "<jwt>", "user": { "id", "username", "role": "admin"|"manager", "projectIds": [] } }`
+- 401 `UNAUTHORIZED` con credenziali non valide.
+
+`GET /auth/me`
+- Auth: JWT
+- 200: `{ "id", "username", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+
+### Gestione utenti (solo `admin`)
+`GET /users`
+- 200: lista di `{ id, username, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
+
+`POST /users`
+- Body: `{ "username": string, "password": string (min 8), "role": "admin"|"manager", "projectIds"?: string[] }`
+- Un `manager` deve avere almeno un progetto; per un `admin` `projectIds` è ignorato (accesso implicito a tutti).
+- 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se lo username esiste.
+
+`PATCH /users/:userId`
+- Body: `{ "role"?: "admin"|"manager", "password"?: string, "projectIds"?: string[] }`
+- Cambiare `role`/`projectIds` aggiorna subito i permessi dell'utente. Non è possibile rimuovere l'ultimo admin né il ruolo admin al proprio utente.
+- 200: utente aggiornato.
+
+`DELETE /users/:userId`
+- 200: `{ id, deleted: true }`. Non è possibile eliminare se stessi o l'ultimo admin. Le associazioni `UserProject` vengono rimosse in cascade; i progetti restano.
+
+### Scoping dei progetti
+- `GET /projects` restituisce tutti i progetti per l'admin, solo quelli assegnati per il manager.
+- Tutte le route project-scoped (`/projects/:projectId/*`, `/tasks/:taskId/*`, `/attachments/:attachmentId/*`, `/board`) verificano l'accesso al progetto della risorsa; per il manager `/board` è limitata ai progetti assegnati.
+- `POST /projects`, `GET/PUT /settings/storage`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
 ### MCP — token di progetto
 - stdio: `MCP_PROJECT_TOKEN` da env.

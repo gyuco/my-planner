@@ -1,4 +1,7 @@
+import type { AuthUser } from "@my-planner/core";
+
 const TOKEN_KEY = "my-planner:jwt";
+const USER_KEY = "my-planner:user";
 
 export function saveToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
@@ -8,8 +11,33 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+/** Salva l'utente corrente (ruolo e progetti) per il primo render dopo un reload. */
+export function saveUser(user: AuthUser) {
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function getStoredUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthUser>;
+    if (!parsed?.id || !parsed.username || (parsed.role !== "admin" && parsed.role !== "manager")) {
+      return null;
+    }
+    return {
+      id: parsed.id,
+      username: parsed.username,
+      role: parsed.role,
+      projectIds: Array.isArray(parsed.projectIds) ? parsed.projectIds : [],
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
 }
 
 /**

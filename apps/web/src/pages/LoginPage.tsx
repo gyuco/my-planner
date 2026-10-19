@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { saveToken } from "../auth";
+import { saveToken, saveUser } from "../auth";
 import { useI18n } from "../i18n";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 
@@ -50,6 +50,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
         return;
       }
       saveToken(data.token);
+      if (data.user) saveUser(data.user);
       onLoggedIn();
     } catch {
       setError(t.login.cannotReachServer);

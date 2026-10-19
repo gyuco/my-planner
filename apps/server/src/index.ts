@@ -8,16 +8,19 @@ import { initNodePrisma } from "./lib/prisma.node.js";
 // Registra il selettore storage allegati Node (local/S3) sul provider condiviso.
 import "./lib/attachmentStorage/index.js";
 import { authRoutes, bootstrapUser } from "./routes/auth.js";
+import { userRoutes } from "./routes/users.js";
 import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { boardRoutes } from "./routes/board.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { settingsRoutes } from "./routes/settings.js";
+import { getAuthUser } from "./services/userService.js";
 import { MAX_ATTACHMENT_SIZE_BYTES } from "./services/attachmentService.js";
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (req: any, reply: any) => Promise<void>;
+    requireAdmin: (req: any, reply: any) => Promise<void>;
   }
 }
 
@@ -48,7 +51,22 @@ app.decorate("authenticate", async function (req: any, reply: any) {
   try {
     await req.jwtVerify();
   } catch {
-    reply.code(401).send(apiError("UNAUTHORIZED", "Token non valido o mancante"));
+    return reply.code(401).send(apiError("UNAUTHORIZED", "Token non valido o mancante"));
+  }
+  // Il ruolo e i progetti associati sono letti dal DB ad ogni richiesta: un
+  // cambio di ruolo/assegnazioni fatto dall'admin ha effetto immediato, senza
+  // aspettare la scadenza del JWT.
+  const authUser = await getAuthUser(req.user.sub);
+  if (!authUser) {
+    return reply.code(401).send(apiError("UNAUTHORIZED", "Utente non piu' valido"));
+  }
+  req.authUser = authUser;
+});
+
+// Da usare dopo `authenticate` (es. onRequest: [app.authenticate, app.requireAdmin]).
+app.decorate("requireAdmin", async function (req: any, reply: any) {
+  if (req.authUser?.role !== "admin") {
+    return reply.code(403).send(apiError("FORBIDDEN", "Operazione riservata agli amministratori"));
   }
 });
 
@@ -72,6 +90,7 @@ app.setErrorHandler((err, _req, reply) => {
 app.get("/health", async () => ({ status: "ok" }));
 
 app.register(authRoutes);
+app.register(userRoutes);
 app.register(projectRoutes);
 app.register(taskRoutes);
 app.register(boardRoutes);

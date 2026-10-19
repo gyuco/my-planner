@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
 import type { TaskPriority, TaskComplexity } from "@my-planner/core";
-import { ApiRequestError, createTask } from "../api";
+import { ApiRequestError, createTask, uploadAttachment } from "../api";
 import { useI18n } from "../i18n";
 
 interface CreateTaskModalProps {
@@ -20,8 +20,19 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
   const [complexity, setComplexity] = useState<TaskComplexity | "">("");
   const [tagsInput, setTagsInput] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  function handleFilesSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []);
+    setFiles((prev) => [...prev, ...selected]);
+    e.target.value = "";
+  }
+
+  function handleRemoveFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,7 +43,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
-      await createTask(projectId, {
+      const task = await createTask(projectId, {
         title,
         description,
         priority,
@@ -40,7 +51,17 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
         tags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       });
+
       onCreated();
+
+      if (files.length > 0) {
+        const results = await Promise.allSettled(files.map((file) => uploadAttachment(task.id, file)));
+        if (results.some((r) => r.status === "rejected")) {
+          setError(t.createTask.attachmentUploadError);
+          return;
+        }
+      }
+
       onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.createTask.createError);
@@ -103,6 +124,26 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
             <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </label>
         </div>
+
+        <label>
+          {t.createTask.attachmentsLabel}
+          <input type="file" multiple onChange={handleFilesSelected} />
+        </label>
+
+        {files.length > 0 && (
+          <ul className="drawer-list">
+            {files.map((file, index) => (
+              <li key={`${file.name}-${index}`}>
+                <span>{file.name}</span>
+                <span className="drawer-list-actions">
+                  <button type="button" onClick={() => handleRemoveFile(index)}>
+                    {t.createTask.removeFile}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {error && <p className="login-error">{error}</p>}
 
