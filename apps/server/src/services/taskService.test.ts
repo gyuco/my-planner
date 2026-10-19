@@ -358,6 +358,20 @@ describe("taskService — move/transizioni di stato", () => {
     expect(reopened.status).toBe("in_progress");
   });
 
+  it("supporta gli stati todo e testing e li espone come colonne della board", async () => {
+    const project = await setupProject();
+    const a = await createTask(project.id, { title: "A" });
+
+    expect((await moveTask(a.id, "todo")).status).toBe("todo");
+    expect((await moveTask(a.id, "in_progress")).status).toBe("in_progress");
+    expect((await moveTask(a.id, "testing")).status).toBe("testing");
+
+    const board = await getBoard(project.id);
+    expect(Object.keys(board)).toEqual(["draft", "todo", "in_progress", "testing", "done"]);
+    expect(board.testing.map((t: any) => t.id)).toEqual([a.id]);
+    expect(board.done).toEqual([]);
+  });
+
   it("moveTask lancia NOT_FOUND su task inesistente", async () => {
     await expect(moveTask("inesistente", "draft")).rejects.toMatchObject({ code: "NOT_FOUND" });
   });

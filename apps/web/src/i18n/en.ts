@@ -53,8 +53,13 @@ export const en = {
   },
   board: {
     draft: "Draft",
+    todo: "To do",
     inProgress: "In progress",
+    testing: "Testing",
     done: "Done",
+    columns: "Columns",
+    columnsMenuTitle: "Visible columns",
+    showAllColumns: "Show all",
   },
   taskCard: {
     priorityLow: "Low",

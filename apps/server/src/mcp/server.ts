@@ -76,7 +76,7 @@ export function createProjectMcpServer(projectId: string) {
     "list_tasks",
     "Elenca i task del progetto associato al token",
     {
-      status: z.enum(["draft", "in_progress", "done"]).optional(),
+      status: z.enum(["draft", "todo", "in_progress", "testing", "done"]).optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
@@ -169,8 +169,8 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "move_task",
-    "Sposta un task del progetto in un nuovo stato (draft | in_progress | done)",
-    { taskId: z.string(), status: z.enum(["draft", "in_progress", "done"]), position: z.number().int().nonnegative().optional() },
+    "Sposta un task del progetto in un nuovo stato (draft | todo | in_progress | testing | done)",
+    { taskId: z.string(), status: z.enum(["draft", "todo", "in_progress", "testing", "done"]), position: z.number().int().nonnegative().optional() },
     async ({ taskId, status, position }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);

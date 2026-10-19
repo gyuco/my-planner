@@ -8,8 +8,8 @@ import { prisma } from "../lib/prisma.js";
  *
  * Il report ha due sezioni principali: cosa e' stato chiuso ieri (giorno di
  * calendario in Europe/Rome, non "ultime 24h" a scorrimento) e cosa c'e' da
- * prendere in carico oggi (task in draft). I task in corso restano come
- * terza sezione, perche' sono lavoro gia' aperto.
+ * prendere in carico oggi (task in draft/todo). I task in corso o in testing
+ * restano come terza sezione, perche' sono lavoro gia' aperto.
  */
 
 const TZ = "Europe/Rome";
@@ -125,8 +125,14 @@ export async function buildStandupReport(now: Date = new Date()): Promise<Standu
       .filter((t) => t.status === "done" && t.updatedAt >= yesterdayStart && t.updatedAt < todayStart)
       .map(toView)
       .sort(byPriorityThenDueDate);
-    const inProgress = project.tasks.filter((t) => t.status === "in_progress").map(toView).sort(byPriorityThenDueDate);
-    const todo = project.tasks.filter((t) => t.status === "draft").map(toView).sort(byPriorityThenDueDate);
+    const inProgress = project.tasks
+      .filter((t) => t.status === "in_progress" || t.status === "testing")
+      .map(toView)
+      .sort(byPriorityThenDueDate);
+    const todo = project.tasks
+      .filter((t) => t.status === "draft" || t.status === "todo")
+      .map(toView)
+      .sort(byPriorityThenDueDate);
 
     if (done.length === 0 && inProgress.length === 0 && todo.length === 0) continue;
 

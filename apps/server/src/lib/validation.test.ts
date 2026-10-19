@@ -61,6 +61,12 @@ describe("validation — moveTaskInputSchema", () => {
     expect(moveTaskInputSchema.safeParse({ status: "in_progress" }).success).toBe(true);
   });
 
+  it("accetta tutti gli stati della board", () => {
+    for (const status of ["draft", "todo", "in_progress", "testing", "done"]) {
+      expect(moveTaskInputSchema.safeParse({ status }).success).toBe(true);
+    }
+  });
+
   it("rifiuta status fuori enum", () => {
     expect(moveTaskInputSchema.safeParse({ status: "archiviato" }).success).toBe(false);
   });

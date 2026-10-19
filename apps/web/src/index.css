@@ -643,6 +643,91 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   padding: 0 0.25rem;
 }
 
+/* --- Board toolbar / selettore colonne ---------------------------------- */
+
+.board-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.85rem 1.75rem 0;
+}
+
+.column-picker {
+  position: relative;
+}
+
+.column-picker-toggle {
+  letter-spacing: 0.01em;
+}
+
+.column-picker-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.45rem);
+  z-index: 20;
+  min-width: 210px;
+  padding: 0.55rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.column-picker-title {
+  padding: 0.25rem 0.5rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.column-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.5rem;
+  border-radius: var(--r-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ink-700);
+  cursor: pointer;
+}
+
+.column-picker-item:hover { background: var(--surface-sunken); }
+
+.column-picker-item input {
+  accent-color: var(--indigo-500);
+  cursor: pointer;
+}
+
+.column-picker-item input:disabled { cursor: default; }
+
+.column-picker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.column-picker-dot-draft { background: var(--ink-300); }
+.column-picker-dot-todo { background: var(--warning); }
+.column-picker-dot-in_progress { background: var(--indigo-500); }
+.column-picker-dot-testing { background: var(--violet-500); }
+.column-picker-dot-done { background: var(--success); }
+
+.column-picker-reset {
+  width: 100%;
+  margin-top: 0.3rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--indigo-600);
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.column-picker-reset:hover { background: var(--indigo-50); }
+
 /* =========================================================================
    Board kanban
    ========================================================================= */
@@ -693,12 +778,17 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   flex-shrink: 0;
 }
 
-.board .column:nth-child(1) h2::before { background: var(--ink-300); }
-.board .column:nth-child(2) h2::before {
+.board .column-status-draft h2::before { background: var(--ink-300); }
+.board .column-status-todo h2::before { background: var(--warning); }
+.board .column-status-in_progress h2::before {
   background: var(--indigo-500);
   box-shadow: 0 0 0 3px rgba(91, 91, 214, 0.16);
 }
-.board .column:nth-child(3) h2::before {
+.board .column-status-testing h2::before {
+  background: var(--violet-500);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
+}
+.board .column-status-done h2::before {
   background: var(--success);
   box-shadow: 0 0 0 3px rgba(15, 157, 99, 0.16);
 }
@@ -1565,6 +1655,7 @@ body.dnd-dragging * {
   .sidebar { width: 200px; }
   .topbar { padding: 1rem 1.15rem; }
   .filter-bar { padding: 0.75rem 1.15rem; }
+  .board-toolbar { padding: 0.75rem 1.15rem 0; }
   .board { padding: 1.15rem 1.15rem 2rem; gap: 0.85rem; }
   .column { min-width: 210px; flex: 1 1 210px; padding: 0.8rem 0.65rem 0.9rem; }
   .filter-search { min-width: 180px; }
@@ -1661,6 +1752,7 @@ body.dnd-dragging * {
   .modal-row { flex-direction: column; gap: 0.5rem; }
 
   .filter-bar { padding: 0.6rem 1rem; }
+  .board-toolbar { padding: 0.65rem 1rem 0; }
   .filter-search { width: 100%; min-width: 0; }
 
   /* In colonna, `align-items: flex-start` (usato su desktop per non stirare le

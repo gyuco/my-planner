@@ -1,4 +1,10 @@
-export type TaskStatus = "draft" | "in_progress" | "done";
+/**
+ * Stati di un task, nell'ordine in cui compaiono come colonne sulla board:
+ * draft -> todo -> in_progress -> testing -> done.
+ */
+export const TASK_STATUSES = ["draft", "todo", "in_progress", "testing", "done"] as const;
+
+export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
@@ -193,6 +199,8 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
 
 export interface Board {
   draft: Task[];
+  todo: Task[];
   in_progress: Task[];
+  testing: Task[];
   done: Task[];
 }

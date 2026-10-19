@@ -55,8 +55,13 @@ export const it: Dictionary = {
   },
   board: {
     draft: "Draft",
+    todo: "To do",
     inProgress: "In progress",
+    testing: "Testing",
     done: "Done",
+    columns: "Colonne",
+    columnsMenuTitle: "Colonne visibili",
+    showAllColumns: "Mostra tutte",
   },
   taskCard: {
     priorityLow: "Bassa",

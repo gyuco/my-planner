@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Board, Project } from "@my-planner/core";
+import { TASK_STATUSES } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
 import { Sidebar } from "./components/Sidebar";
 import { CreateTaskModal } from "./components/CreateTaskModal";
@@ -23,7 +24,11 @@ import {
 } from "./api";
 import { useI18n } from "./i18n";
 
-const EMPTY_BOARD: Board = { draft: [], in_progress: [], done: [] };
+function emptyBoard(): Board {
+  return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Board;
+}
+
+const EMPTY_BOARD: Board = emptyBoard();
 const EMPTY_FILTERS: BoardFiltersState = { priorities: [], blockedOnly: false, search: "", tag: null };
 
 function filterBoard(board: Board, filters: BoardFiltersState): Board {
@@ -42,14 +47,16 @@ function filterBoard(board: Board, filters: BoardFiltersState): Board {
   }
   return {
     draft: applyFilters(board.draft as BoardTask[]),
+    todo: applyFilters(board.todo as BoardTask[]),
     in_progress: applyFilters(board.in_progress as BoardTask[]),
+    testing: applyFilters(board.testing as BoardTask[]),
     done: applyFilters(board.done as BoardTask[]),
   };
 }
 
 function collectTags(board: Board): string[] {
   const set = new Set<string>();
-  for (const status of ["draft", "in_progress", "done"] as const) {
+  for (const status of TASK_STATUSES) {
     for (const t of board[status] as BoardTask[]) {
       for (const tag of t.tags) set.add(tag);
     }
