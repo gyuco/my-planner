@@ -128,6 +128,27 @@ export interface StorageSettings {
   updatedAt: string;
 }
 
+export type EmailSecurity = "tls" | "starttls" | "none";
+
+/**
+ * Config SMTP globale per le email di notifica (GET/PUT /settings/email).
+ * La password non viene mai restituita, solo il flag `passwordSet`.
+ * `configured` = abilitata e completa: solo in quel caso partono email.
+ */
+export interface EmailSettings {
+  enabled: boolean;
+  configured: boolean;
+  host: string | null;
+  port: number;
+  security: EmailSecurity;
+  username: string | null;
+  passwordSet: boolean;
+  fromAddress: string | null;
+  fromName: string;
+  appUrl: string | null;
+  updatedAt: string | null;
+}
+
 export interface ProjectToken {
   id: string;
   projectId: string;
@@ -193,6 +214,7 @@ export type ErrorCode =
   | "ATTACHMENT_TOO_LARGE"
   | "ATTACHMENT_TYPE_NOT_ALLOWED"
   | "CONFLICT"
+  | "EMAIL_SEND_FAILED"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -236,6 +258,7 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   ATTACHMENT_TOO_LARGE: 413,
   ATTACHMENT_TYPE_NOT_ALLOWED: 415,
   CONFLICT: 409,
+  EMAIL_SEND_FAILED: 502,
   INTERNAL_ERROR: 500,
 };
 

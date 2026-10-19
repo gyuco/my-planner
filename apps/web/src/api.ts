@@ -11,6 +11,8 @@ import type {
   Comment,
   Attachment,
   StorageSettings,
+  EmailSettings,
+  EmailSecurity,
   UserAccount,
   UserRole,
   NotificationsResponse,
@@ -382,6 +384,33 @@ export function getStorageSettings(): Promise<StorageSettings> {
 
 export function updateStorageSettings(input: StorageSettingsInput): Promise<StorageSettings> {
   return apiFetch(`/settings/storage`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+// --- Impostazioni email (SMTP notifiche) ------------------------------------
+
+export interface EmailSettingsInput {
+  enabled: boolean;
+  host?: string | null;
+  port: number;
+  security: EmailSecurity;
+  username?: string | null;
+  /** Vuota/omessa = mantiene la password salvata. */
+  password?: string;
+  fromAddress?: string | null;
+  fromName?: string;
+  appUrl?: string | null;
+}
+
+export function getEmailSettings(): Promise<EmailSettings> {
+  return apiFetch(`/settings/email`);
+}
+
+export function updateEmailSettings(input: EmailSettingsInput): Promise<EmailSettings> {
+  return apiFetch(`/settings/email`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function sendTestEmail(to?: string): Promise<{ ok: true; to: string }> {
+  return apiFetch(`/settings/email/test`, { method: "POST", body: JSON.stringify(to ? { to } : {}) });
 }
 
 /**

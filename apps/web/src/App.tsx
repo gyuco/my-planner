@@ -8,6 +8,7 @@ import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
 import { StorageSettingsModal } from "./components/StorageSettingsModal";
+import { EmailSettingsModal } from "./components/EmailSettingsModal";
 import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
@@ -92,6 +93,7 @@ export function App() {
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [showStorageSettings, setShowStorageSettings] = useState(false);
+  const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
@@ -280,6 +282,7 @@ export function App() {
         onRefreshProject={refreshProject}
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
+        onOpenEmailSettings={() => setShowEmailSettings(true)}
         onOpenUsers={() => setShowUsers(true)}
       />
       <div className="app-main">
@@ -432,6 +435,8 @@ export function App() {
       {showStorageSettings && isAdmin && (
         <StorageSettingsModal onClose={() => setShowStorageSettings(false)} />
       )}
+
+      {showEmailSettings && isAdmin && <EmailSettingsModal onClose={() => setShowEmailSettings(false)} />}
 
       {showUsers && currentUser && isAdmin && (
         <UsersModal

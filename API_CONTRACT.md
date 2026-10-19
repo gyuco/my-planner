@@ -58,6 +58,7 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `ATTACHMENT_TOO_LARGE` | 413 | File > 20MB |
 | `ATTACHMENT_TYPE_NOT_ALLOWED` | 415 | Tipo file non ammesso |
 | `CONFLICT` | 409 | Altri conflitti generici (es. nome progetto duplicato, se applicabile) |
+| `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
 `message` è sempre una stringa human-readable in italiano (coerente col resto del codebase), pensata per essere mostrata sia in UI sia restituita a un agente AI via MCP.
@@ -114,7 +115,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 ### Scoping dei progetti
 - `GET /projects` restituisce tutti i progetti per l'admin, solo quelli assegnati per il manager.
 - Tutte le route project-scoped (`/projects/:projectId/*`, `/tasks/:taskId/*`, `/attachments/:attachmentId/*`, `/board`) verificano l'accesso al progetto della risorsa; per il manager `/board` è limitata ai progetti assegnati.
-- `POST /projects`, `GET/PUT /settings/storage`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
+- `POST /projects`, `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
 ### MCP — token di progetto
 - stdio: `MCP_PROJECT_TOKEN` da env.
@@ -361,6 +362,26 @@ Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursor
 - Body: `{ upTo: number }` (tipicamente il `serverCursor` appena ricevuto)
 - Sposta il cursore a `min(upTo, ultimo evento visibile)` — non può "leggere in anticipo" eventi non ancora restituiti.
 - 200: `{ lastSeenEventId }`
+
+### Email di notifica (SMTP)
+Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/email` (vedi `apps/server/src/services/emailNotificationService.ts`).
+- Destinatari = chi vede la notifica in-app: admin + manager associati al progetto, **escluso l'autore**, progetti archiviati esclusi. Più destinatari nello stesso messaggio senza esporre gli indirizzi (`To: undisclosed-recipients:;`), massimo 50 per messaggio.
+- **Mai bloccante**: senza config (nessuna riga, `enabled: false`, campi mancanti, password non decifrabile) non parte nulla; l'invio gira in background dopo la risposta (Worker: `ctx.waitUntil`), quindi errori SMTP o timeout (30s) vengono solo loggati e non toccano né la mutazione né l'evento in-app.
+
+### `GET /settings/email` (admin)
+- 200: `EmailSettings` — `{ enabled, configured, host, port, security: "tls"|"starttls"|"none", username, passwordSet, fromAddress, fromName, appUrl, updatedAt }`. La password non è mai restituita, solo `passwordSet`. `configured` = abilitata e completa (le email partono solo in quel caso). Senza riga salvata restituisce i default (`enabled: false`).
+
+### `PUT /settings/email` (admin)
+- Body: `{ enabled: boolean, host?, port: 1..65535, security, username?, password?, fromAddress?, fromName?, appUrl? }`
+- `password` omessa/vuota → mantiene quella salvata; `username` vuoto → la password viene rimossa.
+- La password è salvata cifrata (AES-256-GCM, chiave HKDF da `SETTINGS_ENCRYPTION_KEY`, fallback `JWT_SECRET`). Cambiando chiave la password va reinserita.
+- 400 `VALIDATION_ERROR`: `enabled: true` senza `host`/`fromAddress`/password (se c'è `username`); credenziali con `security: "none"`; `fromAddress`/`host`/`appUrl` non validi.
+- 200: `EmailSettings` aggiornato.
+
+### `POST /settings/email/test` (admin)
+- Body: `{ to?: string }` (default: email dell'admin che chiama).
+- Usa la config **salvata**, anche se non ancora abilitata.
+- 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
 
 ---
 

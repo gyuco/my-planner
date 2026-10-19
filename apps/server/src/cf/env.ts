@@ -12,6 +12,9 @@ export interface CfEnv {
   BOOTSTRAP_EMAIL?: string;
   BOOTSTRAP_PASSWORD?: string;
   MCP_HTTP_BASE_URL?: string;
+  // Chiave per cifrare i segreti salvati in DB (password SMTP, vedi
+  // lib/secretBox.ts). Opzionale: senza, la chiave e' derivata da JWT_SECRET.
+  SETTINGS_ENCRYPTION_KEY?: string;
   // Var statiche optionale (vedi wrangler.toml [vars])
   PORT?: string;
 

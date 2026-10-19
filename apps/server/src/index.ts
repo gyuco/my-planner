@@ -7,6 +7,8 @@ import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-plan
 import { initNodePrisma } from "./lib/prisma.node.js";
 // Registra il selettore storage allegati Node (local/S3) sul provider condiviso.
 import "./lib/attachmentStorage/index.js";
+// Registra il trasporto SMTP Node per le email di notifica.
+import "./lib/email/index.js";
 import { authRoutes, bootstrapUser } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { projectRoutes } from "./routes/projects.js";

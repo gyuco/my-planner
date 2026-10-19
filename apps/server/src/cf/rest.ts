@@ -48,6 +48,7 @@ import {
   deleteAttachment,
 } from "../services/attachmentService.js";
 import { getStorageSettings, updateStorageSettings } from "../services/storageSettingsService.js";
+import { getEmailSettings, sendTestEmail, updateEmailSettings } from "../services/emailSettingsService.js";
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
@@ -63,6 +64,8 @@ import {
   boardFiltersQuerySchema,
   aggregatedBoardQuerySchema,
   storageSettingsInputSchema,
+  emailSettingsInputSchema,
+  emailTestInputSchema,
   createUserInputSchema,
   updateUserInputSchema,
   updateProfileInputSchema,
@@ -431,6 +434,19 @@ export function buildRestApp() {
   app.put("/settings/storage", async (c) => {
     const input = storageSettingsInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await updateStorageSettings(input));
+  });
+
+  app.get("/settings/email", async (c) => c.json(await getEmailSettings()));
+
+  app.put("/settings/email", async (c) => {
+    const input = emailSettingsInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await updateEmailSettings(input));
+  });
+
+  // Destinatario di default: l'admin che sta configurando.
+  app.post("/settings/email/test", async (c) => {
+    const input = emailTestInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await sendTestEmail(input.to || c.get("user").email));
   });
 
   return app;

@@ -11,6 +11,7 @@ interface SidebarProps {
   onRefreshProject: (projectId: string) => void;
   onOpenArchived: () => void;
   onOpenStorageSettings: () => void;
+  onOpenEmailSettings: () => void;
   onOpenUsers: () => void;
 }
 
@@ -24,6 +25,7 @@ export function Sidebar({
   onRefreshProject,
   onOpenArchived,
   onOpenStorageSettings,
+  onOpenEmailSettings,
   onOpenUsers,
 }: SidebarProps) {
   const { t } = useI18n();
@@ -86,6 +88,11 @@ export function Sidebar({
         {isAdmin && (
           <button className="sidebar-item" onClick={onOpenStorageSettings}>
             {t.sidebar.storageSettings}
+          </button>
+        )}
+        {isAdmin && (
+          <button className="sidebar-item" onClick={onOpenEmailSettings}>
+            {t.sidebar.emailSettings}
           </button>
         )}
       </div>

@@ -7,6 +7,7 @@ import { resolveProjectFromToken } from "./auth.js";
 import { initNodePrisma } from "../lib/prisma.node.js";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/index.js";
+import "../lib/email/index.js";
 
 /**
  * Entry point MCP via HTTP, per uso remoto. Il token di progetto va passato

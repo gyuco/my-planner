@@ -144,3 +144,20 @@ export const storageSettingsInputSchema = z.object({
   // ripresentare il secret ad ogni salvataggio dal form frontend).
   s3SecretAccessKey: z.string().optional().nullable(),
 });
+
+export const emailSettingsInputSchema = z.object({
+  enabled: z.boolean(),
+  host: z.string().trim().max(255).optional().nullable(),
+  port: z.number().int().min(1).max(65535),
+  security: z.enum(["tls", "starttls", "none"]),
+  username: z.string().trim().max(255).optional().nullable(),
+  // Vuota/omessa = mantiene la password gia' salvata (come s3SecretAccessKey).
+  password: z.string().max(500).optional().nullable(),
+  fromAddress: z.string().trim().max(255).optional().nullable(),
+  fromName: z.string().trim().max(100).optional(),
+  appUrl: z.string().trim().max(500).optional().nullable(),
+});
+
+export const emailTestInputSchema = z.object({
+  to: z.string().trim().max(255).optional(),
+});

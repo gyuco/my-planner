@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { ExecutionContext, ScheduledEvent } from "@cloudflare/workers-types";
 import { buildRestApp, bootstrapUserOnWorker } from "./rest.js";
 import { withRequestPrisma } from "./db.js";
@@ -6,6 +7,9 @@ import { createR2AttachmentStorage } from "./storage/r2.js";
 import { handleMcpRequest, handleMcpAttachmentDownload } from "./mcp.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
+import { cfSmtpSocketFactory } from "./smtpSocket.js";
+import { setBackgroundRunner, setSmtpSocketFactory } from "../lib/email/provider.js";
+import { setSecretKeyProvider } from "../lib/secretBox.js";
 import type { CfEnv } from "./env.js";
 
 /**
@@ -22,6 +26,21 @@ import type { CfEnv } from "./env.js";
  */
 
 const rest = buildRestApp();
+
+// `env` e `ctx` dell'invocazione corrente, letti dai provider condivisi:
+// globali di modulo sarebbero condivisi tra richieste concorrenti
+// dell'isolate (stesso problema descritto in lib/prisma.ts).
+const invocation = new AsyncLocalStorage<{ env: CfEnv; ctx: ExecutionContext }>();
+
+setSmtpSocketFactory(cfSmtpSocketFactory);
+setSecretKeyProvider(() => {
+  const env = invocation.getStore()?.env;
+  return env?.SETTINGS_ENCRYPTION_KEY?.trim() || env?.JWT_SECRET?.trim() || null;
+});
+// Le email di notifica partono dopo la risposta: senza waitUntil workerd
+// interromperebbe l'invio a fine richiesta. La promise nasce dentro lo scope
+// della richiesta, quindi usa il suo client Prisma.
+setBackgroundRunner((task) => invocation.getStore()?.ctx.waitUntil(task));
 
 // Deve restare allineato a [triggers].crons in wrangler.toml.
 const STANDUP_CRON = "0 6 * * *";
@@ -47,7 +66,7 @@ async function prepareRequest(env: CfEnv): Promise<void> {
 
 export default {
   async fetch(request: Request, env: CfEnv, ctx: ExecutionContext): Promise<Response> {
-    return withRequestPrisma(env, async () => {
+    return invocation.run({ env, ctx }, () => withRequestPrisma(env, async () => {
       await prepareRequest(env);
 
       const url = new URL(request.url);
@@ -58,12 +77,12 @@ export default {
         return handleMcpRequest(request, env);
       }
       return rest.fetch(request, env, ctx as never);
-    });
+    }));
   },
 
   // Standup giornaliero (CF: Cron Trigger, vedi wrangler.toml [triggers]).
   // Legge direttamente D1 (tutti i progetti, non scoped come un token MCP)
-  // e invia il riepilogo via Gmail API.
+  // e invia il riepilogo via SMTP Gmail (src/cf/email.ts).
   async scheduled(event: ScheduledEvent, env: CfEnv, ctx: ExecutionContext): Promise<void> {
     // Cloudflare può continuare a consegnare cron trigger rimossi dalla config
     // (visto in produzione: un "* * * * *" di test ha inviato una mail al minuto
@@ -72,7 +91,7 @@ export default {
     if (event.cron !== STANDUP_CRON) return;
 
     ctx.waitUntil(
-      withRequestPrisma(env, async () => {
+      invocation.run({ env, ctx }, () => withRequestPrisma(env, async () => {
         await prepareRequest(env);
         const report = await buildStandupReport();
         await sendStandupEmail(
@@ -81,7 +100,7 @@ export default {
           renderStandupText(report),
           renderStandupHtml(report)
         );
-      })
+      }))
     );
   },
 };
