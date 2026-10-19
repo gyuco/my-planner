@@ -11,8 +11,8 @@ import {
   updateUser,
 } from "./userService.js";
 
-async function createAdmin(username = "admin") {
-  return createUser({ username, password: "password123", role: "admin" });
+async function createAdmin(email = "admin@example.com") {
+  return createUser({ email, password: "password123", role: "admin" });
 }
 
 describe("userService — ruoli e assegnazioni", () => {
@@ -20,7 +20,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const admin = await createAdmin();
     const project = await createProject("Progetto A");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [project.id],
@@ -33,7 +33,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const authUser = await getAuthUser(manager.id);
     expect(authUser).toMatchObject({
       id: manager.id,
-      username: "manager",
+      email: "manager@example.com",
       role: "manager",
       projectIds: [project.id],
     });
@@ -48,7 +48,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const projectA = await createProject("A");
     const projectB = await createProject("B");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [projectA.id],
@@ -69,14 +69,14 @@ describe("userService — ruoli e assegnazioni", () => {
     await expect(assertProjectAccess(managerAuth!, projectA.id)).resolves.toBeUndefined();
   });
 
-  it("rifiuta un manager senza progetti e username duplicati", async () => {
+  it("rifiuta un manager senza progetti e email duplicate", async () => {
     await createAdmin();
     await expect(
-      createUser({ username: "manager", password: "password123", role: "manager" }),
+      createUser({ email: "manager@example.com", password: "password123", role: "manager" }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
     await expect(
-      createUser({ username: "admin", password: "password123", role: "admin" }),
+      createUser({ email: "ADMIN@example.com", password: "password123", role: "admin" }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
@@ -85,7 +85,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const projectA = await createProject("A");
     const projectB = await createProject("B");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [projectA.id],
@@ -102,7 +102,7 @@ describe("userService — ruoli e assegnazioni", () => {
   it("impedisce di rimuovere l'ultimo amministratore o se stessi", async () => {
     const admin = await createAdmin();
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [(await createProject("A")).id],
@@ -116,14 +116,14 @@ describe("userService — ruoli e assegnazioni", () => {
     await expect(deleteUser(manager.id, admin.id)).resolves.toEqual({ id: manager.id, deleted: true });
 
     const users = await listUsers();
-    expect(users.map((u) => u.username)).toEqual(["admin"]);
+    expect(users.map((u) => u.email)).toEqual(["admin@example.com"]);
   });
 
   it("valida id progetto inesistenti", async () => {
     await createAdmin();
     await expect(
       createUser({
-        username: "manager",
+        email: "manager@example.com",
         password: "password123",
         role: "manager",
         projectIds: ["progetto-inesistente"],
@@ -131,14 +131,13 @@ describe("userService — ruoli e assegnazioni", () => {
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 
-  it("salva nome, cognome ed email e aggiorna l'email dal profilo", async () => {
+  it("salva nome e cognome, normalizza l'email e la aggiorna dal profilo", async () => {
     const admin = await createUser({
-      username: "admin",
+      email: "Ada@Example.com",
       password: "password123",
       role: "admin",
       firstName: "  Ada  ",
       lastName: "Lovelace",
-      email: "Ada@Example.com",
     });
     expect(admin.firstName).toBe("Ada");
     expect(admin.lastName).toBe("Lovelace");
@@ -152,12 +151,22 @@ describe("userService — ruoli e assegnazioni", () => {
       email: "ada@nuovo.example",
     });
 
-    // Email vuota = rimozione.
-    const cleared = await updateOwnProfile(admin.id, { email: "" });
-    expect(cleared.email).toBeNull();
-
+    // L'email resta obbligatoria e valida.
+    await expect(updateOwnProfile(admin.id, { email: "" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
     await expect(updateOwnProfile(admin.id, { email: "non-una-email" })).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
+    });
+
+    // Non si puo' usare l'email di un altro utente.
+    const other = await createUser({
+      email: "other@example.com",
+      password: "password123",
+      role: "admin",
+    });
+    await expect(updateOwnProfile(other.id, { email: "ada@nuovo.example" })).rejects.toMatchObject({
+      code: "CONFLICT",
     });
   });
 });

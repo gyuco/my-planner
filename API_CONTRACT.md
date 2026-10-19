@@ -71,35 +71,35 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 ### REST — JWT
 - Header: `Authorization: Bearer <jwt>`
 - Tutte le route tranne `POST /auth/login` richiedono JWT valido (`app.authenticate` su Fastify, middleware Hono sul Worker).
-- Claim: `{ sub: userId, username }`. Scadenza 30gg. Ruolo e progetti associati **non** sono nel JWT: vengono riletti dal DB ad ogni richiesta, così un cambio di ruolo/assegnazioni è immediato.
+- Claim: `{ sub: userId, email }`. Scadenza 30gg. Ruolo e progetti associati **non** sono nel JWT: vengono riletti dal DB ad ogni richiesta, così un cambio di ruolo/assegnazioni è immediato.
 - Ruoli: `admin` (accesso a tutti i progetti, gestione utenti e impostazioni globali) e `manager` (accesso solo ai progetti in `UserProject`). Il primo utente creato al bootstrap è sempre `admin`.
 - Errore: token mancante/non valido/scaduto → `401 { error: { code: "UNAUTHORIZED", message: "..." } }`; accesso a una risorsa di un progetto non assegnato → `403 FORBIDDEN`.
 
 `POST /auth/login`
-- Body: `{ "username": string, "password": string }`
-- 200: `{ "token": "<jwt>", "user": { "id", "username", "firstName", "lastName", "email", "role": "admin"|"manager", "projectIds": [] } }`
+- Body: `{ "email": string, "password": string }`
+- 200: `{ "token": "<jwt>", "user": { "id", "email", "firstName", "lastName", "role": "admin"|"manager", "projectIds": [] } }`
 - 401 `UNAUTHORIZED` con credenziali non valide.
 
 `GET /auth/me`
 - Auth: JWT
-- 200: `{ "id", "username", "firstName", "lastName", "email", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+- 200: `{ "id", "email", "firstName", "lastName", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
 
 `PATCH /auth/me`
 - Auth: JWT
-- Body: `{ "email": string | null }` — modifica self-service dell'email del profilo (stringa vuota o `null` la rimuove). Non cambia username, password, ruolo o progetti.
-- 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida.
+- Body: `{ "email": string }` — modifica self-service dell'email, che è anche l'identificativo di login. Non cambia password, ruolo o progetti; l'email deve essere valida e non già usata da un altro utente.
+- 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida; 409 `CONFLICT` se è già in uso.
 
 ### Gestione utenti (solo `admin`)
 `GET /users`
-- 200: lista di `{ id, username, firstName, lastName, email, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
+- 200: lista di `{ id, email, firstName, lastName, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
 
 `POST /users`
-- Body: `{ "username": string, "password": string (min 8), "firstName"?: string, "lastName"?: string, "email"?: string | null, "role": "admin"|"manager", "projectIds"?: string[] }`
+- Body: `{ "email": string, "password": string (min 8), "firstName"?: string, "lastName"?: string, "role": "admin"|"manager", "projectIds"?: string[] }`
 - Un `manager` deve avere almeno un progetto; per un `admin` `projectIds` è ignorato (accesso implicito a tutti).
-- 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se lo username esiste.
+- 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se l'email esiste.
 
 `PATCH /users/:userId`
-- Body: `{ "role"?: "admin"|"manager", "password"?: string, "firstName"?: string, "lastName"?: string, "email"?: string | null, "projectIds"?: string[] }`
+- Body: `{ "role"?: "admin"|"manager", "password"?: string, "email"?: string, "firstName"?: string, "lastName"?: string, "projectIds"?: string[] }`
 - Cambiare `role`/`projectIds` aggiorna subito i permessi dell'utente. Non è possibile rimuovere l'ultimo admin né il ruolo admin al proprio utente.
 - 200: utente aggiornato.
 

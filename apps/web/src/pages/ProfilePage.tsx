@@ -30,20 +30,20 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
   }, [user.email]);
 
   const isAdmin = user.role === "admin";
-  const trimmed = email.trim();
-  const unchanged = trimmed === (user.email ?? "");
+  const trimmed = email.trim().toLowerCase();
+  const unchanged = trimmed === user.email.trim().toLowerCase();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSaved(false);
-    if (trimmed.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    if (trimmed.length === 0 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       setError(t.profile.invalidEmail);
       return;
     }
     setSaving(true);
     try {
-      const updated = await updateMyProfile({ email: trimmed.length > 0 ? trimmed : null });
+      const updated = await updateMyProfile({ email: trimmed });
       onUserUpdated(updated);
       setSaved(true);
     } catch (err) {
@@ -76,10 +76,6 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
               {user.role === "admin" ? t.users.roleAdmin : t.users.roleManager}
             </span>
           </div>
-          <div className="profile-fact">
-            <span className="field-label">{t.profile.username}</span>
-            <span className="profile-username">{user.username}</span>
-          </div>
         </div>
 
         <div className="profile-section">
@@ -109,8 +105,8 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
                 setEmail(e.target.value);
                 setSaved(false);
               }}
-              placeholder={t.profile.emailEmpty}
               autoComplete="email"
+              required
               maxLength={200}
             />
           </label>

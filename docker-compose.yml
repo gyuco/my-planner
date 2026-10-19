@@ -12,7 +12,7 @@ services:
       - PORT=3000
       - MCP_HTTP_PORT=3100
       - MCP_HTTP_BASE_URL=http://localhost:3100
-      - BOOTSTRAP_USERNAME=${BOOTSTRAP_USERNAME:-admin}
+      - BOOTSTRAP_EMAIL=${BOOTSTRAP_EMAIL:-admin@example.com}
       - BOOTSTRAP_PASSWORD=${BOOTSTRAP_PASSWORD:-admin-change-me}
       # Storage allegati: "local" (default) oppure "s3" (vedi config.example.md).
       # Puntato di default al servizio MinIO interno alla rete docker-compose,

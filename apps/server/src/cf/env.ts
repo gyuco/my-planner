@@ -9,7 +9,7 @@ export interface CfEnv {
   DB: D1Database;
   ATTACHMENTS: R2Bucket;
   JWT_SECRET: string;
-  BOOTSTRAP_USERNAME?: string;
+  BOOTSTRAP_EMAIL?: string;
   BOOTSTRAP_PASSWORD?: string;
   MCP_HTTP_BASE_URL?: string;
   // Var statiche optionale (vedi wrangler.toml [vars])

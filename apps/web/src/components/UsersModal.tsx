@@ -19,20 +19,18 @@ interface UsersModalProps {
 }
 
 interface UserFormState {
-  username: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string;
   password: string;
   role: UserRole;
   projectIds: string[];
 }
 
 const EMPTY_FORM: UserFormState = {
-  username: "",
+  email: "",
   firstName: "",
   lastName: "",
-  email: "",
   password: "",
   role: "manager",
   projectIds: [],
@@ -81,10 +79,9 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
     setEditing(user);
     setError(null);
     setForm({
-      username: user.username,
+      email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      email: user.email ?? "",
       password: "",
       role: user.role,
       projectIds: [...user.projectIds],
@@ -123,17 +120,16 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
           projectIds: form.role === "manager" ? form.projectIds : [],
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
-          email: form.email.trim() ? form.email.trim() : null,
+          email: form.email.trim(),
           password: form.password ? form.password : undefined,
         });
       } else {
         await createUser({
-          username: form.username.trim(),
+          email: form.email.trim(),
           password: form.password,
           role: form.role,
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
-          email: form.email.trim() ? form.email.trim() : null,
           projectIds: form.role === "manager" ? form.projectIds : undefined,
         });
       }
@@ -154,7 +150,7 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
   }
 
   async function handleDelete(user: UserAccount) {
-    if (!window.confirm(t.users.deleteConfirm.replace("{username}", user.username))) return;
+    if (!window.confirm(t.users.deleteConfirm.replace("{name}", displayName(user)))) return;
     setError(null);
     try {
       await deleteUser(user.id);
@@ -185,14 +181,14 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
           <form className="user-form" onSubmit={handleSubmit}>
             <h3>{editing ? t.users.editUser : t.users.newUser}</h3>
             <label>
-              {t.users.username}
+              {t.users.email}
               <input
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
                 autoFocus={!editing}
-                disabled={!!editing}
-                maxLength={100}
+                maxLength={200}
                 autoComplete="off"
               />
             </label>
@@ -216,16 +212,6 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
                 />
               </label>
             </div>
-            <label>
-              {t.users.email}
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                maxLength={200}
-                autoComplete="off"
-              />
-            </label>
             <label>
               {editing ? t.users.newPassword : t.users.password}
               <input
@@ -297,7 +283,7 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
                 <div className="user-row-main">
                   <div className="user-row-name">
                     <strong>{displayName(user)}</strong>
-                    <span className="user-row-username">@{user.username}</span>
+                    <span className="user-row-email">{user.email}</span>
                     {user.id === currentUserId && (
                       <span className="user-you">{t.users.currentUser}</span>
                     )}

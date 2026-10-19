@@ -90,11 +90,10 @@ export const projectTokenInputSchema = z.object({
 export const userRoleSchema = z.enum(["admin", "manager"]);
 
 export const createUserInputSchema = z.object({
-  username: z.string().trim().min(1).max(100),
+  email: z.string().trim().min(1).max(200),
   password: z.string().min(8).max(200),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
-  email: z.string().max(200).optional().nullable(),
   role: userRoleSchema,
   projectIds: z.array(z.string().min(1)).optional(),
 });
@@ -102,18 +101,18 @@ export const createUserInputSchema = z.object({
 export const updateUserInputSchema = z.object({
   role: userRoleSchema.optional(),
   password: z.string().min(8).max(200).optional(),
+  email: z.string().trim().min(1).max(200).optional(),
   firstName: z.string().max(100).optional(),
   lastName: z.string().max(100).optional(),
-  email: z.string().max(200).optional().nullable(),
   projectIds: z.array(z.string().min(1)).optional(),
 });
 
 /**
- * Dati modificabili dall'utente sul proprio profilo. Per ora solo l'email:
- * ruolo e progetti restano gestiti dagli admin, nome/cognome sono anagrafica.
+ * Dati modificabili dall'utente sul proprio profilo. L'email e' anche
+ * l'identificativo di login, quindi il cambio e' immediato dalla pagina profilo.
  */
 export const updateProfileInputSchema = z.object({
-  email: z.string().max(200).optional().nullable(),
+  email: z.string().trim().min(1).max(200),
 });
 
 export const storageSettingsInputSchema = z.object({

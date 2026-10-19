@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { S3_BASE_URL, E2E_BOOTSTRAP_PASSWORD, E2E_BOOTSTRAP_USERNAME } from "../playwright.config";
+import { S3_BASE_URL, E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD } from "../playwright.config";
 import { createProjectViaApi, createTaskViaApi, loginViaUi, selectProjectInSidebar, API_BASE_S3 } from "./helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,7 +75,7 @@ test.describe("T6 - allegati locale e S3", () => {
     const project = await createProjectViaApi(`T6 S3 ${Date.now()}`, API_BASE_S3);
 
     await page.goto(S3_BASE_URL);
-    await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
+    await page.getByLabel("Email").fill(E2E_BOOTSTRAP_EMAIL);
     await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.locator(".sidebar-header")).toBeVisible();

@@ -1484,7 +1484,7 @@ body.dnd-dragging * {
   width: auto;
 }
 
-.user-row-username {
+.user-row-email {
   font-size: 0.8rem;
   color: var(--ink-400);
 }
@@ -1588,11 +1588,6 @@ body.dnd-dragging * {
   font-weight: 800;
   letter-spacing: -0.025em;
   color: var(--ink-900);
-}
-
-.profile-username {
-  font-size: 0.82rem;
-  color: var(--ink-400);
 }
 
 .profile-facts {

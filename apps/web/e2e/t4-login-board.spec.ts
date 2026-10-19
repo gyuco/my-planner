@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { E2E_BOOTSTRAP_PASSWORD, E2E_BOOTSTRAP_USERNAME } from "../playwright.config";
+import { E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD } from "../playwright.config";
 import { createProjectViaApi, createTaskViaApi, loginViaUi, selectProjectInSidebar } from "./helpers";
 
 test.describe("T4 - login e board base", () => {
@@ -7,7 +7,7 @@ test.describe("T4 - login e board base", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "my-planner" })).toBeVisible();
 
-    await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
+    await page.getByLabel("Email").fill(E2E_BOOTSTRAP_EMAIL);
     await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 

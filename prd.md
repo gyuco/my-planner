@@ -11,8 +11,8 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 **Canali d'uso:** UI e MCP **alla pari** — ogni operazione disponibile in UI è disponibile via MCP e viceversa.
 
 ## 3. Autenticazione e accesso
-- **UI/REST:** login singolo utente (username/password), sessione via **JWT**. Tutte le route REST richiedono JWT valido tranne `/auth/login`.
-  - **Bootstrap utente:** al primo avvio, se non esiste nessun utente, il server lo crea leggendo username/password da variabili d'ambiente. Nessuna registrazione self-service, nessun comando manuale richiesto.
+- **UI/REST:** login singolo utente (email/password), sessione via **JWT**. Tutte le route REST richiedono JWT valido tranne `/auth/login`.
+  - **Bootstrap utente:** al primo avvio, se non esiste nessun utente, il server lo crea leggendo email/password da variabili d'ambiente. Nessuna registrazione self-service, nessun comando manuale richiesto.
   - **Scadenza JWT:** token a lunga scadenza (es. 30 giorni), senza refresh token né blacklist — coerente con utente singolo locale a basso rischio.
 - **MCP:** autenticazione separata tramite **token per progetto**. Un token dà accesso a un solo progetto. I token si creano/revocano dalla UI (Impostazioni progetto → Token MCP).
   - `get_aggregated_board` **non è esposto via MCP** (incompatibile con lo scope a singolo progetto del token): resta una funzionalità solo UI/JWT. Via MCP resta `get_board`, scoped al progetto del token.

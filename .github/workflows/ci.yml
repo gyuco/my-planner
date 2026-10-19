@@ -13,7 +13,7 @@ env:
   # (vedi README.md, flusso CI/produzione vs dev).
   DATABASE_URL: file:./ci.db
   JWT_SECRET: ci-fake-jwt-secret-not-for-production
-  BOOTSTRAP_USERNAME: ci-admin
+  BOOTSTRAP_EMAIL: ci-admin@example.com
   BOOTSTRAP_PASSWORD: ci-admin-password
 
 jobs:

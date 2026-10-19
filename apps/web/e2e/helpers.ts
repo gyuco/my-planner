@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { E2E_BOOTSTRAP_PASSWORD, E2E_BOOTSTRAP_USERNAME } from "../playwright.config";
+import { E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD } from "../playwright.config";
 
 /** Base REST del backend "local" avviato da playwright.config.ts (webServer). */
 export const API_BASE = "http://localhost:3050";
@@ -12,12 +12,12 @@ export const MCP_HTTP_BASE_S3 = "http://localhost:3151";
 
 /**
  * Login via UI con l'utente bootstrap e2e (vedi playwright.config.ts,
- * BOOTSTRAP_USERNAME/PASSWORD passate al backend "local"). Riusata da tutti
+ * BOOTSTRAP_EMAIL/PASSWORD passate al backend "local"). Riusata da tutti
  * gli scenari che partono da un'app già autenticata.
  */
 export async function loginViaUi(page: Page) {
   await page.goto("/");
-  await page.getByLabel("Username").fill(E2E_BOOTSTRAP_USERNAME);
+  await page.getByLabel("Email").fill(E2E_BOOTSTRAP_EMAIL);
   await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   // Attende lo shell applicativo post-login (header sidebar "Progetti"),
@@ -40,7 +40,7 @@ export async function getJwt(base = API_BASE): Promise<string> {
   const res = await fetch(`${base}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: E2E_BOOTSTRAP_USERNAME, password: E2E_BOOTSTRAP_PASSWORD }),
+    body: JSON.stringify({ email: E2E_BOOTSTRAP_EMAIL, password: E2E_BOOTSTRAP_PASSWORD }),
   });
   if (!res.ok) throw new Error(`login fallito: ${res.status}`);
   const data = await res.json();

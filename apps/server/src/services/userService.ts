@@ -20,7 +20,7 @@ import { prisma } from "../lib/prisma.js";
  */
 
 const MIN_PASSWORD_LENGTH = 8;
-const MAX_USERNAME_LENGTH = 100;
+const MAX_EMAIL_LENGTH = 200;
 
 export function normalizeRole(role: string | null | undefined): UserRole {
   return role === "admin" ? "admin" : "manager";
@@ -46,10 +46,9 @@ export async function getAuthUser(userId: string): Promise<AuthUser | null> {
   const role = normalizeRole(user.role);
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
     firstName: user.firstName ?? "",
     lastName: user.lastName ?? "",
-    email: user.email ?? null,
     role,
     projectIds: role === "admin" ? [] : user.projects.map((p) => p.projectId),
   };
@@ -114,10 +113,9 @@ function serializeAccount(user: any): UserAccount {
   const role = normalizeRole(user.role);
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
     firstName: user.firstName ?? "",
     lastName: user.lastName ?? "",
-    email: user.email ?? null,
     role,
     createdAt: new Date(user.createdAt).toISOString(),
     projectIds: user.projects.map((p: any) => p.projectId),
@@ -147,17 +145,6 @@ async function validateProjectIds(projectIds: string[]): Promise<string[]> {
   return unique;
 }
 
-function validateUsername(username: string): string {
-  const value = username.trim();
-  if (value.length === 0 || value.length > MAX_USERNAME_LENGTH) {
-    throw new ApiErrorException(
-      "VALIDATION_ERROR",
-      `username deve avere tra 1 e ${MAX_USERNAME_LENGTH} caratteri`,
-    );
-  }
-  return value;
-}
-
 function validatePassword(password: string): string {
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new ApiErrorException(
@@ -176,7 +163,6 @@ function validateRole(role: string): UserRole {
 }
 
 const MAX_NAME_LENGTH = 100;
-const MAX_EMAIL_LENGTH = 200;
 
 function validateName(value: string | undefined | null, field: "firstName" | "lastName"): string {
   const trimmed = (value ?? "").trim();
@@ -190,17 +176,27 @@ function validateName(value: string | undefined | null, field: "firstName" | "la
 }
 
 /**
- * Normalizza e valida l'email del profilo. Stringa vuota/null = rimuove
- * l'email. Volutamente permissiva sul formato (una sola @ e un punto nel
- * dominio) ma abbastanza stretta da intercettare gli errori di battitura.
+ * Normalizza e valida l'email, che e' anche l'identificativo di login. Sempre
+ * obbligatoria; il formato e' volutamente permissivo (una sola @ e un punto nel
+ * dominio) ma abbastanza stretto da intercettare gli errori di battitura.
  */
-function validateEmail(value: string | null | undefined): string | null {
+function validateEmail(value: string | null | undefined): string {
   const trimmed = (value ?? "").trim().toLowerCase();
-  if (trimmed.length === 0) return null;
+  if (trimmed.length === 0) {
+    throw new ApiErrorException("VALIDATION_ERROR", "email obbligatoria");
+  }
   if (trimmed.length > MAX_EMAIL_LENGTH || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
     throw new ApiErrorException("VALIDATION_ERROR", "email non valida");
   }
   return trimmed;
+}
+
+/** Email gia' usata da un altro utente (escluso `excludeUserId`). */
+async function assertEmailAvailable(email: string, excludeUserId?: string): Promise<void> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing && existing.id !== excludeUserId) {
+    throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con email "${email}"`);
+  }
 }
 
 async function countAdmins(): Promise<number> {
@@ -216,22 +212,20 @@ export async function listUsers(): Promise<UserAccount[]> {
 }
 
 export interface CreateUserInput {
-  username: string;
+  email: string;
   password: string;
   role: string;
   firstName?: string;
   lastName?: string;
-  email?: string | null;
   projectIds?: string[];
 }
 
 export async function createUser(input: CreateUserInput): Promise<UserAccount> {
-  const username = validateUsername(input.username);
+  const email = validateEmail(input.email);
   const password = validatePassword(input.password);
   const role = validateRole(input.role);
   const firstName = validateName(input.firstName, "firstName");
   const lastName = validateName(input.lastName, "lastName");
-  const email = validateEmail(input.email);
 
   let projectIds: string[] = [];
   if (role === "manager") {
@@ -244,21 +238,17 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
     }
   }
 
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) {
-    throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con username "${username}"`);
-  }
+  await assertEmailAvailable(email);
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
     const created = await prisma.user.create({
       data: {
-        username,
+        email,
         passwordHash,
         role,
         firstName,
         lastName,
-        email,
         projects:
           projectIds.length > 0
             ? { create: projectIds.map((projectId) => ({ projectId })) }
@@ -267,10 +257,10 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
     });
     return serializeAccount(await getUserWithProjects(created.id));
   } catch {
-    // Corsa con un'altra creazione dello stesso username (unique constraint).
-    const nowExisting = await prisma.user.findUnique({ where: { username } });
+    // Corsa con un'altra creazione della stessa email (unique constraint).
+    const nowExisting = await prisma.user.findUnique({ where: { email } });
     if (nowExisting) {
-      throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con username "${username}"`);
+      throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con email "${email}"`);
     }
     throw new ApiErrorException("INTERNAL_ERROR", "Impossibile creare l'utente");
   }
@@ -279,9 +269,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
 export interface UpdateUserInput {
   role?: string;
   password?: string;
+  email?: string;
   firstName?: string;
   lastName?: string;
-  email?: string | null;
   projectIds?: string[];
 }
 
@@ -328,7 +318,9 @@ export async function updateUser(
     data.lastName = validateName(input.lastName, "lastName");
   }
   if (input.email !== undefined) {
-    data.email = validateEmail(input.email);
+    const email = validateEmail(input.email);
+    await assertEmailAvailable(email, userId);
+    data.email = email;
   }
   data.projects =
     nextRole === "manager"
@@ -343,12 +335,12 @@ export async function updateUser(
 }
 
 export interface UpdateProfileInput {
-  email?: string | null;
+  email: string;
 }
 
 /**
  * Modifica dei dati che l'utente puo' cambiare da solo nella pagina profilo.
- * Oggi solo l'email; ruolo/progetti restano in mano agli admin.
+ * L'email e' l'identificativo di login; ruolo/progetti restano in mano agli admin.
  */
 export async function updateOwnProfile(
   userId: string,
@@ -357,9 +349,9 @@ export async function updateOwnProfile(
   const existing = await prisma.user.findUnique({ where: { id: userId } });
   if (!existing) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
 
-  if (input.email !== undefined) {
-    await prisma.user.update({ where: { id: userId }, data: { email: validateEmail(input.email) } });
-  }
+  const email = validateEmail(input.email);
+  await assertEmailAvailable(email, userId);
+  await prisma.user.update({ where: { id: userId }, data: { email } });
 
   const updated = await getAuthUser(userId);
   if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");

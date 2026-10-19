@@ -17,10 +17,9 @@ export type UserRole = "admin" | "manager";
 /** Utente di base (senza relazioni). Per la UI di gestione vedi `UserAccount`. */
 export interface User {
   id: string;
-  username: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string | null;
   role: UserRole;
   createdAt: string;
 }
@@ -31,10 +30,9 @@ export interface User {
  */
 export interface AuthUser {
   id: string;
-  username: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string | null;
   role: UserRole;
   projectIds: string[];
 }
@@ -42,10 +40,9 @@ export interface AuthUser {
 /** Utente completo per la gestione admin (nessun hash password esposto). */
 export interface UserAccount {
   id: string;
-  username: string;
+  email: string;
   firstName: string;
   lastName: string;
-  email: string | null;
   role: UserRole;
   createdAt: string;
   projectIds: string[];

@@ -20,16 +20,24 @@ export function getStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<AuthUser>;
-    if (!parsed?.id || !parsed.username || (parsed.role !== "admin" && parsed.role !== "manager")) {
+    const parsed = JSON.parse(raw) as Partial<AuthUser> & { username?: string };
+    // `username` e' un residuo delle versioni precedenti: se manca l'email
+    // (utente salvato prima dell'unificazione) la usiamo come fallback finché
+    // il primo GET /auth/me non riporta i dati aggiornati.
+    const email =
+      typeof parsed.email === "string"
+        ? parsed.email
+        : typeof parsed.username === "string"
+          ? parsed.username
+          : "";
+    if (!parsed?.id || !email || (parsed.role !== "admin" && parsed.role !== "manager")) {
       return null;
     }
     return {
       id: parsed.id,
-      username: parsed.username,
+      email,
       firstName: typeof parsed.firstName === "string" ? parsed.firstName : "",
       lastName: typeof parsed.lastName === "string" ? parsed.lastName : "",
-      email: typeof parsed.email === "string" ? parsed.email : null,
       role: parsed.role,
       projectIds: Array.isArray(parsed.projectIds) ? parsed.projectIds : [],
     };

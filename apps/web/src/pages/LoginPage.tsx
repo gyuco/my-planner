@@ -29,7 +29,7 @@ function BrandMark() {
 
 export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
   const { t } = useI18n();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -42,7 +42,7 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -71,11 +71,15 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
           <p className="login-tagline">{t.login.tagline}</p>
         </div>
         <label>
-          {t.login.username}
+          {t.login.email}
+          {/* type="text" (non "email"): gli utenti migrati da username possono
+              avere un valore non in formato email e devono poter accedere. */}
           <input
             type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            inputMode="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             autoFocus
             required
           />

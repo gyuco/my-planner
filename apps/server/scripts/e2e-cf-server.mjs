@@ -31,7 +31,7 @@ const child = spawn(
     "--var",
     "JWT_SECRET:e2e-test-secret-do-not-use-in-prod",
     "--var",
-    "BOOTSTRAP_USERNAME:e2e-bootstrap",
+    "BOOTSTRAP_EMAIL:e2e-bootstrap@example.com",
     "--var",
     "BOOTSTRAP_PASSWORD:e2e-bootstrap-password",
     "--var",

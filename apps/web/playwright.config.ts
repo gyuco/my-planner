@@ -30,10 +30,10 @@ const webRoot = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(webRoot, "..", "..");
 
 const E2E_JWT_SECRET = "e2e-test-secret-do-not-use-in-prod";
-const E2E_BOOTSTRAP_USERNAME = "e2e-bootstrap";
+const E2E_BOOTSTRAP_EMAIL = "e2e-bootstrap@example.com";
 const E2E_BOOTSTRAP_PASSWORD = "e2e-bootstrap-password";
 
-export { E2E_JWT_SECRET, E2E_BOOTSTRAP_USERNAME, E2E_BOOTSTRAP_PASSWORD };
+export { E2E_JWT_SECRET, E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD };
 
 const BASE_URL = "http://localhost:5183";
 const S3_BASE_URL = "http://localhost:5184";
@@ -44,7 +44,7 @@ function backendEnv(overrides: Record<string, string>) {
   return {
     ...process.env,
     JWT_SECRET: E2E_JWT_SECRET,
-    BOOTSTRAP_USERNAME: E2E_BOOTSTRAP_USERNAME,
+    BOOTSTRAP_EMAIL: E2E_BOOTSTRAP_EMAIL,
     BOOTSTRAP_PASSWORD: E2E_BOOTSTRAP_PASSWORD,
     ...overrides,
   };

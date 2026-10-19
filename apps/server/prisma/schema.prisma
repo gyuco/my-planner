@@ -20,16 +20,15 @@ datasource db {
 
 model User {
   id           String @id @default(cuid())
-  username     String @unique
+  // L'email e' l'unico identificativo di accesso (sostituisce lo username).
+  // Unica e sempre valorizzata: usata per il login e mostrata nel profilo.
+  email        String @unique
   passwordHash String
   // Dati anagrafici mostrati nella pagina profilo. I default vuoti mantengono
   // validi gli utenti creati prima dell'introduzione del profilo (la UI fa
-  // fallback sullo username quando nome/cognome non sono stati compilati).
+  // fallback sull'email quando nome/cognome non sono stati compilati).
   firstName    String @default("")
   lastName     String @default("")
-  // Email personale modificabile dall'utente nella pagina profilo. Non e'
-  // usata per il login (che resta su username/password).
-  email        String?
   // Ruolo applicativo: "admin" vede/modifica tutto, "manager" accede solo ai
   // progetti associati tramite UserProject. Default "admin" perche' il primo
   // utente creato al bootstrap e gli utenti pre-ruoli sono amministratori.
