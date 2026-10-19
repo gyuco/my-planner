@@ -43,7 +43,7 @@ si passano come vars in `wrangler.toml` e i valori sensibili come secrets:
 
 ```bash
 npx --workspace apps/server wrangler secret put JWT_SECRET
-npx --workspace apps/server wrangler secret put BOOTSTRAP_USERNAME
+npx --workspace apps/server wrangler secret put BOOTSTRAP_EMAIL
 npx --workspace apps/server wrangler secret put BOOTSTRAP_PASSWORD
 ```
 

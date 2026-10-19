@@ -71,30 +71,40 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 ### REST — JWT
 - Header: `Authorization: Bearer <jwt>`
 - Tutte le route tranne `POST /auth/login` richiedono JWT valido (`app.authenticate` su Fastify, middleware Hono sul Worker).
-- Claim: `{ sub: userId, username }`. Scadenza 30gg. Ruolo e progetti associati **non** sono nel JWT: vengono riletti dal DB ad ogni richiesta, così un cambio di ruolo/assegnazioni è immediato.
+- Claim: `{ sub: userId, email }`. Scadenza 30gg. Ruolo e progetti associati **non** sono nel JWT: vengono riletti dal DB ad ogni richiesta, così un cambio di ruolo/assegnazioni è immediato.
 - Ruoli: `admin` (accesso a tutti i progetti, gestione utenti e impostazioni globali) e `manager` (accesso solo ai progetti in `UserProject`). Il primo utente creato al bootstrap è sempre `admin`.
 - Errore: token mancante/non valido/scaduto → `401 { error: { code: "UNAUTHORIZED", message: "..." } }`; accesso a una risorsa di un progetto non assegnato → `403 FORBIDDEN`.
 
 `POST /auth/login`
-- Body: `{ "username": string, "password": string }`
-- 200: `{ "token": "<jwt>", "user": { "id", "username", "role": "admin"|"manager", "projectIds": [] } }`
+- Body: `{ "email": string, "password": string }`
+- 200: `{ "token": "<jwt>", "user": { "id", "email", "firstName", "lastName", "role": "admin"|"manager", "projectIds": [] } }`
 - 401 `UNAUTHORIZED` con credenziali non valide.
 
 `GET /auth/me`
 - Auth: JWT
-- 200: `{ "id", "username", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+- 200: `{ "id", "email", "firstName", "lastName", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+
+`PATCH /auth/me`
+- Auth: JWT
+- Body: `{ "email": string, "firstName"?: string, "lastName"?: string }` — modifica self-service di nome, cognome ed email. L'email è anche l'identificativo di login. Non cambia password, ruolo o progetti; l'email deve essere valida e non già usata da un altro utente.
+- 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida; 409 `CONFLICT` se è già in uso.
+
+`PATCH /auth/me/password`
+- Auth: JWT
+- Body: `{ "currentPassword": string, "newPassword": string (min 8) }` — cambio password self-service; la password attuale viene verificata e la nuova deve essere diversa.
+- 200: `{ "ok": true }`; 400 `VALIDATION_ERROR` se la password attuale non è corretta, se la nuova è troppo corta o coincide con quella attuale.
 
 ### Gestione utenti (solo `admin`)
 `GET /users`
-- 200: lista di `{ id, username, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
+- 200: lista di `{ id, email, firstName, lastName, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).
 
 `POST /users`
-- Body: `{ "username": string, "password": string (min 8), "role": "admin"|"manager", "projectIds"?: string[] }`
+- Body: `{ "email": string, "password": string (min 8), "firstName"?: string, "lastName"?: string, "role": "admin"|"manager", "projectIds"?: string[] }`
 - Un `manager` deve avere almeno un progetto; per un `admin` `projectIds` è ignorato (accesso implicito a tutti).
-- 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se lo username esiste.
+- 201: utente creato; 400 `VALIDATION_ERROR`; 409 `CONFLICT` se l'email esiste.
 
 `PATCH /users/:userId`
-- Body: `{ "role"?: "admin"|"manager", "password"?: string, "projectIds"?: string[] }`
+- Body: `{ "role"?: "admin"|"manager", "password"?: string, "email"?: string, "firstName"?: string, "lastName"?: string, "projectIds"?: string[] }`
 - Cambiare `role`/`projectIds` aggiorna subito i permessi dell'utente. Non è possibile rimuovere l'ultimo admin né il ruolo admin al proprio utente.
 - 200: utente aggiornato.
 
@@ -328,6 +338,32 @@ Config persistita in `StorageSettings` (singleton, id `"singleton"`), sostituisc
 
 ---
 
+## 6ter. REST — Notifiche in-app
+
+Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursore di lettura unico per utente (`NotificationState.lastSeenEventId`). Vedi `apps/server/src/services/notificationService.ts`.
+
+- Nessun fan-out: una riga di evento per azione, non una per destinatario.
+- Filtro "non le mie azioni" e permessi di progetto applicati **in lettura**, quindi aggiungere/rimuovere un manager da un progetto non richiede backfill.
+- Eventi emessi dal service layer (creazione task/sotto-task, cambio di stato, commento), quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo.
+- **Nessun tool MCP per le notifiche**: sono una vista per utente, il token MCP è di progetto.
+
+### `GET /notifications?limit=30`
+- Auth: JWT (qualsiasi utente autenticato)
+- Restituisce gli eventi con `id > lastSeenEventId` visibili all'utente: progetti accessibili (admin: tutti; manager: assegnati), non archiviati, con `actorId != utente` (gli eventi via MCP, `actorId: null`, restano visibili).
+- 200: `{ items: NotificationItem[], unreadCount, lastSeenEventId, serverCursor }`
+  - `NotificationItem`: `{ id, type: "task.created"|"task.status_changed"|"comment.created", projectId, projectName, taskId, taskTitle, actorId, actorName, actorType: "user"|"mcp"|"system", from, to, excerpt, createdAt }`
+  - `taskTitle`/`excerpt` sono denormalizzati nell'evento: la notifica resta leggibile anche se il task non esiste più.
+  - `serverCursor` è il max id visibile, da passare al mark-as-read.
+  - Il cursore viene inizializzato alla creazione dell'utente (e, per utenti storici, alla prima lettura): nessun backlog di eventi precedenti.
+
+### `POST /notifications/read`
+- Auth: JWT
+- Body: `{ upTo: number }` (tipicamente il `serverCursor` appena ricevuto)
+- Sposta il cursore a `min(upTo, ultimo evento visibile)` — non può "leggere in anticipo" eventi non ancora restituiti.
+- 200: `{ lastSeenEventId }`
+
+---
+
 ## 7. Tool MCP (B14/B15)
 
 Tutti i tool sono registrati da `createProjectMcpServer(projectId)` e operano **esclusivamente** sul `projectId` risolto dal token. Nessun parametro `projectId` in input (implicito). Ogni tool richiama le stesse funzioni di `apps/server/src/services/*` usate da REST.
@@ -449,6 +485,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 4. Indice esplicito per la ricerca full-text case-insensitive titolo+descrizione: SQLite + Prisma non hanno FTS nativo abilitato di default in questo schema; v1 userà `contains` case-insensitive lato Prisma (SQLite `LIKE` è case-insensitive per ASCII by default, sufficiente per v1). Nessuna modifica di schema necessaria; annotato qui per `coder`/`dev-ops` come nota implementativa, non un gap di schema.
 
 5. `StorageSettings` (nuovo modello, singleton) — persiste la configurazione del servizio di storage allegati scelta da UI (filesystem locale o S3-compatibile/MinIO), vedi §6bis.
+
+6. `TaskEvent` + `NotificationState` (nuovi modelli) — notifiche in-app (§6ter). `TaskEvent.id` è `Int @default(autoincrement())` e funge da cursore monotono; `actorId` è nullable (MCP/sistema) con `onDelete: SetNull`; `taskId` è uno scalare senza relation, così l'evento sopravvive alla delete del task (il titolo è denormalizzato in `data`). Migrazioni: `prisma/migrations/20261019140000_add_notifications` (Node/SQLite) e `apps/server/migrations/0006_add_notifications.sql` (D1).
 
 Vedi diff applicato in coda al file schema.
 

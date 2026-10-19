@@ -9,6 +9,7 @@ import {
   updateUser,
 } from "../api";
 import { useI18n } from "../i18n";
+import { displayName } from "../lib/user";
 
 interface UsersModalProps {
   currentUserId: string;
@@ -18,14 +19,18 @@ interface UsersModalProps {
 }
 
 interface UserFormState {
-  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   password: string;
   role: UserRole;
   projectIds: string[];
 }
 
 const EMPTY_FORM: UserFormState = {
-  username: "",
+  email: "",
+  firstName: "",
+  lastName: "",
   password: "",
   role: "manager",
   projectIds: [],
@@ -74,7 +79,9 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
     setEditing(user);
     setError(null);
     setForm({
-      username: user.username,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
       password: "",
       role: user.role,
       projectIds: [...user.projectIds],
@@ -111,13 +118,18 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
         await updateUser(editing.id, {
           role: form.role,
           projectIds: form.role === "manager" ? form.projectIds : [],
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
+          email: form.email.trim(),
           password: form.password ? form.password : undefined,
         });
       } else {
         await createUser({
-          username: form.username.trim(),
+          email: form.email.trim(),
           password: form.password,
           role: form.role,
+          firstName: form.firstName.trim(),
+          lastName: form.lastName.trim(),
           projectIds: form.role === "manager" ? form.projectIds : undefined,
         });
       }
@@ -138,7 +150,7 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
   }
 
   async function handleDelete(user: UserAccount) {
-    if (!window.confirm(t.users.deleteConfirm.replace("{username}", user.username))) return;
+    if (!window.confirm(t.users.deleteConfirm.replace("{name}", displayName(user)))) return;
     setError(null);
     try {
       await deleteUser(user.id);
@@ -169,17 +181,37 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
           <form className="user-form" onSubmit={handleSubmit}>
             <h3>{editing ? t.users.editUser : t.users.newUser}</h3>
             <label>
-              {t.users.username}
+              {t.users.email}
               <input
-                value={form.username}
-                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
                 required
                 autoFocus={!editing}
-                disabled={!!editing}
-                maxLength={100}
+                maxLength={200}
                 autoComplete="off"
               />
             </label>
+            <div className="modal-row">
+              <label>
+                {t.users.firstName}
+                <input
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  maxLength={100}
+                  autoComplete="off"
+                />
+              </label>
+              <label>
+                {t.users.lastName}
+                <input
+                  value={form.lastName}
+                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  maxLength={100}
+                  autoComplete="off"
+                />
+              </label>
+            </div>
             <label>
               {editing ? t.users.newPassword : t.users.password}
               <input
@@ -250,7 +282,8 @@ export function UsersModal({ currentUserId, projects, onClose, onChanged }: User
               <div key={user.id} className="user-row">
                 <div className="user-row-main">
                   <div className="user-row-name">
-                    <strong>{user.username}</strong>
+                    <strong>{displayName(user)}</strong>
+                    <span className="user-row-email">{user.email}</span>
                     {user.id === currentUserId && (
                       <span className="user-you">{t.users.currentUser}</span>
                     )}

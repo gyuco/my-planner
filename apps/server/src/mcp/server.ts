@@ -18,6 +18,10 @@ import {
   createSubtasks,
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
+import type { Actor } from "../services/notificationService.js";
+
+/** Il token MCP identifica un progetto, non un utente: gli eventi non sono "miei". */
+const MCP_ACTOR: Actor = { type: "mcp" };
 
 const complexitySchema = z
   .union([
@@ -110,7 +114,7 @@ export function createProjectMcpServer(projectId: string) {
       dueDate: z.string().datetime().nullable().optional(),
       parentId: z.string().nullable().optional(),
     },
-    async (input) => withErrors(() => createTask(projectId, input))
+    async (input) => withErrors(() => createTask(projectId, input, MCP_ACTOR))
   );
 
   server.tool(
@@ -135,7 +139,7 @@ export function createProjectMcpServer(projectId: string) {
     async ({ parentId, subtasks }) =>
       withErrors(async () => {
         await assertTaskInProject(parentId);
-        return createSubtasks(projectId, parentId, subtasks);
+        return createSubtasks(projectId, parentId, subtasks, MCP_ACTOR);
       })
   );
 
@@ -174,7 +178,7 @@ export function createProjectMcpServer(projectId: string) {
     async ({ taskId, status, position }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return moveTask(taskId, status, position);
+        return moveTask(taskId, status, position, MCP_ACTOR);
       })
   );
 
@@ -219,7 +223,7 @@ export function createProjectMcpServer(projectId: string) {
     async ({ taskId, body }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return addComment(taskId, body);
+        return addComment(taskId, body, MCP_ACTOR);
       })
   );
 

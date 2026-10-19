@@ -17,7 +17,9 @@ export type UserRole = "admin" | "manager";
 /** Utente di base (senza relazioni). Per la UI di gestione vedi `UserAccount`. */
 export interface User {
   id: string;
-  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   createdAt: string;
 }
@@ -28,7 +30,9 @@ export interface User {
  */
 export interface AuthUser {
   id: string;
-  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   projectIds: string[];
 }
@@ -36,7 +40,9 @@ export interface AuthUser {
 /** Utente completo per la gestione admin (nessun hash password esposto). */
 export interface UserAccount {
   id: string;
-  username: string;
+  email: string;
+  firstName: string;
+  lastName: string;
   role: UserRole;
   createdAt: string;
   projectIds: string[];
@@ -136,6 +142,42 @@ export interface Comment {
   taskId: string;
   body: string;
   createdAt: string;
+}
+
+/** Eventi che generano una notifica (vedi apps/server/src/services/notificationService.ts). */
+export type TaskEventType = "task.created" | "task.status_changed" | "comment.created";
+
+/**
+ * Notifica restituita da GET /notifications. `taskTitle` e `excerpt` sono
+ * denormalizzati nell'evento, quindi restano leggibili anche dopo che il task
+ * (o il commento) non esiste piu'.
+ */
+export interface NotificationItem {
+  id: number;
+  type: TaskEventType;
+  projectId: string;
+  projectName: string;
+  taskId: string | null;
+  taskTitle: string;
+  actorId: string | null;
+  actorName: string | null;
+  actorType: "user" | "mcp" | "system";
+  from: TaskStatus | null;
+  to: TaskStatus | null;
+  excerpt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  items: NotificationItem[];
+  unreadCount: number;
+  lastSeenEventId: number;
+  /** Max id visibile all'utente: da passare a POST /notifications/read. */
+  serverCursor: number;
+}
+
+export interface MarkNotificationsReadResponse {
+  lastSeenEventId: number;
 }
 
 /** Envelope condiviso per tutti gli errori REST e MCP (vedi API_CONTRACT.md §1). */

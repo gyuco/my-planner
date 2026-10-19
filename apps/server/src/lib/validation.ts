@@ -79,6 +79,16 @@ export const commentInputSchema = z.object({
   body: z.string().min(1),
 });
 
+/** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
+export const notificationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+/** Mark-as-read a cursore unico: `upTo` e' il `serverCursor` ricevuto dal GET. */
+export const markNotificationsReadInputSchema = z.object({
+  upTo: z.number().int().nonnegative(),
+});
+
 export const projectNameInputSchema = z.object({
   name: z.string().min(1).max(200),
 });
@@ -90,8 +100,10 @@ export const projectTokenInputSchema = z.object({
 export const userRoleSchema = z.enum(["admin", "manager"]);
 
 export const createUserInputSchema = z.object({
-  username: z.string().trim().min(1).max(100),
+  email: z.string().trim().min(1).max(200),
   password: z.string().min(8).max(200),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
   role: userRoleSchema,
   projectIds: z.array(z.string().min(1)).optional(),
 });
@@ -99,7 +111,26 @@ export const createUserInputSchema = z.object({
 export const updateUserInputSchema = z.object({
   role: userRoleSchema.optional(),
   password: z.string().min(8).max(200).optional(),
+  email: z.string().trim().min(1).max(200).optional(),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
   projectIds: z.array(z.string().min(1)).optional(),
+});
+
+/**
+ * Dati modificabili dall'utente sul proprio profilo. L'email e' anche
+ * l'identificativo di login, quindi il cambio e' immediato dalla pagina profilo.
+ */
+export const updateProfileInputSchema = z.object({
+  email: z.string().trim().min(1).max(200),
+  firstName: z.string().max(100).optional(),
+  lastName: z.string().max(100).optional(),
+});
+
+/** Cambio password self-service: la password attuale serve come conferma. */
+export const changePasswordInputSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(8).max(200),
 });
 
 export const storageSettingsInputSchema = z.object({

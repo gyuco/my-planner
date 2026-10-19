@@ -11,6 +11,7 @@ import {
   assertAttachmentAccess,
   assertProjectAccess,
   assertTaskAccess,
+  changeOwnPassword,
   createUser,
   deleteUser,
   getAuthUser,
@@ -18,6 +19,7 @@ import {
   listProjectsForUser,
   listUsers,
   restrictProjectIds,
+  updateOwnProfile,
   updateUser,
 } from "../services/userService.js";
 import {
@@ -46,6 +48,7 @@ import {
   deleteAttachment,
 } from "../services/attachmentService.js";
 import { getStorageSettings, updateStorageSettings } from "../services/storageSettingsService.js";
+import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
 import {
@@ -62,6 +65,10 @@ import {
   storageSettingsInputSchema,
   createUserInputSchema,
   updateUserInputSchema,
+  updateProfileInputSchema,
+  changePasswordInputSchema,
+  notificationsQuerySchema,
+  markNotificationsReadInputSchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
@@ -123,10 +130,13 @@ export function buildRestApp() {
   // altrimenti l'handler risponde prima che l'auth venga eseguita.
   const protectedPaths = [
     "/auth/me",
+    "/auth/me/*",
     "/projects/*",
     "/projects",
     "/tasks/*",
     "/board",
+    "/notifications",
+    "/notifications/*",
     "/attachments/*",
     "/settings/*",
     "/admin/*",
@@ -159,6 +169,17 @@ export function buildRestApp() {
 
   // --- Auth / utente corrente ---------------------------------------------
   app.get("/auth/me", (c) => c.json(c.get("user")));
+
+  app.patch("/auth/me", async (c) => {
+    const input = updateProfileInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await updateOwnProfile(c.get("user").id, input));
+  });
+
+  app.patch("/auth/me/password", async (c) => {
+    const input = changePasswordInputSchema.parse(await c.req.json().catch(() => ({})));
+    await changeOwnPassword(c.get("user").id, input);
+    return c.json({ ok: true });
+  });
 
   // --- Gestione utenti (admin) ---------------------------------------------
   app.get("/users", async (c) => c.json(await listUsers()));
@@ -280,7 +301,7 @@ export function buildRestApp() {
     const { projectId } = c.req.param();
     await assertProjectAccess(c.get("user"), projectId);
     const body = taskInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await createTask(projectId, body), 201);
+    return c.json(await createTask(projectId, body, userActor(c.get("user"))), 201);
   });
 
   app.get("/tasks/:taskId", async (c) => {
@@ -302,7 +323,7 @@ export function buildRestApp() {
   app.post("/tasks/:taskId/move", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const { status, position } = moveTaskInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await moveTask(c.req.param("taskId"), status, position));
+    return c.json(await moveTask(c.req.param("taskId"), status, position, userActor(c.get("user"))));
   });
 
   // --- Dipendenze ----------------------------------------------------------
@@ -328,7 +349,7 @@ export function buildRestApp() {
   app.post("/tasks/:taskId/comments", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const { body } = commentInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await addComment(c.req.param("taskId"), body), 201);
+    return c.json(await addComment(c.req.param("taskId"), body, userActor(c.get("user"))), 201);
   });
 
   app.get("/tasks/:taskId/comments", async (c) => {
@@ -353,6 +374,17 @@ export function buildRestApp() {
       allowed = (allowed ?? []).filter((id) => active.has(id));
     }
     return c.json(await getAggregatedBoard(allowed, filters));
+  });
+
+  // --- Notifiche -----------------------------------------------------------
+  app.get("/notifications", async (c) => {
+    const { limit } = notificationsQuerySchema.parse(c.req.query());
+    return c.json(await listNotifications(c.get("user"), limit ?? 30));
+  });
+
+  app.post("/notifications/read", async (c) => {
+    const { upTo } = markNotificationsReadInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await markNotificationsRead(c.get("user"), upTo));
   });
 
   // --- Allegati (CF8: multipart con FormData nativa, upload su R2) ----------

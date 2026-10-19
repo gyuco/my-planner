@@ -519,54 +519,303 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 
 .topbar-actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.75rem;
   align-items: center;
 }
 
-.topbar-actions button {
-  padding: 0.5rem 0.95rem;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--surface);
-  color: var(--ink-700);
-  box-shadow: var(--shadow-xs);
+/* Gruppi di controlli separati da un divisore verticale sottile. */
+.topbar-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line);
 }
 
-/* Il primo bottone della topbar è l'azione primaria ("Nuova task"). */
-.topbar-actions button:first-child {
-  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
+/* Bottone icona quadrato, neutro: base comune per menu, notifiche, logout. */
+.topbar-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink-500);
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.topbar-icon-btn:hover {
   border-color: transparent;
+  background: var(--line-soft);
+  color: var(--ink-900);
+}
+
+.topbar-icon-btn:focus-visible,
+.topbar-avatar:focus-visible,
+.topbar-cta:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.topbar-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.25rem;
+  padding: 0 0.9rem 0 0.7rem;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
   color: #fff;
   box-shadow: 0 1px 2px rgba(74, 69, 201, 0.3), 0 6px 16px rgba(74, 69, 201, 0.28);
 }
 
-.topbar-actions button:first-child:hover {
+.topbar-cta svg { font-size: 1.05rem; }
+
+.topbar-cta:hover {
+  border-color: transparent;
   background: linear-gradient(135deg, var(--violet-500), var(--indigo-500));
   box-shadow: 0 2px 4px rgba(74, 69, 201, 0.3), 0 10px 24px rgba(139, 92, 246, 0.35);
+}
+
+/* Avatar con iniziali: apre il profilo. Lo scudo indica il ruolo admin. */
+.topbar-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-full);
+  background: linear-gradient(135deg, var(--indigo-500), var(--violet-500));
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.topbar-avatar:hover {
+  border: none;
+  background: linear-gradient(135deg, var(--indigo-600), var(--violet-500));
+}
+
+.topbar-avatar.active {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--indigo-300);
+}
+
+.topbar-avatar-role {
+  position: absolute;
+  right: -0.2rem;
+  bottom: -0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--indigo-600);
+  font-size: 0.65rem;
+  box-shadow: var(--shadow-xs);
 }
 
 .language-switcher {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  border: 1px solid var(--line);
+  height: 2.25rem;
+  border: 1px solid transparent;
   border-radius: var(--r-sm);
-  background: var(--surface);
-  padding: 0.35rem 0.55rem;
+  padding: 0 0.5rem;
+  color: var(--ink-500);
   font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.topbar .language-switcher:hover {
+  background: var(--line-soft);
+  color: var(--ink-900);
+}
+
+.language-switcher-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
 }
 
 .language-switcher select {
   border: none;
   background: transparent;
   font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   color: inherit;
   cursor: pointer;
 }
 
 .language-switcher select:focus { outline: none; }
+
+/* --- Notifiche ------------------------------------------------------------ */
+
+.notifications {
+  position: relative;
+  display: inline-flex;
+}
+
+
+.notifications-badge {
+  position: absolute;
+  top: 0.05rem;
+  right: 0.05rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.notifications-panel {
+  position: absolute;
+  z-index: 21;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  width: min(390px, calc(100vw - 2rem));
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  padding: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.notifications-header {
+  position: sticky;
+  top: -0.35rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  background: var(--surface);
+}
+
+.notifications-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.notifications-close {
+  padding: 0.15rem 0.45rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--ink-500);
+}
+
+.notifications-close:hover {
+  background: transparent;
+  color: var(--ink-800);
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notifications-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.notifications-item:hover {
+  background: var(--surface-sunken);
+}
+
+.notifications-dot {
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--indigo-500);
+}
+
+.notifications-dot-status { background: var(--warning); }
+.notifications-dot-comment { background: var(--violet-500); }
+
+.notifications-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.notifications-text {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--ink-800);
+}
+
+.notifications-excerpt {
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--ink-500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notifications-meta {
+  font-size: 0.72rem;
+  color: var(--ink-400);
+}
+
+.notifications-empty {
+  margin: 0;
+  padding: 1rem 0.75rem 1.25rem;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--ink-400);
+}
+
+.notifications-error {
+  margin: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--danger);
+}
 
 /* --- Filter bar ---------------------------------------------------------- */
 
@@ -1043,8 +1292,12 @@ body.dnd-dragging * {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-400);
-  flex: 1;
 }
+
+/* Solo i campi affiancati devono dividersi lo spazio in orizzontale: un
+   `flex: 1` generico sui label allunga i campi in verticale quando il modal
+   occupa tutta l'altezza (mobile). */
+.modal-row label { flex: 1; }
 
 .field-label {
   font-size: 0.72rem;
@@ -1480,6 +1733,205 @@ body.dnd-dragging * {
   width: auto;
 }
 
+.user-row-email {
+  font-size: 0.8rem;
+  color: var(--ink-400);
+}
+
+
+/* =========================================================================
+   Pagina profilo
+   ========================================================================= */
+
+.profile-page {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem 1.75rem 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-back {
+  width: 100%;
+  max-width: 720px;
+  align-self: center;
+  justify-content: flex-start;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  padding-left: 0;
+  color: var(--ink-500);
+}
+
+.profile-back:hover {
+  background: transparent;
+  color: var(--ink-900);
+}
+
+.profile-card {
+  width: 100%;
+  max-width: 720px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #fff;
+  background: linear-gradient(135deg, var(--violet-500), var(--indigo-500) 55%, var(--cyan-400));
+  box-shadow: 0 6px 18px rgba(91, 91, 214, 0.28);
+}
+
+.profile-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.profile-identity h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--ink-900);
+}
+
+.profile-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2.5rem;
+}
+
+.profile-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.profile-fact .role-badge {
+  align-self: flex-start;
+}
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.profile-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-400);
+}
+
+.profile-projects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.profile-project-chip {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--r-full);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  color: var(--ink-700);
+}
+
+.profile-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.profile-subsection {
+  margin-top: 0.5rem;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+}
+
+.profile-field input {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--ink-800);
+  background: var(--surface);
+  width: 100%;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.profile-field input:focus {
+  outline: none;
+  border-color: var(--indigo-300);
+  box-shadow: var(--shadow-focus);
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profile-actions button[type="submit"] {
+  background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(74, 69, 201, 0.3), 0 6px 16px rgba(74, 69, 201, 0.28);
+}
+
+.profile-actions button[type="submit"]:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--violet-500), var(--indigo-500));
+}
+
+.profile-saved {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--success);
+}
+
 
 /* =========================================================================
    Task drawer
@@ -1878,21 +2330,6 @@ body.dnd-dragging * {
    Mobile
    ========================================================================= */
 
-.sidebar-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
-  background: var(--surface-sunken);
-  border-color: var(--line);
-  color: var(--ink-700);
-}
-
-.sidebar-toggle:hover {
-  background: var(--surface);
-  border-color: var(--ink-200);
-}
 .sidebar-backdrop { display: none; }
 
 /* Tablet / laptop stretti: sopra i 700px resta il layout a due pannelli, ma
@@ -1918,18 +2355,6 @@ body.dnd-dragging * {
 
 @media (max-width: 700px) {
   .app-shell { flex-direction: column; }
-
-  .sidebar-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 2.5rem;
-    min-height: 2.5rem;
-    margin-right: 0.5rem;
-    background: var(--surface-sunken);
-    border-color: var(--line);
-    color: var(--ink-700);
-  }
 
   .sidebar {
     position: fixed;
@@ -1969,7 +2394,17 @@ body.dnd-dragging * {
     gap: 0.4rem;
   }
 
-  .topbar-actions button { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+  .topbar-group { padding-left: 0.5rem; gap: 0.2rem; }
+
+  /* Su mobile la CTA resta solo icona per non affollare la riga. */
+  .topbar-cta { width: 2.5rem; padding: 0; justify-content: center; margin-right: auto; }
+  .topbar-cta-label { display: none; }
+
+  .profile-page { padding: 1.1rem 1rem 2rem; }
+  .profile-card { padding: 1.25rem; }
+  .profile-head { align-items: flex-start; }
+  .profile-avatar { width: 52px; height: 52px; font-size: 1rem; }
+  .profile-name-row { grid-template-columns: 1fr; }
 
   .filter-bar { gap: 0.5rem; }
   .filter-chips { gap: 0.35rem; }
@@ -1984,7 +2419,13 @@ body.dnd-dragging * {
     white-space: nowrap;
   }
 
-  .topbar-actions button,
+  .topbar-icon-btn,
+  .topbar-avatar,
+  .topbar-cta,
+  .language-switcher { min-height: 2.5rem; height: 2.5rem; }
+  .topbar-icon-btn,
+  .topbar-avatar { width: 2.5rem; }
+
   .modal-actions button,
   .drawer-list button,
   .filter-chip { min-height: 2.5rem; }

@@ -62,8 +62,8 @@ openssl rand -hex 32
   (nessun fallback insicuro, vedi `apps/server/src/index.ts`).
 - **`DATABASE_URL` relativo a `schema.prisma`**, non alla cwd: `file:./dev.db` →
   `apps/server/prisma/dev.db`. Vale per tutti gli URL `file:` di Prisma.
-- **Credenziali di login: nel database, non nel `.env`.** Username e `passwordHash`
-  (bcrypt) stanno nella tabella `User` di SQLite. `BOOTSTRAP_USERNAME` /
+- **Credenziali di login: nel database, non nel `.env`.** Email e `passwordHash`
+  (bcrypt) stanno nella tabella `User` di SQLite. `BOOTSTRAP_EMAIL` /
   `BOOTSTRAP_PASSWORD` non sono "il login": sono solo un seed usato **una volta**, al
   primo avvio e **solo se la tabella `User` è vuota**; non vengono mai rilette dopo.
   Per creare/cambiare l'utente usa lo script su DB descritto in §5.
@@ -160,7 +160,7 @@ Ispezione veloce del DB:
 
 ```bash
 sqlite3 apps/server/prisma/dev.db ".tables"
-sqlite3 apps/server/prisma/dev.db "select id, username from User;"
+sqlite3 apps/server/prisma/dev.db "select id, email from User;"
 ```
 
 ---
@@ -168,7 +168,7 @@ sqlite3 apps/server/prisma/dev.db "select id, username from User;"
 ## 5. Login: gestione dell'utente sul database
 
 L'app supporta **più utenti** con ruoli diversi, salvati nella tabella `User` di
-`apps/server/prisma/dev.db` (`username`, `passwordHash` bcrypt, `role`). Il ruolo
+`apps/server/prisma/dev.db` (`email`, `passwordHash` bcrypt, `role`). Il ruolo
 `admin` ha accesso a tutti i progetti e alla gestione utenti; il ruolo `manager`
 accede solo ai progetti associati in `UserProject`. L'autenticazione legge sempre
 dal DB: nessuna credenziale sta nel `.env`. Il primo utente creato (bootstrap o
@@ -177,14 +177,14 @@ script) è sempre amministratore; gli altri si creano dalla UI **Utenti** (solo 
 ### Creare il primo utente o reimpostare una password
 
 ```bash
-npm run --workspace apps/server user:set-password -- admin admin123
+npm run --workspace apps/server user:set-password -- admin@example.com admin123
 ```
 
 Comportamento (`apps/server/scripts/set-user-password.mjs`):
 
 - DB senza utenti → **crea** l'utente indicato con ruolo `admin`.
-- utente esistente con quello username → **aggiorna** la passwordHash.
-- username inesistente con altri utenti presenti → errore (crea gli utenti dalla UI admin).
+- utente esistente con quella email → **aggiorna** la passwordHash.
+- email inesistente con altri utenti presenti → errore (crea gli utenti dalla UI admin).
 - password di almeno 8 caratteri; `DATABASE_URL` letta da `apps/server/.env`.
 
 Non serve riavviare il server: il login successivo usa già il nuovo hash.
@@ -194,14 +194,14 @@ Verifica manuale:
 ```bash
 curl -X POST http://localhost:3000/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}'
-# -> {"token":"eyJ...","user":{"id":"...","username":"admin","role":"admin","projectIds":[]}}   (401 se le credenziali sono errate)
+  -d '{"email":"admin@example.com","password":"admin123"}'
+# -> {"token":"eyJ...","user":{"id":"...","email":"admin@example.com","role":"admin","projectIds":[]}}   (401 se le credenziali sono errate)
 ```
 
 Ispezione della riga (senza password in chiaro, solo hash):
 
 ```bash
-sqlite3 apps/server/prisma/dev.db "select id, username, role, substr(passwordHash,1,15)||'...' from User;"
+sqlite3 apps/server/prisma/dev.db "select id, email, role, substr(passwordHash,1,15)||'...' from User;"
 ```
 
 ### Reset totale del DB di sviluppo
@@ -211,10 +211,10 @@ Perde tutti i dati locali (progetti, task, token MCP):
 ```bash
 rm apps/server/prisma/dev.db
 npm run --workspace apps/server prisma:migrate
-npm run --workspace apps/server user:set-password -- admin admin123
+npm run --workspace apps/server user:set-password -- admin@example.com admin123
 ```
 
-In alternativa, su un DB vuoto funziona ancora il seed da env (`BOOTSTRAP_USERNAME` /
+In alternativa, su un DB vuoto funziona ancora il seed da env (`BOOTSTRAP_EMAIL` /
 `BOOTSTRAP_PASSWORD` in `apps/server/.env` o secrets Wrangler): utile in CI/e2e e per il
 Worker Cloudflare, non necessario in sviluppo.
 
@@ -362,8 +362,8 @@ Al boot il container `server` esegue `prisma migrate deploy`
 (`apps/server/docker-entrypoint.sh`), quindi non serve lanciare migrazioni a mano.
 Dati persistiti su `./data`, allegati su `./attachments`.
 
-Credenziali di default: `admin` / `admin-change-me` (override con
-`BOOTSTRAP_USERNAME` / `BOOTSTRAP_PASSWORD`). Cambia anche `JWT_SECRET`:
+Credenziali di default: `admin@example.com` / `admin-change-me` (override con
+`BOOTSTRAP_EMAIL` / `BOOTSTRAP_PASSWORD`). Cambia anche `JWT_SECRET`:
 
 ```bash
 JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
@@ -408,7 +408,7 @@ curl "http://localhost:8787/__scheduled?cron=0+6+*+*+*"
 | --- | --- | --- |
 | `Errore fatale: la variabile d'ambiente JWT_SECRET non e' impostata` | `.env` assente o nella posizione sbagliata | crea `apps/server/.env` (§2) |
 | `Environment variable not found: DATABASE_URL` | `.env` nella root invece che in `apps/server/` | sposta il file in `apps/server/.env` |
-| `Credenziali non valide` al login | password diversa da quella salvata nel DB | `npm run --workspace apps/server user:set-password -- admin <password>` (§5) |
+| `Credenziali non valide` al login | password diversa da quella salvata nel DB | `npm run --workspace apps/server user:set-password -- admin@example.com <password>` (§5) |
 | `EADDRINUSE :3000` / `:5173` | processo precedente ancora vivo (spesso per il `&` dello script root) | `lsof -ti:3000 \| xargs kill` |
 | UI carica ma le chiamate API falliscono | backend non avviato / porta diversa | controlla `curl :3000/health`, poi `VITE_API_PROXY_TARGET` |
 | `502`/`404` sugli allegati | `ATTACHMENTS_LOCAL_DIR` non scrivibile o backend S3 non raggiungibile | verifica la dir / `docker compose up -d minio && docker compose run --rm minio-init` |
@@ -423,7 +423,7 @@ curl "http://localhost:8787/__scheduled?cron=0+6+*+*+*"
 npm install                                        # setup una tantum
 cp config.example.md apps/server/.env             # poi modifica i valori
 npm run --workspace apps/server prisma:migrate     # DB di sviluppo
-npm run --workspace apps/server user:set-password -- admin admin123  # login (nel DB)
+npm run --workspace apps/server user:set-password -- admin@example.com admin123  # login (nel DB)
 npm run dev                                        # API :3000 + UI :5173
 npm test                                           # test
 npm run typecheck                                  # typecheck

@@ -7,7 +7,7 @@
  * sviluppo) né test.db (usato da Vitest, vedi vitest.config.ts). Il DB viene
  * azzerato e ri-migrato ad ogni avvio di questo script, cosi' ogni run della
  * suite e2e parte da uno stato pulito con solo l'utente bootstrap (env
- * BOOTSTRAP_USERNAME/BOOTSTRAP_PASSWORD).
+ * BOOTSTRAP_EMAIL/BOOTSTRAP_PASSWORD).
  *
  * Avvia in parallelo il transport REST/HTTP (src/index.ts) e il transport
  * MCP HTTP (src/mcp/http.ts, usato da T7/T8), sulla porta indicata da PORT e

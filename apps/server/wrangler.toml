@@ -20,7 +20,7 @@ binding = "ATTACHMENTS"
 bucket_name = "my-planner-attachments"
 
 # ---- Var statiche ------------------------------------------------------------
-# JWT_SECRET, BOOTSTRAP_USERNAME, BOOTSTRAP_PASSWORD, GMAIL_USER,
+# JWT_SECRET, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, GMAIL_USER,
 # GMAIL_APP_PASSWORD vanno impostate come secrets (`wrangler secret put`)
 # o vars in produzione.
 [vars]

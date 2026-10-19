@@ -1,17 +1,21 @@
 import { describe, it, expect } from "vitest";
+import bcrypt from "bcryptjs";
+import { prisma } from "../lib/prisma.js";
 import { createProject } from "./taskService.js";
 import {
   assertProjectAccess,
+  changeOwnPassword,
   createUser,
   deleteUser,
   getAuthUser,
   listProjectsForUser,
   listUsers,
+  updateOwnProfile,
   updateUser,
 } from "./userService.js";
 
-async function createAdmin(username = "admin") {
-  return createUser({ username, password: "password123", role: "admin" });
+async function createAdmin(email = "admin@example.com") {
+  return createUser({ email, password: "password123", role: "admin" });
 }
 
 describe("userService — ruoli e assegnazioni", () => {
@@ -19,7 +23,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const admin = await createAdmin();
     const project = await createProject("Progetto A");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [project.id],
@@ -32,7 +36,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const authUser = await getAuthUser(manager.id);
     expect(authUser).toMatchObject({
       id: manager.id,
-      username: "manager",
+      email: "manager@example.com",
       role: "manager",
       projectIds: [project.id],
     });
@@ -47,7 +51,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const projectA = await createProject("A");
     const projectB = await createProject("B");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [projectA.id],
@@ -68,14 +72,14 @@ describe("userService — ruoli e assegnazioni", () => {
     await expect(assertProjectAccess(managerAuth!, projectA.id)).resolves.toBeUndefined();
   });
 
-  it("rifiuta un manager senza progetti e username duplicati", async () => {
+  it("rifiuta un manager senza progetti e email duplicate", async () => {
     await createAdmin();
     await expect(
-      createUser({ username: "manager", password: "password123", role: "manager" }),
+      createUser({ email: "manager@example.com", password: "password123", role: "manager" }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
 
     await expect(
-      createUser({ username: "admin", password: "password123", role: "admin" }),
+      createUser({ email: "ADMIN@example.com", password: "password123", role: "admin" }),
     ).rejects.toMatchObject({ code: "CONFLICT" });
   });
 
@@ -84,7 +88,7 @@ describe("userService — ruoli e assegnazioni", () => {
     const projectA = await createProject("A");
     const projectB = await createProject("B");
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [projectA.id],
@@ -101,7 +105,7 @@ describe("userService — ruoli e assegnazioni", () => {
   it("impedisce di rimuovere l'ultimo amministratore o se stessi", async () => {
     const admin = await createAdmin();
     const manager = await createUser({
-      username: "manager",
+      email: "manager@example.com",
       password: "password123",
       role: "manager",
       projectIds: [(await createProject("A")).id],
@@ -115,17 +119,116 @@ describe("userService — ruoli e assegnazioni", () => {
     await expect(deleteUser(manager.id, admin.id)).resolves.toEqual({ id: manager.id, deleted: true });
 
     const users = await listUsers();
-    expect(users.map((u) => u.username)).toEqual(["admin"]);
+    expect(users.map((u) => u.email)).toEqual(["admin@example.com"]);
   });
 
   it("valida id progetto inesistenti", async () => {
     await createAdmin();
     await expect(
       createUser({
-        username: "manager",
+        email: "manager@example.com",
         password: "password123",
         role: "manager",
         projectIds: ["progetto-inesistente"],
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+
+  it("salva nome e cognome, normalizza l'email e la aggiorna dal profilo", async () => {
+    const admin = await createUser({
+      email: "Ada@Example.com",
+      password: "password123",
+      role: "admin",
+      firstName: "  Ada  ",
+      lastName: "Lovelace",
+    });
+    expect(admin.firstName).toBe("Ada");
+    expect(admin.lastName).toBe("Lovelace");
+    expect(admin.email).toBe("ada@example.com");
+
+    const updated = await updateOwnProfile(admin.id, { email: "ada@nuovo.example" });
+    expect(updated).toMatchObject({
+      id: admin.id,
+      firstName: "Ada",
+      lastName: "Lovelace",
+      email: "ada@nuovo.example",
+    });
+
+    // Nome e cognome sono modificabili dall'utente dal proprio profilo.
+    const renamed = await updateOwnProfile(admin.id, {
+      email: "ada@nuovo.example",
+      firstName: "  Augusta Ada  ",
+      lastName: "King",
+    });
+    expect(renamed).toMatchObject({
+      id: admin.id,
+      firstName: "Augusta Ada",
+      lastName: "King",
+      email: "ada@nuovo.example",
+    });
+
+    // L'email resta obbligatoria e valida.
+    await expect(updateOwnProfile(admin.id, { email: "" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    await expect(updateOwnProfile(admin.id, { email: "non-una-email" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+
+    // Non si puo' usare l'email di un altro utente.
+    const other = await createUser({
+      email: "other@example.com",
+      password: "password123",
+      role: "admin",
+    });
+    await expect(updateOwnProfile(other.id, { email: "ada@nuovo.example" })).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+  });
+
+  it("cambia la password solo con quella attuale corretta", async () => {
+    const admin = await createUser({
+      email: "password@example.com",
+      password: "password123",
+      role: "admin",
+    });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password-sbagliata",
+        newPassword: "nuova-password",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "corta",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "password123",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await changeOwnPassword(admin.id, {
+      currentPassword: "password123",
+      newPassword: "nuova-password",
+    });
+
+    const row = await prisma.user.findUnique({ where: { id: admin.id } });
+    expect(row).not.toBeNull();
+    expect(await bcrypt.compare("nuova-password", row!.passwordHash)).toBe(true);
+    expect(await bcrypt.compare("password123", row!.passwordHash)).toBe(false);
+
+    // La vecchia password non e' piu' accettata.
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "altra-password",
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });

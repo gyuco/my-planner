@@ -13,6 +13,8 @@ import type {
   StorageSettings,
   UserAccount,
   UserRole,
+  NotificationsResponse,
+  MarkNotificationsReadResponse,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -90,18 +92,44 @@ export function getMe(): Promise<AuthUser> {
   return apiFetch("/auth/me");
 }
 
+export interface UpdateProfileInput {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/** Modifica self-service dell'email (identificativo di login) del profilo. */
+export function updateMyProfile(input: UpdateProfileInput): Promise<AuthUser> {
+  return apiFetch("/auth/me", { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** Cambio password self-service: richiede la password attuale come conferma. */
+export async function changeMyPassword(input: ChangePasswordInput): Promise<void> {
+  await apiFetch("/auth/me/password", { method: "PATCH", body: JSON.stringify(input) });
+}
+
 // --- Gestione utenti (solo admin) -------------------------------------------
 
 export interface CreateUserInput {
-  username: string;
+  email: string;
   password: string;
   role: UserRole;
+  firstName?: string;
+  lastName?: string;
   projectIds?: string[];
 }
 
 export interface UpdateUserInput {
   role?: UserRole;
   password?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
   projectIds?: string[];
 }
 
@@ -319,6 +347,21 @@ export async function uploadAttachment(taskId: string, file: File): Promise<Atta
 
 export function deleteAttachment(attachmentId: string): Promise<{ deleted: true }> {
   return apiFetch(`/attachments/${attachmentId}`, { method: "DELETE" });
+}
+
+// --- Notifiche ---------------------------------------------------------------
+
+/**
+ * GET /notifications: oltre agli eventi non letti restituisce `unreadCount`
+ * (per il badge) e `serverCursor` (da passare a markNotificationsRead).
+ */
+export function getNotifications(limit = 30): Promise<NotificationsResponse> {
+  return apiFetch(`/notifications?limit=${limit}`);
+}
+
+/** Cursore unico: segna come lette tutte le notifiche fino a `upTo`. */
+export function markNotificationsRead(upTo: number): Promise<MarkNotificationsReadResponse> {
+  return apiFetch(`/notifications/read`, { method: "POST", body: JSON.stringify({ upTo }) });
 }
 
 // --- Impostazioni storage ----------------------------------------------------

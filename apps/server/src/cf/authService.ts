@@ -8,18 +8,18 @@ import { signAccessToken } from "./jwt.js";
 /**
  * Bootstrap utente unico + login su Workers (CF6). Stessa logica di
  * routes/auth.ts (Node): nessuna registrazione, utente creato al bootstrap
- * da BOOTSTRAP_USERNAME/BOOTSTRAP_PASSWORD (vars/secrets wrangler).
+ * da BOOTSTRAP_EMAIL/BOOTSTRAP_PASSWORD (vars/secrets wrangler).
  */
 
 export async function bootstrapUserOnWorker(env: CfEnv) {
   const count = await prisma.user.count();
   if (count > 0) return;
 
-  const username = env.BOOTSTRAP_USERNAME;
+  const email = env.BOOTSTRAP_EMAIL;
   const password = env.BOOTSTRAP_PASSWORD;
-  if (!username || !password) {
+  if (!email || !password) {
     console.warn(
-      "Nessun utente presente e BOOTSTRAP_USERNAME/BOOTSTRAP_PASSWORD non impostate: " +
+      "Nessun utente presente e BOOTSTRAP_EMAIL/BOOTSTRAP_PASSWORD non impostate: " +
         "impossibile creare l'utente unico (vedi secrets wrangler)."
     );
     return;
@@ -27,31 +27,40 @@ export async function bootstrapUserOnWorker(env: CfEnv) {
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
-    await prisma.user.create({ data: { username, passwordHash, role: "admin" } });
-    console.info(`Utente unico "${username}" creato al bootstrap.`);
+    await prisma.user.create({
+      data: { email: email.trim().toLowerCase(), passwordHash, role: "admin" },
+    });
+    console.info(`Utente unico "${email}" creato al bootstrap.`);
   } catch (err) {
     // Il bootstrap non è più memoizzato come promise condivisa (vedi cf/index.ts),
     // quindi due richieste concorrenti su un isolate freddo possono provare a
-    // creare lo stesso utente: `username` è @unique, una delle due fallisce e va
+    // creare lo stesso utente: `email` è @unique, una delle due fallisce e va
     // ignorata solo se l'utente ora esiste davvero.
     if ((await prisma.user.count()) === 0) throw err;
   }
 }
 
 export async function loginUser(env: CfEnv, body: unknown) {
-  const { username, password } = (body ?? {}) as { username?: string; password?: string };
-  if (!username || !password) {
-    throw new ApiErrorException("VALIDATION_ERROR", "username e password sono obbligatori");
+  const { email, password } = (body ?? {}) as { email?: string; password?: string };
+  if (!email || !password) {
+    throw new ApiErrorException("VALIDATION_ERROR", "email e password sono obbligatori");
   }
-  const user = await prisma.user.findUnique({ where: { username } });
+  const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new ApiErrorException("UNAUTHORIZED", "Credenziali non valide");
   }
-  const token = await signAccessToken(env, { sub: user.id, username: user.username });
+  const token = await signAccessToken(env, { sub: user.id, email: user.email });
   const authUser = await getAuthUser(user.id);
   return {
     token,
     user:
-      authUser ?? { id: user.id, username: user.username, role: normalizeRole(user.role), projectIds: [] },
+      authUser ?? {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        role: normalizeRole(user.role),
+        projectIds: [],
+      },
   };
 }

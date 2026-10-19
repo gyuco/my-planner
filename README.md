@@ -70,7 +70,7 @@ npx wrangler r2 bucket create my-planner-attachments
 
 # 3. Secrets del Worker (produzione)
 npx --workspace apps/server wrangler secret put JWT_SECRET
-npx --workspace apps/server wrangler secret put BOOTSTRAP_USERNAME
+npx --workspace apps/server wrangler secret put BOOTSTRAP_EMAIL
 npx --workspace apps/server wrangler secret put BOOTSTRAP_PASSWORD
 
 # 4. Migrazioni D1 (remote) e deploy del Worker (genera anche il client D1)
@@ -148,7 +148,7 @@ e `apps/server/migrations/` (D1/Worker). Vanno aggiornate entrambe.
 
 **Reset login (bootstrap del primo admin)**
 1. Elimina gli utenti: `npx --workspace apps/server wrangler d1 execute DB --remote --command "DELETE FROM User;"`
-2. Imposta nuovi `BOOTSTRAP_USERNAME`/`BOOTSTRAP_PASSWORD` (secrets).
+2. Imposta nuovi `BOOTSTRAP_EMAIL`/`BOOTSTRAP_PASSWORD` (secrets).
 3. Fai una richiesta qualsiasi al Worker (es. `GET /health`): il primo admin viene ricreato.
    Gli altri utenti si gestiscono dalla UI **Utenti** (solo admin).
 

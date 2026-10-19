@@ -1,13 +1,12 @@
 import { SUPPORTED_LOCALES, type Locale } from "../i18n/config";
 import { useI18n } from "../i18n";
+import { GlobeIcon } from "./Icons";
 
 export function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
   return (
     <label className="language-switcher" title={t.language.label}>
-      <span className="language-switcher-label" aria-hidden="true">
-        🌐
-      </span>
+      <GlobeIcon className="language-switcher-icon" />
       <select
         value={locale}
         onChange={(e) => setLocale(e.target.value as Locale)}

@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 
 /**
  * JWT su Workers (CF6): sostituisce @fastify/jwt con jose (Web Crypto).
- * HS256, stesso payload ({sub, username}) e stessa scadenza (30gg) di Node,
+ * HS256, stesso payload ({sub, email}) e stessa scadenza (30gg) di Node,
  * cosi' i token emessi dal runtime Fastify restano validi e viceversa.
  * JWT_SECRET arriva da vars/secrets wrangler (obbligatorio: nessun default).
  */
@@ -19,10 +19,10 @@ export function getJwtSecret(env: { JWT_SECRET?: string }): string {
 
 export async function signAccessToken(
   env: { JWT_SECRET?: string },
-  payload: { sub: string; username: string }
+  payload: { sub: string; email: string }
 ): Promise<string> {
   const secret = new TextEncoder().encode(getJwtSecret(env));
-  return new SignJWT({ username: payload.username })
+  return new SignJWT({ email: payload.email })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(payload.sub)
     .setIssuedAt()
@@ -37,15 +37,15 @@ export async function signAccessToken(
 export async function verifyAccessToken(
   env: { JWT_SECRET?: string },
   authorization: string | undefined | null
-): Promise<{ sub: string; username: string } | null> {
+): Promise<{ sub: string; email: string } | null> {
   const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : undefined;
   if (!token) return null;
   try {
     const secret = new TextEncoder().encode(getJwtSecret(env));
     const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
     if (typeof payload.sub !== "string") return null;
-    const username = typeof payload.username === "string" ? payload.username : "";
-    return { sub: payload.sub, username };
+    const email = typeof payload.email === "string" ? payload.email : "";
+    return { sub: payload.sub, email };
   } catch {
     return null;
   }

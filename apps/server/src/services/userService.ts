@@ -6,6 +6,7 @@ import {
   type UserRole,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { initNotificationStateForUser } from "./notificationService.js";
 
 /**
  * Gestione utenti e autorizzazione per progetto, condivisa tra runtime Node
@@ -20,7 +21,7 @@ import { prisma } from "../lib/prisma.js";
  */
 
 const MIN_PASSWORD_LENGTH = 8;
-const MAX_USERNAME_LENGTH = 100;
+const MAX_EMAIL_LENGTH = 200;
 
 export function normalizeRole(role: string | null | undefined): UserRole {
   return role === "admin" ? "admin" : "manager";
@@ -46,7 +47,9 @@ export async function getAuthUser(userId: string): Promise<AuthUser | null> {
   const role = normalizeRole(user.role);
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
     role,
     projectIds: role === "admin" ? [] : user.projects.map((p) => p.projectId),
   };
@@ -111,7 +114,9 @@ function serializeAccount(user: any): UserAccount {
   const role = normalizeRole(user.role);
   return {
     id: user.id,
-    username: user.username,
+    email: user.email,
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
     role,
     createdAt: new Date(user.createdAt).toISOString(),
     projectIds: user.projects.map((p: any) => p.projectId),
@@ -141,17 +146,6 @@ async function validateProjectIds(projectIds: string[]): Promise<string[]> {
   return unique;
 }
 
-function validateUsername(username: string): string {
-  const value = username.trim();
-  if (value.length === 0 || value.length > MAX_USERNAME_LENGTH) {
-    throw new ApiErrorException(
-      "VALIDATION_ERROR",
-      `username deve avere tra 1 e ${MAX_USERNAME_LENGTH} caratteri`,
-    );
-  }
-  return value;
-}
-
 function validatePassword(password: string): string {
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new ApiErrorException(
@@ -169,6 +163,43 @@ function validateRole(role: string): UserRole {
   return role;
 }
 
+const MAX_NAME_LENGTH = 100;
+
+function validateName(value: string | undefined | null, field: "firstName" | "lastName"): string {
+  const trimmed = (value ?? "").trim();
+  if (trimmed.length > MAX_NAME_LENGTH) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      `${field} deve avere al massimo ${MAX_NAME_LENGTH} caratteri`,
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Normalizza e valida l'email, che e' anche l'identificativo di login. Sempre
+ * obbligatoria; il formato e' volutamente permissivo (una sola @ e un punto nel
+ * dominio) ma abbastanza stretto da intercettare gli errori di battitura.
+ */
+function validateEmail(value: string | null | undefined): string {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  if (trimmed.length === 0) {
+    throw new ApiErrorException("VALIDATION_ERROR", "email obbligatoria");
+  }
+  if (trimmed.length > MAX_EMAIL_LENGTH || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    throw new ApiErrorException("VALIDATION_ERROR", "email non valida");
+  }
+  return trimmed;
+}
+
+/** Email gia' usata da un altro utente (escluso `excludeUserId`). */
+async function assertEmailAvailable(email: string, excludeUserId?: string): Promise<void> {
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing && existing.id !== excludeUserId) {
+    throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con email "${email}"`);
+  }
+}
+
 async function countAdmins(): Promise<number> {
   return prisma.user.count({ where: { role: "admin" } });
 }
@@ -182,16 +213,20 @@ export async function listUsers(): Promise<UserAccount[]> {
 }
 
 export interface CreateUserInput {
-  username: string;
+  email: string;
   password: string;
   role: string;
+  firstName?: string;
+  lastName?: string;
   projectIds?: string[];
 }
 
 export async function createUser(input: CreateUserInput): Promise<UserAccount> {
-  const username = validateUsername(input.username);
+  const email = validateEmail(input.email);
   const password = validatePassword(input.password);
   const role = validateRole(input.role);
+  const firstName = validateName(input.firstName, "firstName");
+  const lastName = validateName(input.lastName, "lastName");
 
   let projectIds: string[] = [];
   if (role === "manager") {
@@ -204,30 +239,32 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
     }
   }
 
-  const existing = await prisma.user.findUnique({ where: { username } });
-  if (existing) {
-    throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con username "${username}"`);
-  }
+  await assertEmailAvailable(email);
 
   const passwordHash = await bcrypt.hash(password, 10);
   try {
     const created = await prisma.user.create({
       data: {
-        username,
+        email,
         passwordHash,
         role,
+        firstName,
+        lastName,
         projects:
           projectIds.length > 0
             ? { create: projectIds.map((projectId) => ({ projectId })) }
             : undefined,
       },
     });
+    // Cursore notifiche ancorato alla creazione dell'account: il nuovo utente
+    // non deve vedere gli eventi avvenuti prima che esistesse.
+    await initNotificationStateForUser(created.id);
     return serializeAccount(await getUserWithProjects(created.id));
   } catch {
-    // Corsa con un'altra creazione dello stesso username (unique constraint).
-    const nowExisting = await prisma.user.findUnique({ where: { username } });
+    // Corsa con un'altra creazione della stessa email (unique constraint).
+    const nowExisting = await prisma.user.findUnique({ where: { email } });
     if (nowExisting) {
-      throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con username "${username}"`);
+      throw new ApiErrorException("CONFLICT", `Esiste gia' un utente con email "${email}"`);
     }
     throw new ApiErrorException("INTERNAL_ERROR", "Impossibile creare l'utente");
   }
@@ -236,6 +273,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
 export interface UpdateUserInput {
   role?: string;
   password?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
   projectIds?: string[];
 }
 
@@ -275,6 +315,17 @@ export async function updateUser(
   if (input.password !== undefined) {
     data.passwordHash = await bcrypt.hash(validatePassword(input.password), 10);
   }
+  if (input.firstName !== undefined) {
+    data.firstName = validateName(input.firstName, "firstName");
+  }
+  if (input.lastName !== undefined) {
+    data.lastName = validateName(input.lastName, "lastName");
+  }
+  if (input.email !== undefined) {
+    const email = validateEmail(input.email);
+    await assertEmailAvailable(email, userId);
+    data.email = email;
+  }
   data.projects =
     nextRole === "manager"
       ? {
@@ -285,6 +336,70 @@ export async function updateUser(
 
   await prisma.user.update({ where: { id: userId }, data });
   return serializeAccount(await getUserWithProjects(userId));
+}
+
+export interface UpdateProfileInput {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/**
+ * Modifica dei dati che l'utente puo' cambiare da solo nella pagina profilo:
+ * nome, cognome ed email. L'email e' l'identificativo di login; ruolo e
+ * progetti restano in mano agli admin.
+ */
+export async function updateOwnProfile(
+  userId: string,
+  input: UpdateProfileInput,
+): Promise<AuthUser> {
+  const existing = await prisma.user.findUnique({ where: { id: userId } });
+  if (!existing) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+
+  const email = validateEmail(input.email);
+  await assertEmailAvailable(email, userId);
+  const data: { email: string; firstName?: string; lastName?: string } = { email };
+  if (input.firstName !== undefined) data.firstName = validateName(input.firstName, "firstName");
+  if (input.lastName !== undefined) data.lastName = validateName(input.lastName, "lastName");
+  await prisma.user.update({ where: { id: userId }, data });
+
+  const updated = await getAuthUser(userId);
+  if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+  return updated;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
+ * Cambio password self-service: richiede la password attuale, verifica i
+ * requisiti minimi e salva il nuovo hash. Il JWT corrente resta valido perché
+ * l'identità è legata all'id utente, non alla password.
+ */
+export async function changeOwnPassword(
+  userId: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+
+  const currentOk = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!currentOk) {
+    throw new ApiErrorException("VALIDATION_ERROR", "La password attuale non è corretta");
+  }
+
+  const newPassword = validatePassword(input.newPassword);
+  if (await bcrypt.compare(newPassword, user.passwordHash)) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      "La nuova password deve essere diversa da quella attuale",
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
 }
 
 export async function deleteUser(userId: string, actorId: string): Promise<{ id: string; deleted: true }> {
