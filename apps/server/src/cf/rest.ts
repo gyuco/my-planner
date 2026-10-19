@@ -11,6 +11,7 @@ import {
   assertAttachmentAccess,
   assertProjectAccess,
   assertTaskAccess,
+  changeOwnPassword,
   createUser,
   deleteUser,
   getAuthUser,
@@ -64,6 +65,7 @@ import {
   createUserInputSchema,
   updateUserInputSchema,
   updateProfileInputSchema,
+  changePasswordInputSchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
@@ -125,6 +127,7 @@ export function buildRestApp() {
   // altrimenti l'handler risponde prima che l'auth venga eseguita.
   const protectedPaths = [
     "/auth/me",
+    "/auth/me/*",
     "/projects/*",
     "/projects",
     "/tasks/*",
@@ -165,6 +168,12 @@ export function buildRestApp() {
   app.patch("/auth/me", async (c) => {
     const input = updateProfileInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await updateOwnProfile(c.get("user").id, input));
+  });
+
+  app.patch("/auth/me/password", async (c) => {
+    const input = changePasswordInputSchema.parse(await c.req.json().catch(() => ({})));
+    await changeOwnPassword(c.get("user").id, input);
+    return c.json({ ok: true });
   });
 
   // --- Gestione utenti (admin) ---------------------------------------------

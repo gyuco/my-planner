@@ -117,6 +117,12 @@ export const updateProfileInputSchema = z.object({
   lastName: z.string().max(100).optional(),
 });
 
+/** Cambio password self-service: la password attuale serve come conferma. */
+export const changePasswordInputSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(8).max(200),
+});
+
 export const storageSettingsInputSchema = z.object({
   backend: z.enum(["local", "s3"]),
   localDir: z.string().min(1).optional(),

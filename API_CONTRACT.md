@@ -89,6 +89,11 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 - Body: `{ "email": string, "firstName"?: string, "lastName"?: string }` — modifica self-service di nome, cognome ed email. L'email è anche l'identificativo di login. Non cambia password, ruolo o progetti; l'email deve essere valida e non già usata da un altro utente.
 - 200: utente aggiornato nella stessa forma di `GET /auth/me`; 400 `VALIDATION_ERROR` se l'email non è valida; 409 `CONFLICT` se è già in uso.
 
+`PATCH /auth/me/password`
+- Auth: JWT
+- Body: `{ "currentPassword": string, "newPassword": string (min 8) }` — cambio password self-service; la password attuale viene verificata e la nuova deve essere diversa.
+- 200: `{ "ok": true }`; 400 `VALIDATION_ERROR` se la password attuale non è corretta, se la nuova è troppo corta o coincide con quella attuale.
+
 ### Gestione utenti (solo `admin`)
 `GET /users`
 - 200: lista di `{ id, email, firstName, lastName, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).

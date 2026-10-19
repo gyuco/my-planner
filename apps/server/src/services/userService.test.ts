@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
+import bcrypt from "bcryptjs";
+import { prisma } from "../lib/prisma.js";
 import { createProject } from "./taskService.js";
 import {
   assertProjectAccess,
+  changeOwnPassword,
   createUser,
   deleteUser,
   getAuthUser,
@@ -181,5 +184,52 @@ describe("userService — ruoli e assegnazioni", () => {
     await expect(updateOwnProfile(other.id, { email: "ada@nuovo.example" })).rejects.toMatchObject({
       code: "CONFLICT",
     });
+  });
+
+  it("cambia la password solo con quella attuale corretta", async () => {
+    const admin = await createUser({
+      email: "password@example.com",
+      password: "password123",
+      role: "admin",
+    });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password-sbagliata",
+        newPassword: "nuova-password",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "corta",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "password123",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+
+    await changeOwnPassword(admin.id, {
+      currentPassword: "password123",
+      newPassword: "nuova-password",
+    });
+
+    const row = await prisma.user.findUnique({ where: { id: admin.id } });
+    expect(row).not.toBeNull();
+    expect(await bcrypt.compare("nuova-password", row!.passwordHash)).toBe(true);
+    expect(await bcrypt.compare("password123", row!.passwordHash)).toBe(false);
+
+    // La vecchia password non e' piu' accettata.
+    await expect(
+      changeOwnPassword(admin.id, {
+        currentPassword: "password123",
+        newPassword: "altra-password",
+      }),
+    ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
   });
 });

@@ -2,8 +2,13 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { apiError } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { updateProfileInputSchema } from "../lib/validation.js";
-import { getAuthUser, normalizeRole, updateOwnProfile } from "../services/userService.js";
+import { changePasswordInputSchema, updateProfileInputSchema } from "../lib/validation.js";
+import {
+  changeOwnPassword,
+  getAuthUser,
+  normalizeRole,
+  updateOwnProfile,
+} from "../services/userService.js";
 
 const JWT_EXPIRES_IN = "30d";
 
@@ -67,10 +72,17 @@ export async function authRoutes(app: FastifyInstance) {
     return (req as any).authUser;
   });
 
-  // Modifica self-service dei dati del profilo (oggi solo l'email). Restituisce
-  // l'AuthUser aggiornato così la UI può riusarlo senza un altro GET /auth/me.
+  // Modifica self-service dei dati del profilo (nome, cognome, email).
+  // Restituisce l'AuthUser aggiornato così la UI può riusarlo senza un altro GET /auth/me.
   app.patch("/auth/me", { onRequest: [app.authenticate] }, async (req) => {
     const input = updateProfileInputSchema.parse(req.body ?? {});
     return updateOwnProfile((req as any).authUser.id, input);
+  });
+
+  // Cambio password self-service: richiede la password attuale come conferma.
+  app.patch("/auth/me/password", { onRequest: [app.authenticate] }, async (req) => {
+    const input = changePasswordInputSchema.parse(req.body ?? {});
+    await changeOwnPassword((req as any).authUser.id, input);
+    return { ok: true };
   });
 }

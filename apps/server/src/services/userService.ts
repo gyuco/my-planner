@@ -364,6 +364,40 @@ export async function updateOwnProfile(
   return updated;
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/**
+ * Cambio password self-service: richiede la password attuale, verifica i
+ * requisiti minimi e salva il nuovo hash. Il JWT corrente resta valido perché
+ * l'identità è legata all'id utente, non alla password.
+ */
+export async function changeOwnPassword(
+  userId: string,
+  input: ChangePasswordInput,
+): Promise<void> {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+
+  const currentOk = await bcrypt.compare(input.currentPassword, user.passwordHash);
+  if (!currentOk) {
+    throw new ApiErrorException("VALIDATION_ERROR", "La password attuale non è corretta");
+  }
+
+  const newPassword = validatePassword(input.newPassword);
+  if (await bcrypt.compare(newPassword, user.passwordHash)) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      "La nuova password deve essere diversa da quella attuale",
+    );
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+}
+
 export async function deleteUser(userId: string, actorId: string): Promise<{ id: string; deleted: true }> {
   if (userId === actorId) {
     throw new ApiErrorException("VALIDATION_ERROR", "Non puoi eliminare il tuo utente");

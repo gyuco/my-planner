@@ -101,6 +101,16 @@ export function updateMyProfile(input: UpdateProfileInput): Promise<AuthUser> {
   return apiFetch("/auth/me", { method: "PATCH", body: JSON.stringify(input) });
 }
 
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** Cambio password self-service: richiede la password attuale come conferma. */
+export async function changeMyPassword(input: ChangePasswordInput): Promise<void> {
+  await apiFetch("/auth/me/password", { method: "PATCH", body: JSON.stringify(input) });
+}
+
 // --- Gestione utenti (solo admin) -------------------------------------------
 
 export interface CreateUserInput {
