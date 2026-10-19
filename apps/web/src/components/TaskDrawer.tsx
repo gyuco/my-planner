@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
@@ -19,8 +19,11 @@ import {
   uploadAttachment,
 } from "../api";
 import { useI18n } from "../i18n";
+import { useActivityFeed } from "../lib/activity";
+import { ActivityList } from "./ActivityList";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
+const ACTIVITY_POLL_INTERVAL_MS = 10_000;
 
 interface TaskDrawerProps {
   taskId: string;
@@ -69,6 +72,21 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
   const [editingDescription, setEditingDescription] = useState(false);
   const [newSubtaskTitles, setNewSubtaskTitles] = useState("");
   const [addingSubtasks, setAddingSubtasks] = useState(false);
+
+  // Log attivita' del solo task mostrato. Con il drawer aperto si aggiorna
+  // da solo (polling) e subito dopo ogni azione fatta qui (vedi effetto sotto).
+  const activityQuery = useMemo(() => ({ taskId }), [taskId]);
+  const activity = useActivityFeed(activityQuery, {
+    live: true,
+    intervalMs: ACTIVITY_POLL_INTERVAL_MS,
+    pageSize: 20,
+    errorMessage: t.activity.loadError,
+  });
+  const { pollNow: pollActivity } = activity;
+
+  useEffect(() => {
+    pollActivity();
+  }, [task, comments, attachments, pollActivity]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -518,6 +536,28 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                 {attachments.length === 0 && <li className="drawer-empty">{t.taskDrawer.noAttachments}</li>}
               </ul>
               <input type="file" onChange={handleUpload} disabled={uploading} />
+            </section>
+
+            <section className="drawer-section">
+              <h3>{t.activity.taskSection}</h3>
+              {activity.error && <p className="activity-error">{activity.error}</p>}
+              {activity.loading ? (
+                <p className="drawer-empty">{t.taskDrawer.loading}</p>
+              ) : activity.items.length === 0 ? (
+                <p className="drawer-empty">{t.activity.empty}</p>
+              ) : (
+                <ActivityList items={activity.items} />
+              )}
+              {activity.hasMore && (
+                <button
+                  type="button"
+                  className="activity-load-more"
+                  onClick={activity.loadMore}
+                  disabled={activity.loadingMore}
+                >
+                  {t.activity.loadMore}
+                </button>
+              )}
             </section>
           </div>
         )}

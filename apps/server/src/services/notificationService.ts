@@ -4,8 +4,10 @@ import type {
   NotificationItem,
   NotificationsResponse,
   TaskEventType,
+  TaskFieldChange,
   TaskStatus,
 } from "@my-planner/core";
+import { NOTIFICATION_EVENT_TYPES } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 
 /**
@@ -21,6 +23,9 @@ import { prisma } from "../lib/prisma.js";
  *
  * Gli eventi vengono scritti dal service layer (taskService), quindi coprono
  * automaticamente REST Node, REST Cloudflare e MCP.
+ *
+ * La stessa tabella fa anche da log attivita' (vedi activityService.ts): le
+ * notifiche considerano solo i tipi in `NOTIFICATION_EVENT_TYPES`.
  */
 
 export type Actor =
@@ -44,6 +49,13 @@ export interface TaskEventData {
   to?: TaskStatus;
   /** Estratto del commento (markdown troncato). */
   excerpt?: string;
+  /** Campi modificati (`task.updated`). */
+  changes?: TaskFieldChange[];
+  /** Task che blocca (`dependency.*`), titolo denormalizzato. */
+  relatedTaskId?: string;
+  relatedTaskTitle?: string;
+  /** Nome file (`attachment.*`). */
+  fileName?: string;
 }
 
 export interface RecordTaskEventInput {
@@ -57,7 +69,7 @@ export interface RecordTaskEventInput {
 /**
  * Scrive un evento. Non va chiamato direttamente dalle route: la mutazione
  * principale e l'evento devono restare vicini (vedi `emitEvent` in
- * taskService, che non fa fallire l'azione se la notifica non viene scritta).
+ * activityService, che non fa fallire l'azione se l'evento non viene scritto).
  */
 export async function recordTaskEvent(input: RecordTaskEventInput) {
   return prisma.taskEvent.create({
@@ -74,6 +86,7 @@ export async function recordTaskEvent(input: RecordTaskEventInput) {
 
 /**
  * Filtro di visibilita' condiviso da lista, conteggio e mark-as-read:
+ *  - solo i tipi che generano notifica (il resto e' solo log attivita');
  *  - eventi di progetti accessibili (admin: tutti, manager: assegnati);
  *  - niente progetti archiviati;
  *  - esclude le azioni dell'utente corrente. `actorId` e' nullable (MCP /
@@ -81,6 +94,7 @@ export async function recordTaskEvent(input: RecordTaskEventInput) {
  */
 function visibilityFilter(user: AuthUser): Record<string, unknown> {
   const where: Record<string, unknown> = {
+    type: { in: [...NOTIFICATION_EVENT_TYPES] },
     project: { archived: false },
     OR: [{ actorId: null }, { actorId: { not: user.id } }],
   };
@@ -118,7 +132,7 @@ export async function initNotificationStateForUser(userId: string): Promise<void
   });
 }
 
-function parseData(raw: string): TaskEventData {
+export function parseEventData(raw: string): TaskEventData {
   try {
     const parsed = JSON.parse(raw ?? "{}");
     return typeof parsed === "object" && parsed !== null ? (parsed as TaskEventData) : { title: "" };
@@ -127,8 +141,8 @@ function parseData(raw: string): TaskEventData {
   }
 }
 
-function serializeEvent(row: any): NotificationItem {
-  const data = parseData(row.data);
+export function serializeEvent(row: any): NotificationItem {
+  const data = parseEventData(row.data);
   const actorName = row.actor
     ? [row.actor.firstName, row.actor.lastName].filter(Boolean).join(" ") || row.actor.email
     : null;

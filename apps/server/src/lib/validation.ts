@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TASK_EVENT_TYPES } from "@my-planner/core";
 
 /**
  * Schemi zod condivisi tra le route REST, allineati agli enum e ai formati
@@ -82,6 +83,28 @@ export const commentInputSchema = z.object({
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+/**
+ * Filtri del log attivita' (GET /activity). `types` e' CSV; `actor` e'
+ * "mcp", "system" oppure l'id di un utente. `from`/`to` accettano ISO date o
+ * datetime.
+ */
+export const activityQuerySchema = z.object({
+  projectId: z.string().min(1).optional(),
+  taskId: z.string().min(1).optional(),
+  types: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+    .pipe(z.array(z.enum(TASK_EVENT_TYPES)).optional()),
+  actor: z.string().min(1).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  search: z.string().trim().min(1).max(200).optional(),
+  afterId: z.coerce.number().int().nonnegative().optional(),
+  beforeId: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
 });
 
 /** Mark-as-read a cursore unico: `upTo` e' il `serverCursor` ricevuto dal GET. */

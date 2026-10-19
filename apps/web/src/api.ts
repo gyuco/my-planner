@@ -17,6 +17,9 @@ import type {
   UserRole,
   NotificationsResponse,
   MarkNotificationsReadResponse,
+  ActivityActor,
+  ActivityLogResponse,
+  TaskEventType,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -364,6 +367,42 @@ export function getNotifications(limit = 30): Promise<NotificationsResponse> {
 /** Cursore unico: segna come lette tutte le notifiche fino a `upTo`. */
 export function markNotificationsRead(upTo: number): Promise<MarkNotificationsReadResponse> {
   return apiFetch(`/notifications/read`, { method: "POST", body: JSON.stringify({ upTo }) });
+}
+
+// --- Log attivita' -----------------------------------------------------------
+
+export interface ActivityQuery {
+  projectId?: string;
+  taskId?: string;
+  types?: TaskEventType[];
+  /** Id utente, oppure "mcp" / "system". */
+  actor?: string;
+  /** ISO datetime, estremi inclusivi. */
+  from?: string;
+  to?: string;
+  search?: string;
+  afterId?: number;
+  beforeId?: number;
+  limit?: number;
+}
+
+/** GET /activity: eventi dal piu' recente; `afterId` per il polling, `beforeId` per paginare. */
+export function getActivity(query: ActivityQuery = {}): Promise<ActivityLogResponse> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === "") continue;
+    if (Array.isArray(value)) {
+      if (value.length > 0) params.set(key, value.join(","));
+    } else {
+      params.set(key, String(value));
+    }
+  }
+  const qs = params.toString();
+  return apiFetch(`/activity${qs ? `?${qs}` : ""}`);
+}
+
+export function getActivityActors(): Promise<ActivityActor[]> {
+  return apiFetch(`/activity/actors`);
 }
 
 // --- Impostazioni storage ----------------------------------------------------

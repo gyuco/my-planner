@@ -5,17 +5,13 @@ import {
   TASK_STATUSES,
   type SubtaskStatusCounts,
   type TaskComplexity,
+  type TaskFieldChange,
   type TaskStatus,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
-import {
-  recordTaskEvent,
-  SYSTEM_ACTOR,
-  type Actor,
-  type RecordTaskEventInput,
-} from "./notificationService.js";
-import { queueTaskEventEmail } from "./emailNotificationService.js";
+import { SYSTEM_ACTOR, type Actor } from "./notificationService.js";
+import { emitEvent } from "./activityService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -26,28 +22,6 @@ import { queueTaskEventEmail } from "./emailNotificationService.js";
  */
 
 type TaskPriority = "low" | "medium" | "high" | "urgent";
-
-/**
- * Scrive l'evento di notifica senza far fallire l'azione principale: un
- * problema sul log non deve impedire di creare/spostare un task o commentare.
- * Gli eventi sono best-effort per definizione (non sono dati di dominio).
- * Stesso discorso per l'email: senza config SMTP non parte nulla, e l'invio
- * gira in background, quindi non rallenta né fa fallire la risposta.
- */
-async function emitEvent(input: RecordTaskEventInput): Promise<void> {
-  try {
-    await recordTaskEvent(input);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[my-planner] impossibile registrare l'evento di notifica", err);
-  }
-  try {
-    await queueTaskEventEmail(input);
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error("[my-planner] impossibile accodare l'email di notifica", err);
-  }
-}
 
 /** Board vuota con tutte le colonne previste, nell'ordine di `TASK_STATUSES`. */
 function emptyBoard(): Record<TaskStatus, any[]> {
@@ -333,7 +307,34 @@ export interface TaskUpdateInput {
   parentId?: string | null;
 }
 
-export async function updateTask(taskId: string, input: TaskUpdateInput) {
+const MAX_CHANGE_VALUE_LENGTH = 200;
+
+function changeValue(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) return value.toISOString();
+  return String(value).slice(0, MAX_CHANGE_VALUE_LENGTH);
+}
+
+/**
+ * Diff tra il task prima e dopo l'update, per l'evento `task.updated`. Il
+ * drawer salva tutti i campi ad ogni blur: senza diff ogni blur produrrebbe
+ * un evento vuoto. La descrizione e' segnalata come cambiata ma senza valori.
+ */
+function diffTask(before: any, after: any): TaskFieldChange[] {
+  const changes: TaskFieldChange[] = [];
+  const fields = ["title", "priority", "complexity", "tags", "dueDate", "parentId"] as const;
+  for (const field of fields) {
+    const from = changeValue(before[field]);
+    const to = changeValue(after[field]);
+    if (from !== to) changes.push({ field, from, to });
+  }
+  if ((before.description ?? "") !== (after.description ?? "")) {
+    changes.push({ field: "description", from: null, to: null });
+  }
+  return changes;
+}
+
+export async function updateTask(taskId: string, input: TaskUpdateInput, actor: Actor = SYSTEM_ACTOR) {
   const existing = await getTaskOrThrow(taskId);
 
   if (input.title !== undefined && (input.title.trim().length === 0 || input.title.length > 300)) {
@@ -361,11 +362,23 @@ export async function updateTask(taskId: string, input: TaskUpdateInput) {
   if (input.parentId !== undefined) data.parentId = input.parentId;
 
   const task = await prisma.task.update({ where: { id: taskId }, data });
+
+  const changes = diffTask(existing, task);
+  if (changes.length > 0) {
+    await emitEvent({
+      projectId: task.projectId,
+      taskId: task.id,
+      type: "task.updated",
+      actor,
+      data: { title: task.title, parentId: task.parentId, changes },
+    });
+  }
+
   return serializeTask(task);
 }
 
-export async function deleteTask(taskId: string) {
-  await getTaskOrThrow(taskId);
+export async function deleteTask(taskId: string, actor: Actor = SYSTEM_ACTOR) {
+  const existing = await getTaskOrThrow(taskId);
 
   const subtaskCount = await prisma.task.count({ where: { parentId: taskId } });
   if (subtaskCount > 0) {
@@ -387,6 +400,14 @@ export async function deleteTask(taskId: string) {
     prisma.taskDependency.deleteMany({ where: { OR: [{ taskId }, { blockedByTaskId: taskId }] } }),
     prisma.task.deleteMany({ where: { id: taskId } }),
   ]);
+
+  await emitEvent({
+    projectId: existing.projectId,
+    taskId,
+    type: "task.deleted",
+    actor,
+    data: { title: existing.title, parentId: existing.parentId },
+  });
 
   return { id: taskId, deleted: true as const };
 }
@@ -584,7 +605,7 @@ export async function createSubtasks(
 // Dipendenze
 // ---------------------------------------------------------------------------
 
-export async function addDependency(taskId: string, blockedByTaskId: string) {
+export async function addDependency(taskId: string, blockedByTaskId: string, actor: Actor = SYSTEM_ACTOR) {
   if (taskId === blockedByTaskId) {
     throw new ApiErrorException("VALIDATION_ERROR", "Un task non può bloccare se stesso");
   }
@@ -598,15 +619,22 @@ export async function addDependency(taskId: string, blockedByTaskId: string) {
     throw new ApiErrorException("CIRCULAR_DEPENDENCY", "Questa dipendenza creerebbe un ciclo tra i task");
   }
 
-  void task;
-  void blockedByTask;
-
   const existing = await prisma.taskDependency.findUnique({
     where: { taskId_blockedByTaskId: { taskId, blockedByTaskId } },
   });
   if (existing) return existing;
 
-  return prisma.taskDependency.create({ data: { taskId, blockedByTaskId } });
+  const dependency = await prisma.taskDependency.create({ data: { taskId, blockedByTaskId } });
+
+  await emitEvent({
+    projectId: task.projectId,
+    taskId,
+    type: "dependency.added",
+    actor,
+    data: { title: task.title, relatedTaskId: blockedByTaskId, relatedTaskTitle: blockedByTask.title },
+  });
+
+  return dependency;
 }
 
 /**
@@ -629,12 +657,26 @@ async function canReach(fromTaskId: string, targetTaskId: string): Promise<boole
   return false;
 }
 
-export async function removeDependency(taskId: string, blockedByTaskId: string) {
+export async function removeDependency(taskId: string, blockedByTaskId: string, actor: Actor = SYSTEM_ACTOR) {
   const existing = await prisma.taskDependency.findUnique({
     where: { taskId_blockedByTaskId: { taskId, blockedByTaskId } },
+    include: { task: true, blockedByTask: true },
   });
   if (!existing) throw new ApiErrorException("NOT_FOUND", "Dipendenza non trovata");
   await prisma.taskDependency.delete({ where: { taskId_blockedByTaskId: { taskId, blockedByTaskId } } });
+
+  await emitEvent({
+    projectId: existing.task.projectId,
+    taskId,
+    type: "dependency.removed",
+    actor,
+    data: {
+      title: existing.task.title,
+      relatedTaskId: blockedByTaskId,
+      relatedTaskTitle: existing.blockedByTask.title,
+    },
+  });
+
   return { deleted: true as const };
 }
 

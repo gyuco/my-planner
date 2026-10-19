@@ -2,6 +2,8 @@ import { ApiErrorException } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { getTaskOrThrow } from "./taskService.js";
+import { emitEvent } from "./activityService.js";
+import { SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 
 /**
  * Service layer condiviso REST/MCP per gli allegati (B9-B11, vedi
@@ -116,8 +118,12 @@ export interface CreateAttachmentInput {
   buffer: Buffer;
 }
 
-export async function createAttachment(taskId: string, input: CreateAttachmentInput) {
-  await getTaskOrThrow(taskId);
+export async function createAttachment(
+  taskId: string,
+  input: CreateAttachmentInput,
+  actor: Actor = SYSTEM_ACTOR,
+) {
+  const task = await getTaskOrThrow(taskId);
   validateAttachment(input.fileName, input.buffer.length, input.buffer);
 
   const storage = await getAttachmentStorage();
@@ -138,6 +144,15 @@ export async function createAttachment(taskId: string, input: CreateAttachmentIn
       storageRef,
     },
   });
+
+  await emitEvent({
+    projectId: task.projectId,
+    taskId,
+    type: "attachment.added",
+    actor,
+    data: { title: task.title, fileName: attachment.fileName },
+  });
+
   return serializeAttachment(attachment);
 }
 
@@ -166,10 +181,20 @@ export async function getAttachmentUrl(attachmentId: string) {
   return storage.getUrl(attachment.storageRef, attachment);
 }
 
-export async function deleteAttachment(attachmentId: string) {
+export async function deleteAttachment(attachmentId: string, actor: Actor = SYSTEM_ACTOR) {
   const attachment = await getAttachmentOrThrow(attachmentId);
+  const task = await getTaskOrThrow(attachment.taskId);
   const storage = await getAttachmentStorage();
   await storage.delete(attachment.storageRef).catch(() => {});
   await prisma.attachment.delete({ where: { id: attachmentId } });
+
+  await emitEvent({
+    projectId: task.projectId,
+    taskId: task.id,
+    type: "attachment.deleted",
+    actor,
+    data: { title: task.title, fileName: attachment.fileName },
+  });
+
   return { deleted: true as const };
 }

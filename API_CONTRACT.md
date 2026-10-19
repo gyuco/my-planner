@@ -345,7 +345,7 @@ Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursor
 
 - Nessun fan-out: una riga di evento per azione, non una per destinatario.
 - Filtro "non le mie azioni" e permessi di progetto applicati **in lettura**, quindi aggiungere/rimuovere un manager da un progetto non richiede backfill.
-- Eventi emessi dal service layer (creazione task/sotto-task, cambio di stato, commento), quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo.
+- Eventi emessi dal service layer, quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo. `TaskEvent` registra tutte le mutazioni dei task (log attività, §6quater); le notifiche e le email considerano solo `task.created`, `task.status_changed`, `comment.created` (`NOTIFICATION_EVENT_TYPES` in `@my-planner/core`).
 - **Nessun tool MCP per le notifiche**: sono una vista per utente, il token MCP è di progetto.
 
 ### `GET /notifications?limit=30`
@@ -382,6 +382,31 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - Body: `{ to?: string }` (default: email dell'admin che chiama).
 - Usa la config **salvata**, anche se non ancora abilitata.
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
+
+## 6quater. REST — Log attività
+
+Stessa tabella `TaskEvent` delle notifiche, esposta per intero (incluse le azioni dell'utente corrente). Vedi `apps/server/src/services/activityService.ts`.
+
+Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_changed`, `task.deleted`, `comment.created`, `dependency.added`, `dependency.removed`, `attachment.added`, `attachment.deleted`.
+- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|priority|complexity|tags|dueDate|parentId`. Per `description` i valori non vengono salvati (`from`/`to` null). Valori troncati a 200 caratteri.
+- `dependency.*` è registrato sul task bloccato, con `relatedTaskId`/`relatedTaskTitle` del task che blocca.
+- `attachment.*` riporta `fileName`.
+- Riordino nella stessa colonna e `add_dependency` idempotente su dipendenza già esistente non generano eventi.
+
+"Tempo reale" = polling con `afterId` (UI: 5s sulla pagina log, 10s nel drawer, solo con tab visibile). Niente SSE/WebSocket per lo stesso motivo delle notifiche (Workers/D1).
+
+### `GET /activity`
+- Auth: JWT (qualsiasi utente autenticato)
+- Visibilità: admin tutti i progetti, manager solo quelli assegnati (archiviati inclusi). Un `projectId` non accessibile restituisce lista vuota, non 403. Il filtro `taskId` funziona anche su task eliminati.
+- Query (tutti opzionali): `projectId`, `taskId`, `types` (CSV di tipi evento), `actor` (id utente, oppure `mcp` / `system`), `from`/`to` (ISO, estremi inclusivi su `createdAt`), `search` (testo su titolo task/estratto/nome file denormalizzati, max 200), `afterId` (solo eventi più nuovi), `beforeId` (solo più vecchi, per paginare), `limit` (1..200, default 50).
+- 200: `{ items: ActivityLogItem[], hasMore }`, ordinati per `id` decrescente.
+  - `ActivityLogItem` = `NotificationItem` + `{ changes, relatedTaskId, relatedTaskTitle, fileName }`.
+- 400 `VALIDATION_ERROR` su tipi sconosciuti o date non valide.
+
+### `GET /activity/actors`
+- Auth: JWT
+- 200: `[{ id, name }]` per il filtro autore: admin vede tutti gli utenti, manager gli admin e i manager che condividono almeno un suo progetto.
+- **Nessun tool MCP** per il log (vista per utente).
 
 ---
 
@@ -508,6 +533,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 5. `StorageSettings` (nuovo modello, singleton) — persiste la configurazione del servizio di storage allegati scelta da UI (filesystem locale o S3-compatibile/MinIO), vedi §6bis.
 
 6. `TaskEvent` + `NotificationState` (nuovi modelli) — notifiche in-app (§6ter). `TaskEvent.id` è `Int @default(autoincrement())` e funge da cursore monotono; `actorId` è nullable (MCP/sistema) con `onDelete: SetNull`; `taskId` è uno scalare senza relation, così l'evento sopravvive alla delete del task (il titolo è denormalizzato in `data`). Migrazioni: `prisma/migrations/20261019140000_add_notifications` (Node/SQLite) e `apps/server/migrations/0006_add_notifications.sql` (D1).
+
+7. Indice `TaskEvent(taskId, id)` per il log attività per task (§6quater). Migrazioni: `prisma/migrations/20261019200000_task_event_task_index` e `apps/server/migrations/0008_add_task_event_task_index.sql`.
 
 Vedi diff applicato in coda al file schema.
 

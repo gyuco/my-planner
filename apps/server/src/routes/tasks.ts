@@ -52,13 +52,13 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     const body = taskUpdateInputSchema.parse(req.body ?? {});
-    return updateTask(taskId, body);
+    return updateTask(taskId, body, userActor((req as any).authUser));
   });
 
   app.delete("/tasks/:taskId", { onRequest: [app.authenticate] }, async (req) => {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
-    return deleteTask(taskId);
+    return deleteTask(taskId, userActor((req as any).authUser));
   });
 
   app.post("/tasks/:taskId/subtasks", { onRequest: [app.authenticate] }, async (req, reply) => {
@@ -84,7 +84,7 @@ export async function taskRoutes(app: FastifyInstance) {
     await assertTaskAccess((req as any).authUser, taskId);
     const { blockedByTaskId } = dependencyInputSchema.parse(req.body ?? {});
     await assertTaskAccess((req as any).authUser, blockedByTaskId);
-    const dep = await addDependency(taskId, blockedByTaskId);
+    const dep = await addDependency(taskId, blockedByTaskId, userActor((req as any).authUser));
     return reply.code(201).send(dep);
   });
 
@@ -92,7 +92,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId, blockedByTaskId } = req.params as { taskId: string; blockedByTaskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     await assertTaskAccess((req as any).authUser, blockedByTaskId);
-    return removeDependency(taskId, blockedByTaskId);
+    return removeDependency(taskId, blockedByTaskId, userActor((req as any).authUser));
   });
 
   app.get("/tasks/:taskId/blockers", { onRequest: [app.authenticate] }, async (req) => {

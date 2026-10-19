@@ -4,6 +4,8 @@ import { useI18n } from "../i18n";
 interface SidebarProps {
   projects: Project[];
   selectedProjectId: string | "all" | null;
+  /** Evidenzia la voce "Log attivita'" quando la pagina e' aperta. */
+  activityActive: boolean;
   isAdmin: boolean;
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
@@ -13,11 +15,13 @@ interface SidebarProps {
   onOpenStorageSettings: () => void;
   onOpenEmailSettings: () => void;
   onOpenUsers: () => void;
+  onOpenActivity: () => void;
 }
 
 export function Sidebar({
   projects,
   selectedProjectId,
+  activityActive,
   isAdmin,
   onSelect,
   onCreateProject,
@@ -27,6 +31,7 @@ export function Sidebar({
   onOpenStorageSettings,
   onOpenEmailSettings,
   onOpenUsers,
+  onOpenActivity,
 }: SidebarProps) {
   const { t } = useI18n();
   return (
@@ -77,6 +82,9 @@ export function Sidebar({
         ))}
       </nav>
       <div className="sidebar-footer">
+        <button className={`sidebar-item${activityActive ? " active" : ""}`} onClick={onOpenActivity}>
+          {t.sidebar.activityLog}
+        </button>
         {isAdmin && (
           <button className="sidebar-item" onClick={onOpenUsers}>
             {t.sidebar.users}

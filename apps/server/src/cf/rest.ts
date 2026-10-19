@@ -50,6 +50,7 @@ import {
 import { getStorageSettings, updateStorageSettings } from "../services/storageSettingsService.js";
 import { getEmailSettings, sendTestEmail, updateEmailSettings } from "../services/emailSettingsService.js";
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
+import { activityFiltersFromQuery, listActivity, listActivityActors } from "../services/activityService.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
 import {
@@ -72,6 +73,7 @@ import {
   changePasswordInputSchema,
   notificationsQuerySchema,
   markNotificationsReadInputSchema,
+  activityQuerySchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
@@ -140,6 +142,8 @@ export function buildRestApp() {
     "/board",
     "/notifications",
     "/notifications/*",
+    "/activity",
+    "/activity/*",
     "/attachments/*",
     "/settings/*",
     "/admin/*",
@@ -315,12 +319,12 @@ export function buildRestApp() {
   app.patch("/tasks/:taskId", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const body = taskUpdateInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await updateTask(c.req.param("taskId"), body));
+    return c.json(await updateTask(c.req.param("taskId"), body, userActor(c.get("user"))));
   });
 
   app.delete("/tasks/:taskId", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
-    return c.json(await deleteTask(c.req.param("taskId")));
+    return c.json(await deleteTask(c.req.param("taskId"), userActor(c.get("user"))));
   });
 
   app.post("/tasks/:taskId/move", async (c) => {
@@ -334,13 +338,15 @@ export function buildRestApp() {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const { blockedByTaskId } = dependencyInputSchema.parse(await c.req.json().catch(() => ({})));
     await assertTaskAccess(c.get("user"), blockedByTaskId);
-    return c.json(await addDependency(c.req.param("taskId"), blockedByTaskId), 201);
+    return c.json(await addDependency(c.req.param("taskId"), blockedByTaskId, userActor(c.get("user"))), 201);
   });
 
   app.delete("/tasks/:taskId/dependencies/:blockedByTaskId", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     await assertTaskAccess(c.get("user"), c.req.param("blockedByTaskId"));
-    return c.json(await removeDependency(c.req.param("taskId"), c.req.param("blockedByTaskId")));
+    return c.json(
+      await removeDependency(c.req.param("taskId"), c.req.param("blockedByTaskId"), userActor(c.get("user"))),
+    );
   });
 
   app.get("/tasks/:taskId/blockers", async (c) => {
@@ -390,6 +396,14 @@ export function buildRestApp() {
     return c.json(await markNotificationsRead(c.get("user"), upTo));
   });
 
+  // --- Log attivita' ------------------------------------------------------
+  app.get("/activity", async (c) => {
+    const query = activityQuerySchema.parse(c.req.query());
+    return c.json(await listActivity(c.get("user"), activityFiltersFromQuery(query)));
+  });
+
+  app.get("/activity/actors", async (c) => c.json(await listActivityActors(c.get("user"))));
+
   // --- Allegati (CF8: multipart con FormData nativa, upload su R2) ----------
   app.post("/tasks/:taskId/attachments", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
@@ -403,7 +417,7 @@ export function buildRestApp() {
       fileName: file.name,
       mimeType: file.type,
       buffer,
-    });
+    }, userActor(c.get("user")));
     return c.json(attachment, 201);
   });
 
@@ -425,7 +439,7 @@ export function buildRestApp() {
 
   app.delete("/attachments/:attachmentId", async (c) => {
     await assertAttachmentAccess(c.get("user"), c.req.param("attachmentId"));
-    return c.json(await deleteAttachment(c.req.param("attachmentId")));
+    return c.json(await deleteAttachment(c.req.param("attachmentId"), userActor(c.get("user"))));
   });
 
   // --- Settings ------------------------------------------------------------

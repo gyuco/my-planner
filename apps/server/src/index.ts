@@ -15,6 +15,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { taskRoutes } from "./routes/tasks.js";
 import { boardRoutes } from "./routes/board.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { activityRoutes } from "./routes/activity.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { getAuthUser } from "./services/userService.js";
@@ -98,6 +99,7 @@ app.register(projectRoutes);
 app.register(taskRoutes);
 app.register(boardRoutes);
 app.register(notificationRoutes);
+app.register(activityRoutes);
 app.register(attachmentRoutes);
 app.register(settingsRoutes);
 
