@@ -60,6 +60,7 @@ export function TaskCard({
   const blocked = (task.blockedByOpenCount ?? 0) > 0;
   const subtaskCount = task.subtaskCount ?? 0;
   const doneSubtasks = subtaskCount - (task.openSubtaskCount ?? 0);
+  const subtaskProgress = subtaskCount > 0 ? Math.round((doneSubtasks / subtaskCount) * 100) : 0;
 
   return (
     <div
@@ -99,15 +100,34 @@ export function TaskCard({
         </div>
       )}
 
+      {subtaskCount > 0 && (
+        <div className="task-card-progress" title={t.taskCard.subtasksTitle}>
+          <div className="task-card-progress-head">
+            <span className="task-card-progress-count">
+              ☑ {doneSubtasks}/{subtaskCount}
+            </span>
+            <span className="task-card-progress-pct">{subtaskProgress}%</span>
+          </div>
+          <div
+            className="task-card-progress-track"
+            role="progressbar"
+            aria-valuenow={subtaskProgress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={t.taskCard.subtasksTitle}
+          >
+            <div
+              className={`task-card-progress-fill${subtaskProgress === 100 ? " task-card-progress-fill-done" : ""}`}
+              style={{ width: `${subtaskProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="task-card-footer">
         {blocked && (
           <span className="task-card-blocked" title={t.taskCard.blockedTitle}>
             🔒 {task.blockedByOpenCount}
-          </span>
-        )}
-        {subtaskCount > 0 && (
-          <span className="task-card-subtasks" title={t.taskCard.subtasksTitle}>
-            ☑ {doneSubtasks}/{subtaskCount}
           </span>
         )}
         {task.dueDate && (
