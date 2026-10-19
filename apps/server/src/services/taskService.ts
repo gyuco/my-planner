@@ -7,6 +7,12 @@ import {
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
+import {
+  recordTaskEvent,
+  SYSTEM_ACTOR,
+  type Actor,
+  type RecordTaskEventInput,
+} from "./notificationService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -17,6 +23,20 @@ import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
  */
 
 type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+/**
+ * Scrive l'evento di notifica senza far fallire l'azione principale: un
+ * problema sul log non deve impedire di creare/spostare un task o commentare.
+ * Gli eventi sono best-effort per definizione (non sono dati di dominio).
+ */
+async function emitEvent(input: RecordTaskEventInput): Promise<void> {
+  try {
+    await recordTaskEvent(input);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[my-planner] impossibile registrare l'evento di notifica", err);
+  }
+}
 
 /** Board vuota con tutte le colonne previste, nell'ordine di `TASK_STATUSES`. */
 function emptyBoard(): Record<TaskStatus, any[]> {
@@ -174,7 +194,7 @@ export async function getTaskOrThrow(taskId: string) {
   return task;
 }
 
-export async function createTask(projectId: string, input: TaskInput) {
+export async function createTask(projectId: string, input: TaskInput, actor: Actor = SYSTEM_ACTOR) {
   await getProjectOrThrow(projectId);
 
   if (!input.title || input.title.trim().length === 0 || input.title.length > 300) {
@@ -201,6 +221,15 @@ export async function createTask(projectId: string, input: TaskInput) {
       parentId: input.parentId ?? null,
     },
   });
+
+  await emitEvent({
+    projectId,
+    taskId: task.id,
+    type: "task.created",
+    actor,
+    data: { title: task.title, parentId: task.parentId },
+  });
+
   return serializeTask(task);
 }
 
@@ -334,8 +363,13 @@ export async function deleteTask(taskId: string) {
 // Move / Board
 // ---------------------------------------------------------------------------
 
-export async function moveTask(taskId: string, status: TaskStatus, position?: number) {
-  await getTaskOrThrow(taskId);
+export async function moveTask(
+  taskId: string,
+  status: TaskStatus,
+  position?: number,
+  actor: Actor = SYSTEM_ACTOR,
+) {
+  const existing = await getTaskOrThrow(taskId);
 
   if (status === "in_progress") {
     const blockers = await prisma.taskDependency.findMany({
@@ -355,15 +389,31 @@ export async function moveTask(taskId: string, status: TaskStatus, position?: nu
 
   let targetPosition = position;
   if (targetPosition === undefined) {
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
     const maxPosition = await prisma.task.aggregate({
-      where: { projectId: task!.projectId, status },
+      where: { projectId: existing.projectId, status },
       _max: { position: true },
     });
     targetPosition = (maxPosition._max.position ?? -1) + 1;
   }
 
   const updated = await prisma.task.update({ where: { id: taskId }, data: { status, position: targetPosition } });
+
+  // Un riordino nella stessa colonna passa da qui: non e' un cambio di stato
+  // e non deve generare una notifica.
+  if (existing.status !== status) {
+    await emitEvent({
+      projectId: updated.projectId,
+      taskId: updated.id,
+      type: "task.status_changed",
+      actor,
+      data: {
+        title: updated.title,
+        from: existing.status as TaskStatus,
+        to: status,
+      },
+    });
+  }
+
   return serializeTask(updated);
 }
 
@@ -446,7 +496,12 @@ export async function getAggregatedBoard(
  * blocco invece che una per una). Tutto o niente: se una sola riga fallisce
  * la validazione, non viene creato nulla.
  */
-export async function createSubtasks(projectId: string, parentId: string, inputs: TaskInput[]) {
+export async function createSubtasks(
+  projectId: string,
+  parentId: string,
+  inputs: TaskInput[],
+  actor: Actor = SYSTEM_ACTOR,
+) {
   await validateParent(projectId, parentId);
   if (inputs.length === 0) {
     throw new ApiErrorException("VALIDATION_ERROR", "Serve almeno una sotto-task da creare");
@@ -481,6 +536,19 @@ export async function createSubtasks(projectId: string, parentId: string, inputs
       })
     )
   );
+
+  // Sequenziale: su D1 l'accesso Prisma e' serializzato (vedi cf/db.ts) e il
+  // numero di sotto-task per chiamata e' comunque piccolo.
+  for (const task of created) {
+    await emitEvent({
+      projectId,
+      taskId: task.id,
+      type: "task.created",
+      actor,
+      data: { title: task.title, parentId },
+    });
+  }
+
   return created.map(serializeTask);
 }
 
@@ -557,12 +625,22 @@ export async function listBlockers(taskId: string) {
 // Commenti
 // ---------------------------------------------------------------------------
 
-export async function addComment(taskId: string, body: string) {
-  await getTaskOrThrow(taskId);
+export async function addComment(taskId: string, body: string, actor: Actor = SYSTEM_ACTOR) {
+  const task = await getTaskOrThrow(taskId);
   if (!body || body.trim().length === 0) {
     throw new ApiErrorException("VALIDATION_ERROR", "body del commento non può essere vuoto");
   }
-  return prisma.comment.create({ data: { taskId, body } });
+  const comment = await prisma.comment.create({ data: { taskId, body } });
+
+  await emitEvent({
+    projectId: task.projectId,
+    taskId: task.id,
+    type: "comment.created",
+    actor,
+    data: { title: task.title, excerpt: body.slice(0, 200) },
+  });
+
+  return comment;
 }
 
 export async function listComments(taskId: string) {

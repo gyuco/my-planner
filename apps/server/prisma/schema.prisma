@@ -36,6 +36,8 @@ model User {
   createdAt    DateTime @default(now())
 
   projects UserProject[]
+  notificationState NotificationState?
+  taskEvents TaskEvent[]
 }
 
 // Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
@@ -59,6 +61,7 @@ model Project {
   tasks   Task[]
   tokens  ProjectToken[]
   members UserProject[]
+  events  TaskEvent[]
 }
 
 model ProjectToken {
@@ -145,4 +148,37 @@ model Attachment {
   storageBackend  String // local | s3
   storageRef      String
   createdAt       DateTime @default(now())
+}
+
+// Log append-only delle azioni che generano notifiche (creazione task, cambio
+// stato, commenti). `id` autoincrementale e' il cursore usato dal client:
+// niente fan-out per utente, il filtro "non le mie azioni" e i permessi di
+// progetto vengono applicati in lettura (vedi notificationService.ts).
+model TaskEvent {
+  id        Int      @id @default(autoincrement())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  // Scalar senza relation: l'evento deve sopravvivere alla cancellazione del
+  // task (il titolo e' denormalizzato in `data`).
+  taskId    String?
+  // user | mcp | system: il token MCP non identifica un utente, quindi gli
+  // eventi via MCP non possono essere filtrati come "fatti da me".
+  type      String
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorType String   @default("user")
+  data      String   @default("{}") // JSON serializzato (title, from, to, excerpt...)
+  createdAt DateTime @default(now())
+
+  @@index([projectId, id])
+  @@index([id])
+}
+
+// Cursore di lettura per utente: tutto cio' che ha id <= lastSeenEventId e'
+// considerato letto. Una sola riga per utente, creata alla prima lettura.
+model NotificationState {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastSeenEventId Int      @default(0)
+  updatedAt       DateTime @updatedAt
 }

@@ -6,6 +6,7 @@ import {
   type UserRole,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { initNotificationStateForUser } from "./notificationService.js";
 
 /**
  * Gestione utenti e autorizzazione per progetto, condivisa tra runtime Node
@@ -255,6 +256,9 @@ export async function createUser(input: CreateUserInput): Promise<UserAccount> {
             : undefined,
       },
     });
+    // Cursore notifiche ancorato alla creazione dell'account: il nuovo utente
+    // non deve vedere gli eventi avvenuti prima che esistesse.
+    await initNotificationStateForUser(created.id);
     return serializeAccount(await getUserWithProjects(created.id));
   } catch {
     // Corsa con un'altra creazione della stessa email (unique constraint).

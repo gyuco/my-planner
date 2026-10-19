@@ -12,6 +12,7 @@ import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
+import { NotificationsBell } from "./components/NotificationsBell";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -297,6 +298,14 @@ export function App() {
             {view === "board" && currentProject && (
               <button onClick={() => setShowCreateTask(true)}>{t.app.newTask}</button>
             )}
+            <NotificationsBell
+              onOpenTask={(taskId, projectId) => {
+                setView("board");
+                setOpenTaskId(taskId);
+                setOpenTaskProjectId(projectId);
+                setSidebarOpen(false);
+              }}
+            />
             <LanguageSwitcher />
             {currentUser && (
               <button

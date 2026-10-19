@@ -338,6 +338,32 @@ Config persistita in `StorageSettings` (singleton, id `"singleton"`), sostituisc
 
 ---
 
+## 6ter. REST — Notifiche in-app
+
+Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursore di lettura unico per utente (`NotificationState.lastSeenEventId`). Vedi `apps/server/src/services/notificationService.ts`.
+
+- Nessun fan-out: una riga di evento per azione, non una per destinatario.
+- Filtro "non le mie azioni" e permessi di progetto applicati **in lettura**, quindi aggiungere/rimuovere un manager da un progetto non richiede backfill.
+- Eventi emessi dal service layer (creazione task/sotto-task, cambio di stato, commento), quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo.
+- **Nessun tool MCP per le notifiche**: sono una vista per utente, il token MCP è di progetto.
+
+### `GET /notifications?limit=30`
+- Auth: JWT (qualsiasi utente autenticato)
+- Restituisce gli eventi con `id > lastSeenEventId` visibili all'utente: progetti accessibili (admin: tutti; manager: assegnati), non archiviati, con `actorId != utente` (gli eventi via MCP, `actorId: null`, restano visibili).
+- 200: `{ items: NotificationItem[], unreadCount, lastSeenEventId, serverCursor }`
+  - `NotificationItem`: `{ id, type: "task.created"|"task.status_changed"|"comment.created", projectId, projectName, taskId, taskTitle, actorId, actorName, actorType: "user"|"mcp"|"system", from, to, excerpt, createdAt }`
+  - `taskTitle`/`excerpt` sono denormalizzati nell'evento: la notifica resta leggibile anche se il task non esiste più.
+  - `serverCursor` è il max id visibile, da passare al mark-as-read.
+  - Il cursore viene inizializzato alla creazione dell'utente (e, per utenti storici, alla prima lettura): nessun backlog di eventi precedenti.
+
+### `POST /notifications/read`
+- Auth: JWT
+- Body: `{ upTo: number }` (tipicamente il `serverCursor` appena ricevuto)
+- Sposta il cursore a `min(upTo, ultimo evento visibile)` — non può "leggere in anticipo" eventi non ancora restituiti.
+- 200: `{ lastSeenEventId }`
+
+---
+
 ## 7. Tool MCP (B14/B15)
 
 Tutti i tool sono registrati da `createProjectMcpServer(projectId)` e operano **esclusivamente** sul `projectId` risolto dal token. Nessun parametro `projectId` in input (implicito). Ogni tool richiama le stesse funzioni di `apps/server/src/services/*` usate da REST.
@@ -459,6 +485,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 4. Indice esplicito per la ricerca full-text case-insensitive titolo+descrizione: SQLite + Prisma non hanno FTS nativo abilitato di default in questo schema; v1 userà `contains` case-insensitive lato Prisma (SQLite `LIKE` è case-insensitive per ASCII by default, sufficiente per v1). Nessuna modifica di schema necessaria; annotato qui per `coder`/`dev-ops` come nota implementativa, non un gap di schema.
 
 5. `StorageSettings` (nuovo modello, singleton) — persiste la configurazione del servizio di storage allegati scelta da UI (filesystem locale o S3-compatibile/MinIO), vedi §6bis.
+
+6. `TaskEvent` + `NotificationState` (nuovi modelli) — notifiche in-app (§6ter). `TaskEvent.id` è `Int @default(autoincrement())` e funge da cursore monotono; `actorId` è nullable (MCP/sistema) con `onDelete: SetNull`; `taskId` è uno scalare senza relation, così l'evento sopravvive alla delete del task (il titolo è denormalizzato in `data`). Migrazioni: `prisma/migrations/20261019140000_add_notifications` (Node/SQLite) e `apps/server/migrations/0006_add_notifications.sql` (D1).
 
 Vedi diff applicato in coda al file schema.
 

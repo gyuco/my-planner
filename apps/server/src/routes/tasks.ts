@@ -15,6 +15,7 @@ import {
   getTaskOrThrow,
 } from "../services/taskService.js";
 import { assertProjectAccess, assertTaskAccess } from "../services/userService.js";
+import { userActor } from "../services/notificationService.js";
 import {
   taskFiltersQuerySchema,
   taskInputSchema,
@@ -37,7 +38,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
     const body = taskInputSchema.parse(req.body ?? {});
-    const task = await createTask(projectId, body);
+    const task = await createTask(projectId, body, userActor((req as any).authUser));
     return reply.code(201).send(task);
   });
 
@@ -65,7 +66,7 @@ export async function taskRoutes(app: FastifyInstance) {
     await assertTaskAccess((req as any).authUser, taskId);
     const { subtasks } = createSubtasksInputSchema.parse(req.body ?? {});
     const parent = await getTaskOrThrow(taskId);
-    const created = await createSubtasks(parent.projectId, taskId, subtasks);
+    const created = await createSubtasks(parent.projectId, taskId, subtasks, userActor((req as any).authUser));
     return reply.code(201).send(created);
   });
 
@@ -73,7 +74,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     const { status, position } = moveTaskInputSchema.parse(req.body ?? {});
-    return moveTask(taskId, status, position);
+    return moveTask(taskId, status, position, userActor((req as any).authUser));
   });
 
   // --- Dipendenze ------------------------------------------------------------
@@ -106,7 +107,7 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     const { body } = commentInputSchema.parse(req.body ?? {});
-    const comment = await addComment(taskId, body);
+    const comment = await addComment(taskId, body, userActor((req as any).authUser));
     return reply.code(201).send(comment);
   });
 

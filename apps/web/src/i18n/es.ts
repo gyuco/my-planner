@@ -285,6 +285,18 @@ export const es: Dictionary = {
     passwordTooShort: "La nueva contraseña debe tener al menos 8 caracteres",
     passwordSaveError: "Error al actualizar la contraseña",
   },
+  notifications: {
+    open: "Notificaciones",
+    title: "Notificaciones",
+    empty: "No hay notificaciones nuevas",
+    loadError: "No se pudieron actualizar las notificaciones",
+    viaMcp: "MCP/API",
+    someone: "Alguien",
+    taskCreated: '{actor} ha creado "{title}"',
+    statusChanged: '{actor} ha movido "{title}" de {from} a {to}',
+    commented: '{actor} ha comentado en "{title}"',
+    close: "Cerrar notificaciones",
+  },
   api: {
     sessionExpired: "Sesión caducada, inicia sesión de nuevo",
   },

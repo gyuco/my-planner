@@ -282,6 +282,18 @@ export const en = {
     passwordTooShort: "The new password must be at least 8 characters",
     passwordSaveError: "Error updating the password",
   },
+  notifications: {
+    open: "Notifications",
+    title: "Notifications",
+    empty: "No new notifications",
+    loadError: "Unable to refresh notifications",
+    viaMcp: "MCP/API",
+    someone: "Someone",
+    taskCreated: '{actor} created "{title}"',
+    statusChanged: '{actor} moved "{title}" from {from} to {to}',
+    commented: '{actor} commented on "{title}"',
+    close: "Close notifications",
+  },
   api: {
     sessionExpired: "Session expired, please log in again",
   },

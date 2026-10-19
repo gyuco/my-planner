@@ -13,6 +13,8 @@ import type {
   StorageSettings,
   UserAccount,
   UserRole,
+  NotificationsResponse,
+  MarkNotificationsReadResponse,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -345,6 +347,21 @@ export async function uploadAttachment(taskId: string, file: File): Promise<Atta
 
 export function deleteAttachment(attachmentId: string): Promise<{ deleted: true }> {
   return apiFetch(`/attachments/${attachmentId}`, { method: "DELETE" });
+}
+
+// --- Notifiche ---------------------------------------------------------------
+
+/**
+ * GET /notifications: oltre agli eventi non letti restituisce `unreadCount`
+ * (per il badge) e `serverCursor` (da passare a markNotificationsRead).
+ */
+export function getNotifications(limit = 30): Promise<NotificationsResponse> {
+  return apiFetch(`/notifications?limit=${limit}`);
+}
+
+/** Cursore unico: segna come lette tutte le notifiche fino a `upTo`. */
+export function markNotificationsRead(upTo: number): Promise<MarkNotificationsReadResponse> {
+  return apiFetch(`/notifications/read`, { method: "POST", body: JSON.stringify({ upTo }) });
 }
 
 // --- Impostazioni storage ----------------------------------------------------

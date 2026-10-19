@@ -79,6 +79,16 @@ export const commentInputSchema = z.object({
   body: z.string().min(1),
 });
 
+/** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
+export const notificationsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+/** Mark-as-read a cursore unico: `upTo` e' il `serverCursor` ricevuto dal GET. */
+export const markNotificationsReadInputSchema = z.object({
+  upTo: z.number().int().nonnegative(),
+});
+
 export const projectNameInputSchema = z.object({
   name: z.string().min(1).max(200),
 });

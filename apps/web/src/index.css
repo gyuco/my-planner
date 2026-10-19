@@ -523,7 +523,7 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   align-items: center;
 }
 
-.topbar-actions button {
+.topbar-actions > button {
   padding: 0.5rem 0.95rem;
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
@@ -532,15 +532,17 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   box-shadow: var(--shadow-xs);
 }
 
-/* Il primo bottone della topbar è l'azione primaria ("Nuova task"). */
-.topbar-actions button:first-child {
+/* Il primo bottone della topbar è l'azione primaria ("Nuova task"). Il
+   combinatore `>` evita di applicare lo stile anche a bottoni annidati in
+   altri elementi (es. il trigger delle notifiche). */
+.topbar-actions > button:first-child {
   background: linear-gradient(135deg, var(--indigo-500), var(--indigo-600));
   border-color: transparent;
   color: #fff;
   box-shadow: 0 1px 2px rgba(74, 69, 201, 0.3), 0 6px 16px rgba(74, 69, 201, 0.28);
 }
 
-.topbar-actions button:first-child:hover {
+.topbar-actions > button:first-child:hover {
   background: linear-gradient(135deg, var(--violet-500), var(--indigo-500));
   box-shadow: 0 2px 4px rgba(74, 69, 201, 0.3), 0 10px 24px rgba(139, 92, 246, 0.35);
 }
@@ -567,6 +569,170 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 }
 
 .language-switcher select:focus { outline: none; }
+
+/* --- Notifiche ------------------------------------------------------------ */
+
+.notifications {
+  position: relative;
+  display: inline-flex;
+}
+
+.notifications-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  padding: 0;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.notifications-badge {
+  position: absolute;
+  top: -0.3rem;
+  right: -0.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.notifications-panel {
+  position: absolute;
+  z-index: 21;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  width: min(390px, calc(100vw - 2rem));
+  max-height: min(70vh, 480px);
+  overflow-y: auto;
+  padding: 0.35rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.notifications-header {
+  position: sticky;
+  top: -0.35rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.55rem;
+  background: var(--surface);
+}
+
+.notifications-header h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.notifications-close {
+  padding: 0.15rem 0.45rem;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--ink-500);
+}
+
+.notifications-close:hover {
+  background: transparent;
+  color: var(--ink-800);
+}
+
+.notifications-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notifications-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.notifications-item:hover {
+  background: var(--surface-sunken);
+}
+
+.notifications-dot {
+  flex: 0 0 auto;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.4rem;
+  border-radius: 50%;
+  background: var(--indigo-500);
+}
+
+.notifications-dot-status { background: var(--warning); }
+.notifications-dot-comment { background: var(--violet-500); }
+
+.notifications-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.notifications-text {
+  font-size: 0.85rem;
+  line-height: 1.35;
+  color: var(--ink-800);
+}
+
+.notifications-excerpt {
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--ink-500);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notifications-meta {
+  font-size: 0.72rem;
+  color: var(--ink-400);
+}
+
+.notifications-empty {
+  margin: 0;
+  padding: 1rem 0.75rem 1.25rem;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--ink-400);
+}
+
+.notifications-error {
+  margin: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--danger);
+}
 
 /* --- Filter bar ---------------------------------------------------------- */
 
@@ -2191,7 +2357,10 @@ body.dnd-dragging * {
     gap: 0.4rem;
   }
 
-  .topbar-actions button { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+  .topbar-actions > button { padding: 0.5rem 0.8rem; font-size: 0.82rem; }
+
+  /* Il trigger delle notifiche resta quadrato anche con il padding mobile. */
+  .topbar-actions .notifications-trigger { width: 2.3rem; height: 2.3rem; padding: 0; }
 
   .topbar-profile { max-width: 100%; }
   .topbar-profile-name { max-width: 110px; }
@@ -2215,7 +2384,7 @@ body.dnd-dragging * {
     white-space: nowrap;
   }
 
-  .topbar-actions button,
+  .topbar-actions > button,
   .modal-actions button,
   .drawer-list button,
   .filter-chip { min-height: 2.5rem; }
