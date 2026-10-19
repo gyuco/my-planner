@@ -16,7 +16,8 @@ import { NotificationsBell } from "./components/NotificationsBell";
 import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { displayName } from "./lib/user";
+import { displayName, userInitials } from "./lib/user";
+import { LogOutIcon, MenuIcon, PlusIcon, ShieldIcon } from "./components/Icons";
 import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
 import {
   getAggregatedBoard,
@@ -285,44 +286,71 @@ export function App() {
         <header className="topbar">
           <div className="topbar-title">
             <button
-              className="icon-button sidebar-toggle"
+              type="button"
+              className="topbar-icon-btn sidebar-toggle"
               onClick={handleToggleSidebar}
               aria-label={t.app.toggleSidebar}
               title={t.app.toggleSidebar}
             >
-              ☰
+              <MenuIcon />
             </button>
             <h1>{view === "profile" ? t.profile.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
-              <button onClick={() => setShowCreateTask(true)}>{t.app.newTask}</button>
-            )}
-            <NotificationsBell
-              onOpenTask={(taskId, projectId) => {
-                setView("board");
-                setOpenTaskId(taskId);
-                setOpenTaskProjectId(projectId);
-                setSidebarOpen(false);
-              }}
-            />
-            <LanguageSwitcher />
-            {currentUser && (
               <button
-                className={`topbar-profile${view === "profile" ? " active" : ""}`}
-                onClick={() => {
-                  setView((v) => (v === "profile" ? "board" : "profile"));
-                  setSidebarOpen(false);
-                }}
-                title={t.profile.open}
+                type="button"
+                className="topbar-cta"
+                onClick={() => setShowCreateTask(true)}
+                title={t.app.newTask}
               >
-                <span className="topbar-profile-name">{displayName(currentUser)}</span>
-                <span className={`role-badge role-${currentUser.role}`}>
-                  {currentUser.role === "admin" ? t.users.roleAdmin : t.users.roleManager}
-                </span>
+                <PlusIcon />
+                <span className="topbar-cta-label">{t.app.newTask}</span>
               </button>
             )}
-            <button onClick={handleLogout}>Logout</button>
+            <div className="topbar-group">
+              <NotificationsBell
+                onOpenTask={(taskId, projectId) => {
+                  setView("board");
+                  setOpenTaskId(taskId);
+                  setOpenTaskProjectId(projectId);
+                  setSidebarOpen(false);
+                }}
+              />
+              <LanguageSwitcher />
+            </div>
+            {currentUser && (
+              <div className="topbar-group">
+                <button
+                  type="button"
+                  className={`topbar-avatar${view === "profile" ? " active" : ""}`}
+                  onClick={() => {
+                    setView((v) => (v === "profile" ? "board" : "profile"));
+                    setSidebarOpen(false);
+                  }}
+                  aria-label={`${t.profile.open}: ${displayName(currentUser)}`}
+                  title={`${displayName(currentUser)} · ${
+                    currentUser.role === "admin" ? t.users.roleAdmin : t.users.roleManager
+                  }`}
+                >
+                  {userInitials(currentUser)}
+                  {currentUser.role === "admin" && (
+                    <span className="topbar-avatar-role">
+                      <ShieldIcon />
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className="topbar-icon-btn"
+                  onClick={handleLogout}
+                  aria-label={t.app.logout}
+                  title={t.app.logout}
+                >
+                  <LogOutIcon />
+                </button>
+              </div>
+            )}
           </div>
         </header>
 

@@ -29,7 +29,7 @@ test.describe("T4 - login e board base", () => {
 
     // Creazione task via modale
     const taskTitle = `Task E2E ${Date.now()}`;
-    await page.getByRole("button", { name: "+ New task" }).click();
+    await page.getByRole("button", { name: "New task" }).click();
     await page.getByLabel("Title").fill(taskTitle);
     await page.getByRole("button", { name: "Create task" }).click();
 

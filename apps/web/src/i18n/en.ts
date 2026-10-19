@@ -26,7 +26,8 @@ export const en = {
   },
   app: {
     allProjects: "All projects",
-    newTask: "+ New task",
+    newTask: "New task",
+    logout: "Log out",
     projectsMenu: "Projects menu",
     toggleSidebar: "Toggle sidebar",
     loadProjectsError: "Unable to load projects",

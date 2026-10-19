@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NotificationItem, TaskStatus } from "@my-planner/core";
 import { getNotifications, markNotificationsRead } from "../api";
 import { useI18n } from "../i18n";
+import { BellIcon } from "./Icons";
 
 const POLL_INTERVAL_MS = 25_000;
 const MAX_ITEMS = 50;
@@ -174,13 +175,13 @@ export function NotificationsBell({ onOpenTask }: NotificationsBellProps) {
     <div className="notifications" ref={containerRef}>
       <button
         type="button"
-        className="notifications-trigger"
+        className="topbar-icon-btn notifications-trigger"
         aria-label={t.notifications.open}
         aria-expanded={open}
         title={t.notifications.open}
         onClick={togglePanel}
       >
-        <span aria-hidden="true">🔔</span>
+        <BellIcon />
         {unreadCount > 0 && (
           <span className="notifications-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
         )}

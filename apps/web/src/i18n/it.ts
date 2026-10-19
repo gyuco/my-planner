@@ -28,7 +28,8 @@ export const it: Dictionary = {
   },
   app: {
     allProjects: "Tutti i progetti",
-    newTask: "+ Nuovo task",
+    newTask: "Nuovo task",
+    logout: "Esci",
     projectsMenu: "Menu progetti",
     toggleSidebar: "Mostra/nascondi sidebar",
     loadProjectsError: "Impossibile caricare i progetti",
