@@ -223,6 +223,7 @@ export const TASK_EVENT_TYPES = [
   "task.created",
   "task.updated",
   "task.status_changed",
+  "task.assigned",
   "task.deleted",
   "comment.created",
   "dependency.added",
@@ -233,10 +234,14 @@ export const TASK_EVENT_TYPES = [
 
 export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
 
-/** Eventi che generano una notifica in-app ed email. */
+/**
+ * Eventi che possono generare una notifica in-app ed email. Il destinatario
+ * e' solo l'assegnatario del task, e solo se l'azione e' di qualcun altro.
+ */
 export const NOTIFICATION_EVENT_TYPES = [
   "task.created",
   "task.status_changed",
+  "task.assigned",
   "comment.created",
 ] as const satisfies readonly TaskEventType[];
 
@@ -249,13 +254,12 @@ export type TaskTrackedField =
   | "complexity"
   | "tags"
   | "dueDate"
-  | "parentId"
-  | "assigneeId";
+  | "parentId";
 
 /**
  * Singola modifica di un campo. Per `description` i valori non vengono
- * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null. Per
- * `assigneeId` `from`/`to` contengono il nome dell'utente, non l'id.
+ * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null. Il
+ * cambio di assegnatario e' un evento a parte (`task.assigned`).
  */
 export interface TaskFieldChange {
   field: TaskTrackedField;
@@ -305,6 +309,8 @@ export interface ActivityLogItem extends NotificationItem {
   relatedTaskTitle: string | null;
   /** Nome file per `attachment.*`. */
   fileName: string | null;
+  /** Nuovo assegnatario per `task.assigned` (null = assegnatario rimosso). */
+  assigneeName: string | null;
 }
 
 export interface ActivityLogResponse {

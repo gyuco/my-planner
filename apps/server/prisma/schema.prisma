@@ -203,11 +203,17 @@ model TaskEvent {
   actorId   String?
   actor     User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   actorType String   @default("user")
+  // Utente da notificare (in-app + email), deciso quando l'evento viene
+  // scritto: l'assegnatario del task, se non e' lui l'autore dell'azione
+  // (vedi taskService.notifyAssignee). Null = nessuna notifica. Scalar senza
+  // relation: se l'utente viene cancellato le sue notifiche non servono piu'.
+  recipientId String?
   data      String   @default("{}") // JSON serializzato (title, from, to, excerpt...)
   createdAt DateTime @default(now())
 
   @@index([projectId, id])
   @@index([taskId, id])
+  @@index([recipientId, id])
   @@index([id])
 }
 

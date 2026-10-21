@@ -162,11 +162,12 @@ export function NotificationsBell({ onOpenTask }: NotificationsBellProps) {
     };
     if (item.type === "task.created") return fill(t.notifications.taskCreated, vars);
     if (item.type === "task.status_changed") return fill(t.notifications.statusChanged, vars);
+    if (item.type === "task.assigned") return fill(t.notifications.assigned, vars);
     return fill(t.notifications.commented, vars);
   }
 
   function dotClass(item: NotificationItem): string {
-    if (item.type === "task.created") return "notifications-dot-created";
+    if (item.type === "task.created" || item.type === "task.assigned") return "notifications-dot-created";
     if (item.type === "task.status_changed") return "notifications-dot-status";
     return "notifications-dot-comment";
   }

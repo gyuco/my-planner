@@ -355,16 +355,21 @@ Config persistita in `StorageSettings` (singleton, id `"singleton"`), sostituisc
 
 Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursore di lettura unico per utente (`NotificationState.lastSeenEventId`). Vedi `apps/server/src/services/notificationService.ts`.
 
-- Nessun fan-out: una riga di evento per azione, non una per destinatario.
-- Filtro "non le mie azioni" e permessi di progetto applicati **in lettura**, quindi aggiungere/rimuovere un manager da un progetto non richiede backfill.
-- Eventi emessi dal service layer, quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo. `TaskEvent` registra tutte le mutazioni dei task (log attività, §6quater); le notifiche e le email considerano solo `task.created`, `task.status_changed`, `comment.created` (`NOTIFICATION_EVENT_TYPES` in `@my-planner/core`).
+- Nessun fan-out: una riga di evento per azione, con al massimo un destinatario (`TaskEvent.recipientId`) deciso quando l'evento viene scritto.
+- **Destinatario = l'assegnatario del task**, solo se esiste e non è lui l'autore dell'azione (nessuno riceve notifiche delle proprie azioni; le azioni via MCP notificano l'assegnatario). Admin e altri membri non ricevono notifiche: vedono tutto nel log attività.
+  - `task.created`: all'assegnatario indicato alla creazione.
+  - `task.assigned`: al nuovo assegnatario quando un task viene assegnato/riassegnato (nessuno se l'assegnatario viene tolto).
+  - `task.status_changed`: all'assegnatario se lo stato lo cambia qualcun altro.
+  - `comment.created`: all'assegnatario se commenta qualcun altro.
+- Permessi di progetto applicati in lettura: un manager tolto dal progetto non vede più le notifiche relative. Gli eventi scritti prima di `recipientId` non generano notifiche.
+- Eventi emessi dal service layer, quindi coprono REST Node, REST Cloudflare e MCP allo stesso modo. `TaskEvent` registra tutte le mutazioni dei task (log attività, §6quater); le notifiche e le email considerano solo `NOTIFICATION_EVENT_TYPES` (`@my-planner/core`).
 - **Nessun tool MCP per le notifiche**: sono una vista per utente, il token MCP è di progetto.
 
 ### `GET /notifications?limit=30`
 - Auth: JWT (qualsiasi utente autenticato)
-- Restituisce gli eventi con `id > lastSeenEventId` visibili all'utente: progetti accessibili (admin: tutti; manager: assegnati), non archiviati, con `actorId != utente` (gli eventi via MCP, `actorId: null`, restano visibili).
+- Restituisce gli eventi con `id > lastSeenEventId` destinati all'utente (`recipientId`), di progetti accessibili (admin: tutti; manager: assegnati) e non archiviati.
 - 200: `{ items: NotificationItem[], unreadCount, lastSeenEventId, serverCursor }`
-  - `NotificationItem`: `{ id, type: "task.created"|"task.status_changed"|"comment.created", projectId, projectName, taskId, taskTitle, actorId, actorName, actorType: "user"|"mcp"|"system", from, to, excerpt, createdAt }`
+  - `NotificationItem`: `{ id, type: "task.created"|"task.status_changed"|"task.assigned"|"comment.created", projectId, projectName, taskId, taskTitle, actorId, actorName, actorType: "user"|"mcp"|"system", from, to, excerpt, createdAt }`
   - `taskTitle`/`excerpt` sono denormalizzati nell'evento: la notifica resta leggibile anche se il task non esiste più.
   - `serverCursor` è il max id visibile, da passare al mark-as-read.
   - Il cursore viene inizializzato alla creazione dell'utente (e, per utenti storici, alla prima lettura): nessun backlog di eventi precedenti.
@@ -377,7 +382,7 @@ Notifiche locali basate su un event log append-only (`TaskEvent`) e su un cursor
 
 ### Email di notifica (SMTP)
 Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/email` (vedi `apps/server/src/services/emailNotificationService.ts`).
-- Destinatari = chi vede la notifica in-app: admin + manager associati al progetto, **escluso l'autore**, progetti archiviati esclusi. Più destinatari nello stesso messaggio senza esporre gli indirizzi (`To: undisclosed-recipients:;`), massimo 50 per messaggio.
+- Destinatario = lo stesso della notifica in-app (l'assegnatario, mai l'autore), solo se ha ancora accesso al progetto; progetti archiviati esclusi. Un messaggio per evento.
 - **Mai bloccante**: senza config (nessuna riga, `enabled: false`, campi mancanti, password non decifrabile) non parte nulla; l'invio gira in background dopo la risposta (Worker: `ctx.waitUntil`), quindi errori SMTP o timeout (30s) vengono solo loggati e non toccano né la mutazione né l'evento in-app.
 
 ### `GET /settings/email` (admin)
@@ -399,8 +404,8 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 
 Stessa tabella `TaskEvent` delle notifiche, esposta per intero (incluse le azioni dell'utente corrente). Vedi `apps/server/src/services/activityService.ts`.
 
-Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_changed`, `task.deleted`, `comment.created`, `dependency.added`, `dependency.removed`, `attachment.added`, `attachment.deleted`.
-- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|type|priority|complexity|tags|dueDate|parentId|assigneeId`. Per `description` i valori non vengono salvati (`from`/`to` null); per `assigneeId` `from`/`to` sono i nomi degli utenti. Valori troncati a 200 caratteri.
+Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_changed`, `task.assigned`, `task.deleted`, `comment.created`, `dependency.added`, `dependency.removed`, `attachment.added`, `attachment.deleted`.
+- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|type|priority|complexity|tags|dueDate|parentId`. Per `description` i valori non vengono salvati (`from`/`to` null). Valori troncati a 200 caratteri. Il cambio di assegnatario è l'evento `task.assigned` con `assigneeName` (null = assegnatario tolto).
 - `dependency.*` è registrato sul task bloccato, con `relatedTaskId`/`relatedTaskTitle` del task che blocca.
 - `attachment.*` riporta `fileName`.
 - Riordino nella stessa colonna e `add_dependency` idempotente su dipendenza già esistente non generano eventi.
@@ -412,7 +417,7 @@ Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_c
 - Visibilità: admin tutti i progetti, manager solo quelli assegnati (archiviati inclusi). Un `projectId` non accessibile restituisce lista vuota, non 403. Il filtro `taskId` funziona anche su task eliminati.
 - Query (tutti opzionali): `projectId`, `taskId`, `types` (CSV di tipi evento), `actor` (id utente, oppure `mcp` / `system`), `from`/`to` (ISO, estremi inclusivi su `createdAt`), `search` (testo su titolo task/estratto/nome file denormalizzati, max 200), `afterId` (solo eventi più nuovi), `beforeId` (solo più vecchi, per paginare), `limit` (1..200, default 50).
 - 200: `{ items: ActivityLogItem[], hasMore }`, ordinati per `id` decrescente.
-  - `ActivityLogItem` = `NotificationItem` + `{ changes, relatedTaskId, relatedTaskTitle, fileName }`.
+  - `ActivityLogItem` = `NotificationItem` + `{ changes, relatedTaskId, relatedTaskTitle, fileName, assigneeName }`.
 - 400 `VALIDATION_ERROR` su tipi sconosciuti o date non valide.
 
 ### `GET /activity/actors`
