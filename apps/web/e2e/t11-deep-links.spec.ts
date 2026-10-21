@@ -73,4 +73,32 @@ test.describe("T11 - URL condivisibili (deep link)", () => {
     await page.goto("/qualcosa/di/strano");
     await expect(page).toHaveURL(/\/projects\//);
   });
+
+  test("i filtri della board stanno nell'URL e sopravvivono a reload e apertura task", async ({ page }) => {
+    const project = await createProjectViaApi(`T11 Filtri ${Date.now()}`);
+    await createTaskViaApi(project.id, { title: "Alfa uno" });
+    const beta = await createTaskViaApi(project.id, { title: "Beta due" });
+
+    await loginViaUi(page);
+    await page.goto(`/projects/${project.id}`);
+    await page.getByPlaceholder("Search by title or description...").fill("Alfa");
+    await expect(page).toHaveURL(/q=Alfa/);
+    await expect(page.locator(".task-card", { hasText: "Alfa uno" })).toBeVisible();
+    await expect(page.locator(".task-card", { hasText: "Beta due" })).toHaveCount(0);
+
+    // Reload: i filtri tornano dall'URL.
+    await page.reload();
+    await expect(page.getByPlaceholder("Search by title or description...")).toHaveValue("Alfa");
+    await expect(page.locator(".task-card", { hasText: "Beta due" })).toHaveCount(0);
+
+    // Aprire un task non perde i filtri.
+    await page.locator(".task-card", { hasText: "Alfa uno" }).click();
+    await expect(page.locator(".drawer")).toBeVisible();
+    await expect(page).toHaveURL(/q=Alfa/);
+    await expect(page).toHaveURL(/task=/);
+
+    // Deep link con filtro che esclude il task: il drawer si apre comunque.
+    await page.goto(`/projects/${project.id}?q=Alfa&task=${beta.id}`);
+    await expect(page.locator(".drawer input").first()).toHaveValue("Beta due");
+  });
 });

@@ -40,21 +40,19 @@ import {
 } from "./api";
 import { useI18n } from "./i18n";
 import { parseRoute, projectPath } from "./lib/routes";
+import {
+  filtersSearch,
+  parseFilters,
+  parseProjectIds,
+  writeFilters,
+  writeProjectIds,
+} from "./lib/filters";
 
 function emptyBoard(): Board {
   return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Board;
 }
 
 const EMPTY_BOARD: Board = emptyBoard();
-const EMPTY_FILTERS: BoardFiltersState = {
-  assignedToMe: false,
-  assignee: null,
-  priorities: [],
-  blockedOnly: false,
-  search: "",
-  tag: null,
-  showSubtasks: false,
-};
 
 /** Preferenza locale di visibilità della sidebar (desktop). */
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "my-planner-sidebar-collapsed";
@@ -141,7 +139,6 @@ export function App() {
   const [showStorageSettings, setShowStorageSettings] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
-  const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
   // Task aperto nel drawer: l'id sta nell'URL (?task=), il progetto viene
@@ -149,8 +146,6 @@ export function App() {
   const [resolvedTask, setResolvedTask] = useState<{ taskId: string; projectId: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
-  // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
-  const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
   const isAdmin = currentUser?.role === "admin";
 
@@ -171,6 +166,40 @@ export function App() {
   useEffect(() => {
     if (selectedProjectId) lastProjectRef.current = selectedProjectId;
   }, [selectedProjectId]);
+
+  // Filtri e sottoinsieme progetti vivono nel query string (link condivisibili).
+  // Si memoizza sulla parte "filtri" (senza ?task=) cosi' aprire il drawer non
+  // ricarica la board.
+  const filterSearch = useMemo(() => {
+    const p = new URLSearchParams(location.search);
+    p.delete("task");
+    return p.toString();
+  }, [location.search]);
+  const filters = useMemo(() => parseFilters(filterSearch), [filterSearch]);
+  const aggregatedProjectIds = useMemo(() => parseProjectIds(filterSearch), [filterSearch]);
+  // Ultimi filtri usati su board/statistiche: si ripristinano tornando da profilo/attivita'.
+  const lastBoardSearchRef = useRef("");
+  useEffect(() => {
+    if (view === "board" || view === "stats") lastBoardSearchRef.current = filtersSearch(`?${filterSearch}`, true);
+  }, [view, filterSearch]);
+
+  const updateQuery = useCallback(
+    (mutate: (p: URLSearchParams) => void) => {
+      const p = new URLSearchParams(location.search);
+      mutate(p);
+      const search = p.toString();
+      navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace: true });
+    },
+    [navigate, location.pathname, location.search],
+  );
+  const setFilters = useCallback(
+    (next: BoardFiltersState) => updateQuery((p) => writeFilters(p, next)),
+    [updateQuery],
+  );
+  const setAggregatedProjectIds = useCallback(
+    (ids: string[] | null) => updateQuery((p) => writeProjectIds(p, ids)),
+    [updateQuery],
+  );
 
   const setTaskParam = useCallback(
     (taskId: string | null, replace: boolean) => {
@@ -298,7 +327,10 @@ export function App() {
   const refreshProject = useCallback(
     async (projectId: string) => {
       if (projectId !== selectedProjectId) {
-        navigate(projectPath(projectId, view === "stats" ? "stats" : "board"));
+        navigate({
+          pathname: projectPath(projectId, view === "stats" ? "stats" : "board"),
+          search: filtersSearch(location.search, false),
+        });
       }
       try {
         const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
@@ -367,6 +399,14 @@ export function App() {
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) ?? null;
 
+  // Torna alla board dell'ultimo progetto con gli ultimi filtri usati.
+  function backToBoard() {
+    return {
+      pathname: projectPath(lastProjectRef.current ?? projects[0]?.id ?? "all"),
+      search: lastBoardSearchRef.current,
+    };
+  }
+
   // Apre il drawer scrivendo ?task= nell'URL (push: "indietro" lo chiude).
   // `toBoard`: da profilo/attivita'/statistiche torna prima alla board.
   function openTask(taskId: string, projectId: string, toBoard = false) {
@@ -376,7 +416,9 @@ export function App() {
       toBoard && view !== "board"
         ? projectPath(selectedProjectId ?? lastProjectRef.current ?? projectId)
         : location.pathname;
-    navigate({ pathname, search: `?task=${encodeURIComponent(taskId)}` });
+    const params = new URLSearchParams(location.search);
+    params.set("task", taskId);
+    navigate({ pathname, search: `?${params.toString()}` });
   }
 
   function handleTaskClick(task: BoardTask) {
@@ -417,7 +459,10 @@ export function App() {
         onSelect={(id) => {
           // Cambiando progetto si resta sulle statistiche (non esistono per la vista aggregata).
           setRouteNotice(null);
-          navigate(projectPath(id, view === "stats" ? "stats" : "board"));
+          navigate({
+            pathname: projectPath(id, view === "stats" ? "stats" : "board"),
+            search: filtersSearch(location.search, id === "all"),
+          });
           setSidebarOpen(false);
         }}
         onCreateProject={() => setShowCreateProject(true)}
@@ -474,11 +519,7 @@ export function App() {
                   type="button"
                   className={`topbar-avatar${view === "profile" ? " active" : ""}`}
                   onClick={() => {
-                    navigate(
-                      view === "profile"
-                        ? projectPath(lastProjectRef.current ?? projects[0]?.id ?? "all")
-                        : "/profile",
-                    );
+                    navigate(view === "profile" ? backToBoard() : "/profile");
                     setSidebarOpen(false);
                   }}
                   aria-label={`${t.profile.open}: ${displayName(currentUser)}`}
@@ -518,7 +559,7 @@ export function App() {
           <ProfilePage
             user={currentUser}
             projects={projects}
-            onBack={() => navigate(projectPath(lastProjectRef.current ?? projects[0]?.id ?? "all"))}
+            onBack={() => navigate(backToBoard())}
             onUserUpdated={(user) => {
               setCurrentUser(user);
               saveUser(user);
@@ -533,7 +574,7 @@ export function App() {
                   role="tab"
                   aria-selected={view === "board"}
                   className={`view-tab${view === "board" ? " active" : ""}`}
-                  onClick={() => currentProject && navigate(projectPath(currentProject.id))}
+                  onClick={() => currentProject && navigate({ pathname: projectPath(currentProject.id), search: filtersSearch(location.search, false) })}
                 >
                   {t.app.tabBoard}
                 </button>
@@ -542,7 +583,7 @@ export function App() {
                   role="tab"
                   aria-selected={view === "stats"}
                   className={`view-tab${view === "stats" ? " active" : ""}`}
-                  onClick={() => currentProject && navigate(projectPath(currentProject.id, "stats"))}
+                  onClick={() => currentProject && navigate({ pathname: projectPath(currentProject.id, "stats"), search: filtersSearch(location.search, false) })}
                 >
                   {t.app.tabStats}
                 </button>

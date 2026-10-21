@@ -2,7 +2,7 @@ import type { TaskStatus } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { sendMail, type MailMessage } from "../lib/email/smtp.js";
 import { getSmtpSocketFactory, runInBackground } from "../lib/email/provider.js";
-import { getActiveEmailConfig, type ActiveEmailConfig } from "./emailSettingsService.js";
+import { buildTaskUrl, getActiveEmailConfig, type ActiveEmailConfig } from "./emailSettingsService.js";
 import type { RecordTaskEventInput } from "./notificationService.js";
 
 /**
@@ -97,7 +97,7 @@ export function renderTaskEventEmail(
   // senza taskId o appUrl resta la home / nessun link.
   const link = ctx.appUrl
     ? input.taskId
-      ? `${ctx.appUrl}/projects/${encodeURIComponent(input.projectId)}?task=${encodeURIComponent(input.taskId)}`
+      ? buildTaskUrl(ctx.appUrl, input.projectId, input.taskId)
       : ctx.appUrl
     : null;
   const excerpt = input.data.excerpt?.trim() || null;

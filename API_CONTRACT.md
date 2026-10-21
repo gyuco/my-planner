@@ -80,7 +80,9 @@ Il frontend (SPA) espone URL stabili e condivisibili; il server deve servire `in
 | `/profile` | Profilo utente |
 | `<qualsiasi vista>?task=:taskId` | Apre il drawer del task sopra la vista corrente |
 
-Path sconosciuti o progetti non accessibili/archiviati → redirect al primo progetto (altrimenti `/projects/all`) con avviso. Un `?task=` inesistente o non accessibile (`GET /tasks/:taskId` → 403/404) viene rimosso con avviso. Le email di notifica, se `appUrl` è configurato, linkano `${appUrl}/projects/:projectId?task=:taskId`.
+Filtri della board nel query string (opzionali, combinabili): `assignedToMe=1`, `assignee=<userId\|__unassigned__>`, `priority=low,high`, `blocked=1`, `q=<testo>`, `tag=<tag>`, `subtasks=1`, `projects=<id,id>` (solo `/projects/all`). I filtri restano attivi cambiando progetto.
+
+Path sconosciuti o progetti non accessibili/archiviati → redirect al primo progetto (altrimenti `/projects/all`) con avviso. Un `?task=` inesistente o non accessibile (`GET /tasks/:taskId` → 403/404) viene rimosso con avviso. Le email di notifica e il tool MCP `get_task` (campo `url`), se `appUrl` è configurato (Impostazioni → Notifiche email), linkano `${appUrl}/projects/:projectId?task=:taskId`.
 
 ---
 
