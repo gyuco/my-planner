@@ -108,6 +108,7 @@ export function createProjectMcpServer(projectId: string) {
     {
       title: z.string().min(1).max(300),
       description: z.string().default(""),
+      type: z.enum(["bug", "feature", "analysis"]).default("feature"),
       priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
       complexity: complexitySchema,
       tags: z.array(z.string()).default([]),
@@ -128,6 +129,7 @@ export function createProjectMcpServer(projectId: string) {
           z.object({
             title: z.string().min(1).max(300),
             description: z.string().default(""),
+            type: z.enum(["bug", "feature", "analysis"]).default("feature"),
             priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
             complexity: complexitySchema,
             tags: z.array(z.string()).default([]),
@@ -151,6 +153,7 @@ export function createProjectMcpServer(projectId: string) {
       taskId: z.string(),
       title: z.string().min(1).max(300).optional(),
       description: z.string().optional(),
+      type: z.enum(["bug", "feature", "analysis"]).optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       complexity: complexitySchema,
       tags: z.array(z.string()).optional(),

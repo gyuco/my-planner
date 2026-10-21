@@ -68,6 +68,12 @@ export const it: Dictionary = {
     columnsMenuTitle: "Colonne visibili",
     showAllColumns: "Mostra tutte",
   },
+  taskType: {
+    label: "Tipo",
+    bug: "Bug",
+    feature: "Funzionalità",
+    analysis: "Analisi",
+  },
   taskCard: {
     priorityLow: "Bassa",
     priorityMedium: "Media",
@@ -386,6 +392,7 @@ export const it: Dictionary = {
       attachmentDeleted: '{actor} ha rimosso "{file}" da "{title}"',
     },
     fields: {
+      type: "Tipo",
       title: "Titolo",
       description: "Descrizione",
       priority: "Priorità",

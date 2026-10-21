@@ -1162,6 +1162,57 @@ body.dnd-dragging * {
 .badge-priority-high { background: var(--warning-bg); color: var(--warning); }
 .badge-priority-urgent { background: var(--danger-bg); color: var(--danger); }
 
+/* --- Tipo di ticket ------------------------------------------------------
+   Ogni tipo ha un colore (--type-fg/--type-bg) riusato da badge, selettore
+   e bordo del drawer. */
+.task-type-bug { --type-fg: var(--danger); --type-bg: var(--danger-bg); }
+.task-type-feature { --type-fg: var(--success); --type-bg: var(--success-bg); }
+.task-type-analysis { --type-fg: var(--info); --type-bg: var(--info-bg); }
+
+.badge-type { background: var(--type-bg); color: var(--type-fg); }
+
+.task-type-picker {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.task-type-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-500);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s var(--ease), border-color 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.task-type-option:hover { border-color: var(--type-fg); color: var(--type-fg); }
+
+.task-type-option.is-active {
+  background: var(--type-bg);
+  border-color: var(--type-fg);
+  color: var(--type-fg);
+}
+
+.task-type-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--r-full);
+  background: var(--type-fg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
 /* La complessità è un numero: pallino monospace, non un'etichetta. */
 .badge-complexity {
   background: #f1ecfe;
@@ -2075,6 +2126,19 @@ body.dnd-dragging * {
   z-index: 2;
 }
 
+.drawer-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.drawer-header-title .badge { font-size: 0.68rem; }
+
+/* Bordo superiore colorato secondo il tipo di ticket. */
+.drawer.drawer-type-bug { border-top: 4px solid var(--danger); }
+.drawer.drawer-type-feature { border-top: 4px solid var(--success); }
+.drawer.drawer-type-analysis { border-top: 4px solid var(--info); }
+
 .drawer-header h2 {
   margin: 0;
   font-size: 1.25rem;
@@ -2124,6 +2188,47 @@ body.dnd-dragging * {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-400);
+}
+
+/* Sezioni richiudibili (<details>): il titolo diventa il toggle. */
+.drawer-collapsible { gap: 0; }
+
+.drawer-collapsible > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.drawer-collapsible > summary::-webkit-details-marker { display: none; }
+
+.drawer-collapsible > summary:hover h3 { color: var(--ink-700); }
+
+.drawer-collapsible-chevron {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--ink-300);
+  transition: transform 0.2s var(--ease);
+}
+
+.drawer-collapsible[open] .drawer-collapsible-chevron { transform: rotate(90deg); }
+
+.drawer-collapsible-count {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--r-full);
+  background: var(--surface-sunken);
+  color: var(--ink-400);
+}
+
+.drawer-collapsible-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  padding-top: 0.7rem;
 }
 
 .drawer-section h4 {

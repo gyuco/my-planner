@@ -8,6 +8,10 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
+/** Tipo di ticket: bug, nuova funzionalita' o analisi. Default "feature". */
+export const TASK_TYPES = ["bug", "feature", "analysis"] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+
 export const FIBONACCI_COMPLEXITY = [1, 2, 3, 5, 8, 13, 21] as const;
 export type TaskComplexity = (typeof FIBONACCI_COMPLEXITY)[number];
 
@@ -95,6 +99,7 @@ export interface Task {
   title: string;
   description: string;
   status: TaskStatus;
+  type: TaskType;
   priority: TaskPriority;
   complexity: TaskComplexity | null;
   tags: string[];
@@ -224,6 +229,7 @@ export const NOTIFICATION_EVENT_TYPES = [
 export type TaskTrackedField =
   | "title"
   | "description"
+  | "type"
   | "priority"
   | "complexity"
   | "tags"

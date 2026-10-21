@@ -24,6 +24,11 @@ describe("validation — taskInputSchema", () => {
     expect(taskInputSchema.safeParse({ title: "a".repeat(301) }).success).toBe(false);
   });
 
+  it("accetta solo i tipi di ticket ammessi", () => {
+    expect(taskInputSchema.safeParse({ title: "T", type: "bug" }).success).toBe(true);
+    expect(taskInputSchema.safeParse({ title: "T", type: "epic" }).success).toBe(false);
+  });
+
   it("rifiuta complexity non-Fibonacci", () => {
     expect(taskInputSchema.safeParse({ title: "T", complexity: 4 }).success).toBe(false);
   });

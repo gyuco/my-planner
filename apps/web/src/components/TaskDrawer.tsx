@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
-import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus } from "@my-planner/core";
+import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus, TaskType } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
 import {
   ApiRequestError,
@@ -21,6 +21,7 @@ import {
 import { useI18n } from "../i18n";
 import { useActivityFeed } from "../lib/activity";
 import { ActivityList } from "./ActivityList";
+import { TaskTypePicker } from "./TaskTypePicker";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const ACTIVITY_POLL_INTERVAL_MS = 10_000;
@@ -33,6 +34,29 @@ interface TaskDrawerProps {
   onChanged: () => void;
   /** Naviga il drawer su un altro task (sotto-task o parent), sostituendo quello mostrato. */
   onOpenTask: (taskId: string) => void;
+}
+
+interface CollapsibleSectionProps {
+  title: string;
+  /** Mostrato accanto al titolo, utile a sezione chiusa (es. numero di elementi). */
+  count?: number;
+  children: React.ReactNode;
+}
+
+/** Sezione del drawer richiudibile: chiusa di default, il contenuto resta montato. */
+function CollapsibleSection({ title, count, children }: CollapsibleSectionProps) {
+  return (
+    <details className="drawer-section drawer-collapsible">
+      <summary>
+        <svg className="drawer-collapsible-chevron" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M7 5l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <h3>{title}</h3>
+        {count !== undefined && count > 0 && <span className="drawer-collapsible-count">{count}</span>}
+      </summary>
+      <div className="drawer-collapsible-body">{children}</div>
+    </details>
+  );
 }
 
 function toDateInputValue(iso: string | null): string {
@@ -56,6 +80,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
   // form fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [type, setType] = useState<TaskType>("feature");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [complexity, setComplexity] = useState<TaskComplexity | "">("");
   const [tagsInput, setTagsInput] = useState("");
@@ -101,6 +126,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
       setTask(t);
       setTitle(t.title);
       setDescription(t.description);
+      setType(t.type);
       setPriority(t.priority);
       setComplexity(t.complexity ?? "");
       setTagsInput(t.tags.join(", "));
@@ -120,7 +146,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
     load();
   }, [load]);
 
-  async function saveFields() {
+  async function saveFields(overrides: { type?: TaskType } = {}) {
     if (!task) return;
     try {
       const tags = tagsInput
@@ -130,6 +156,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
       const updated = await updateTask(taskId, {
         title,
         description,
+        type: overrides.type ?? type,
         priority,
         complexity: complexity === "" ? null : complexity,
         tags,
@@ -279,9 +306,12 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
 
   return (
     <div className="drawer-overlay" onClick={onClose}>
-      <aside className="drawer" onClick={(e) => e.stopPropagation()}>
+      <aside className={`drawer drawer-type-${type}`} onClick={(e) => e.stopPropagation()}>
         <div className="drawer-header">
-          <h2>{t.taskDrawer.details}</h2>
+          <div className="drawer-header-title">
+            <h2>{t.taskDrawer.details}</h2>
+            {task && <span className={`badge badge-type task-type-${type}`}>{t.taskType[type]}</span>}
+          </div>
           <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
             &times;
           </button>
@@ -327,9 +357,19 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                   <button onClick={() => setStatusError(null)}>&times;</button>
                 </div>
               )}
+              <div className="field">
+                <span className="field-label">{t.taskType.label}</span>
+                <TaskTypePicker
+                  value={type}
+                  onChange={(next) => {
+                    setType(next);
+                    saveFields({ type: next });
+                  }}
+                />
+              </div>
               <label>
                 {t.taskDrawer.titleLabel}
-                <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={saveFields} maxLength={300} />
+                <input value={title} onChange={(e) => setTitle(e.target.value)} onBlur={() => saveFields()} maxLength={300} />
               </label>
               <div className="drawer-description">
                 <div className="drawer-description-head">
@@ -350,7 +390,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                     className="drawer-description-editor"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    onBlur={saveFields}
+                    onBlur={() => saveFields()}
                     rows={10}
                     placeholder={t.taskDrawer.descriptionPlaceholder}
                     autoFocus
@@ -373,7 +413,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                   <select
                     value={priority}
                     onChange={(e) => setPriority(e.target.value as TaskPriority)}
-                    onBlur={saveFields}
+                    onBlur={() => saveFields()}
                   >
                     {PRIORITIES.map((p) => (
                       <option key={p} value={p}>
@@ -389,7 +429,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                     onChange={(e) =>
                       setComplexity(e.target.value === "" ? "" : (Number(e.target.value) as TaskComplexity))
                     }
-                    onBlur={saveFields}
+                    onBlur={() => saveFields()}
                   >
                     <option value="">—</option>
                     {FIBONACCI_COMPLEXITY.map((c) => (
@@ -403,20 +443,22 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
               <div className="modal-row">
                 <label>
                   {t.taskDrawer.tagsLabel}
-                  <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} onBlur={saveFields} />
+                  <input value={tagsInput} onChange={(e) => setTagsInput(e.target.value)} onBlur={() => saveFields()} />
                 </label>
                 <label>
                   {t.taskDrawer.dueDateLabel}
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={saveFields} />
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={() => saveFields()} />
                 </label>
               </div>
-              <button type="button" className="drawer-save-button" onClick={saveFields}>
+              <button type="button" className="drawer-save-button" onClick={() => saveFields()}>
                 {t.taskDrawer.save}
               </button>
             </section>
 
-            <section className="drawer-section">
-              <h3>{t.taskDrawer.dependencies}</h3>
+            <CollapsibleSection
+              title={t.taskDrawer.dependencies}
+              count={(task.blockedBy ?? []).length + (task.blocking ?? []).length}
+            >
               <h4>{t.taskDrawer.blockedBy}</h4>
               <ul className="drawer-list">
                 {(task.blockedBy ?? []).map((d) => {
@@ -456,11 +498,10 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                 ))}
                 {(task.blocking ?? []).length === 0 && <li className="drawer-empty">{t.taskDrawer.notBlocking}</li>}
               </ul>
-            </section>
+            </CollapsibleSection>
 
             {!task.parentId && (
-              <section className="drawer-section">
-                <h3>{t.taskDrawer.subtasks}</h3>
+              <CollapsibleSection title={t.taskDrawer.subtasks} count={(task.subtasks ?? []).length}>
                 <ul className="drawer-list">
                   {(task.subtasks ?? []).map((s) => (
                     <li key={s.id}>
@@ -491,7 +532,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                     {t.taskDrawer.add}
                   </button>
                 </form>
-              </section>
+              </CollapsibleSection>
             )}
 
             <section className="drawer-section">
@@ -515,8 +556,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
               </form>
             </section>
 
-            <section className="drawer-section">
-              <h3>{t.taskDrawer.attachments}</h3>
+            <CollapsibleSection title={t.taskDrawer.attachments} count={attachments.length}>
               <ul className="drawer-list">
                 {attachments.map((a) => (
                   <li key={a.id}>
@@ -536,10 +576,9 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                 {attachments.length === 0 && <li className="drawer-empty">{t.taskDrawer.noAttachments}</li>}
               </ul>
               <input type="file" onChange={handleUpload} disabled={uploading} />
-            </section>
+            </CollapsibleSection>
 
-            <section className="drawer-section">
-              <h3>{t.activity.taskSection}</h3>
+            <CollapsibleSection title={t.activity.taskSection}>
               {activity.error && <p className="activity-error">{activity.error}</p>}
               {activity.loading ? (
                 <p className="drawer-empty">{t.taskDrawer.loading}</p>
@@ -558,7 +597,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                   {t.activity.loadMore}
                 </button>
               )}
-            </section>
+            </CollapsibleSection>
           </div>
         )}
       </aside>

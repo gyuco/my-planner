@@ -66,6 +66,12 @@ export const en = {
     columnsMenuTitle: "Visible columns",
     showAllColumns: "Show all",
   },
+  taskType: {
+    label: "Type",
+    bug: "Bug",
+    feature: "Feature",
+    analysis: "Analysis",
+  },
   taskCard: {
     priorityLow: "Low",
     priorityMedium: "Medium",
@@ -384,6 +390,7 @@ export const en = {
       attachmentDeleted: '{actor} removed "{file}" from "{title}"',
     },
     fields: {
+      type: "Type",
       title: "Title",
       description: "Description",
       priority: "Priority",

@@ -9,6 +9,7 @@ import { TASK_EVENT_TYPES } from "@my-planner/core";
 
 export const taskStatusSchema = z.enum(["draft", "todo", "in_progress", "testing", "done"]);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
+export const taskTypeSchema = z.enum(["bug", "feature", "analysis"]);
 
 export const complexitySchema = z
   .union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8), z.literal(13), z.literal(21)])
@@ -35,6 +36,7 @@ export const aggregatedBoardQuerySchema = boardFiltersQuerySchema.extend({
 export const taskInputSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().optional(),
+  type: taskTypeSchema.optional(),
   priority: taskPrioritySchema.optional(),
   complexity: complexitySchema,
   tags: z.array(z.string()).optional(),
@@ -45,6 +47,7 @@ export const taskInputSchema = z.object({
 export const taskUpdateInputSchema = z.object({
   title: z.string().min(1).max(300).optional(),
   description: z.string().optional(),
+  type: taskTypeSchema.optional(),
   priority: taskPrioritySchema.optional(),
   complexity: complexitySchema,
   tags: z.array(z.string()).optional(),
@@ -58,6 +61,7 @@ export const createSubtasksInputSchema = z.object({
       z.object({
         title: z.string().min(1).max(300),
         description: z.string().optional(),
+        type: taskTypeSchema.optional(),
         priority: taskPrioritySchema.optional(),
         complexity: complexitySchema,
         tags: z.array(z.string()).optional(),

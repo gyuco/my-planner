@@ -82,6 +82,7 @@ model Task {
   title       String
   description String   @default("")
   status      String   @default("draft") // draft | todo | in_progress | testing | done
+  type        String   @default("feature") // bug | feature | analysis
   priority    String   @default("medium") // low | medium | high | urgent
   complexity  Int?
   tags        String   @default("") // comma-separated

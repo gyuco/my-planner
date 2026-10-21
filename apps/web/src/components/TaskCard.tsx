@@ -97,6 +97,7 @@ export function TaskCard({
       {...dragListeners}
     >
       <div className="task-card-badges">
+        <span className={`badge badge-type task-type-${task.type}`}>{t.taskType[task.type]}</span>
         <span className={`badge badge-priority badge-priority-${task.priority}`}>
           {PRIORITY_LABEL[task.priority]}
         </span>
