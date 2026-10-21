@@ -21,6 +21,7 @@ import type {
   ActivityActor,
   ActivityLogResponse,
   TaskEventType,
+  TaskAssignee,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -212,6 +213,11 @@ export interface BoardFilters {
   search?: string;
 }
 
+/** Utenti a cui si puo' assegnare un task del progetto (admin + membri). */
+export function listProjectAssignees(projectId: string): Promise<TaskAssignee[]> {
+  return apiFetch(`/projects/${projectId}/assignees`);
+}
+
 function buildQuery(filters?: BoardFilters): string {
   if (!filters) return "";
   const params = new URLSearchParams();
@@ -250,6 +256,8 @@ export interface CreateTaskInput {
   tags?: string[];
   dueDate?: string | null;
   parentId?: string | null;
+  /** Omesso: il server assegna il task a chi lo crea se e' un manager. */
+  assigneeId?: string | null;
 }
 
 export function createTask(projectId: string, input: CreateTaskInput): Promise<Task> {
@@ -305,6 +313,7 @@ export interface UpdateTaskInput {
   tags?: string[];
   dueDate?: string | null;
   parentId?: string | null;
+  assigneeId?: string | null;
 }
 
 export function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {

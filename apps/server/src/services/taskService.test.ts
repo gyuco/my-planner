@@ -21,6 +21,7 @@ import {
   getBoard,
 } from "./taskService.js";
 import { createAttachment } from "./attachmentService.js";
+import { createUser, deleteUser, listProjectAssignees } from "./userService.js";
 
 async function setupProject(name = "Progetto Test") {
   return createProject(name);
@@ -435,5 +436,89 @@ describe("taskService — errori sono ApiErrorException", () => {
       expect(err).toBeInstanceOf(ApiErrorException);
       expect((err as ApiErrorException).code).toBe("VALIDATION_ERROR");
     }
+  });
+});
+
+describe("taskService — assegnatario, owner e filtri per persona", () => {
+  async function setupPeople() {
+    const project = await createProject("Progetto");
+    const other = await createProject("Altro");
+    const admin = await createUser({ email: "admin@test.it", password: "password123", role: "admin" });
+    const manager = await createUser({
+      email: "manager@test.it",
+      password: "password123",
+      role: "manager",
+      firstName: "Mario",
+      lastName: "Rossi",
+      projectIds: [project.id],
+    });
+    const outsider = await createUser({
+      email: "outsider@test.it",
+      password: "password123",
+      role: "manager",
+      projectIds: [other.id],
+    });
+    return { project, admin, manager, outsider };
+  }
+
+  it("l'owner e' chi crea il task via REST, null via MCP", async () => {
+    const { project, manager } = await setupPeople();
+    const byUser = await createTask(project.id, { title: "Da utente" }, { type: "user", id: manager.id });
+    expect(byUser).toMatchObject({ ownerId: manager.id, ownerName: "Mario Rossi", assigneeId: null, assigneeName: null });
+
+    const byMcp = await createTask(project.id, { title: "Da MCP" }, { type: "mcp" });
+    expect(byMcp.ownerId).toBeNull();
+
+    const [sub] = await createSubtasks(project.id, byUser.id, [{ title: "Sotto" }], { type: "user", id: manager.id });
+    expect(sub.ownerId).toBe(manager.id);
+  });
+
+  it("assegnatari ammessi: admin e membri del progetto", async () => {
+    const { project, admin, manager, outsider } = await setupPeople();
+    const ids = (await listProjectAssignees(project.id)).map((u) => u.id).sort();
+    expect(ids).toEqual([admin.id, manager.id].sort());
+
+    await expect(createTask(project.id, { title: "X", assigneeId: outsider.id })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    const task = await createTask(project.id, { title: "Y", assigneeId: manager.id });
+    expect(task.assigneeName).toBe("Mario Rossi");
+    await expect(updateTask(task.id, { assigneeId: outsider.id })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    const cleared = await updateTask(task.id, { assigneeId: null });
+    expect(cleared.assigneeId).toBeNull();
+  });
+
+  it("la board filtra per assegnatario e owner, anche insieme alla ricerca", async () => {
+    const { project, admin, manager } = await setupPeople();
+    const mine = await createTask(project.id, { title: "Bug login", assigneeId: manager.id });
+    await createTask(project.id, { title: "Bug export", assigneeId: admin.id });
+    const created = await createTask(project.id, { title: "Bug creato" }, { type: "user", id: manager.id });
+
+    const assigned = await getBoard(project.id, { assigneeId: manager.id, search: "Bug" });
+    expect(assigned.draft.map((t: any) => t.id)).toEqual([mine.id]);
+
+    const owned = await getBoard(project.id, { ownerId: manager.id });
+    expect(owned.draft.map((t: any) => t.id)).toEqual([created.id]);
+
+    const all = await getBoard(project.id);
+    expect(all.draft).toHaveLength(3);
+  });
+
+  it("il cambio assegnatario finisce nel log col nome", async () => {
+    const { project, manager } = await setupPeople();
+    const task = await createTask(project.id, { title: "Da assegnare" });
+    await updateTask(task.id, { assigneeId: manager.id });
+    const event = await prisma.taskEvent.findFirst({ where: { taskId: task.id, type: "task.updated" } });
+    expect(JSON.parse(event!.data).changes).toEqual([{ field: "assigneeId", from: null, to: "Mario Rossi" }]);
+  });
+
+  it("cancellare l'utente lascia i task senza assegnatario e owner", async () => {
+    const { project, admin, manager } = await setupPeople();
+    const task = await createTask(project.id, { title: "Orfano", assigneeId: manager.id }, { type: "user", id: manager.id });
+    await deleteUser(manager.id, admin.id);
+    const after = await prisma.task.findUnique({ where: { id: task.id } });
+    expect(after).toMatchObject({ assigneeId: null, ownerId: null });
   });
 });

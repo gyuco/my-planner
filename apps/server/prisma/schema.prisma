@@ -38,6 +38,8 @@ model User {
   projects UserProject[]
   notificationState NotificationState?
   taskEvents TaskEvent[]
+  assignedTasks Task[] @relation("TaskAssignee")
+  ownedTasks    Task[] @relation("TaskOwner")
 }
 
 // Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
@@ -89,6 +91,15 @@ model Task {
   dueDate     DateTime?
   position    Int      @default(0)
 
+  // Assegnatario (opzionale) e owner, cioe' chi ha creato il task (null se
+  // creato via MCP/sistema). Non limitano la visibilita': servono a filtri
+  // come "assegnati a me". SetNull: cancellare un utente lascia i suoi task
+  // senza assegnatario/owner invece di eliminarli.
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  ownerId    String?
+  owner      User?   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
   // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
   // volta avere subtasks, vedi validazione in taskService.ts). Nessun
   // onDelete cascade: deleteTask rifiuta la cancellazione di un parent con
@@ -104,6 +115,9 @@ model Task {
   attachments  Attachment[]
   blockedBy    TaskDependency[] @relation("BlockedTask")
   blocking     TaskDependency[] @relation("BlockerTask")
+
+  @@index([assigneeId])
+  @@index([ownerId])
 }
 
 model TaskDependency {

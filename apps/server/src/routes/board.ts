@@ -12,12 +12,11 @@ export async function boardRoutes(app: FastifyInstance) {
   app.get("/projects/:projectId/board", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
-    const { priority, tag, search } = boardFiltersQuerySchema.parse(req.query ?? {});
-    return getBoard(projectId, { priority, tag, search });
+    return getBoard(projectId, boardFiltersQuerySchema.parse(req.query ?? {}));
   });
 
   app.get("/board", { onRequest: [app.authenticate] }, async (req) => {
-    const { projectIds, priority, tag, search } = aggregatedBoardQuerySchema.parse(req.query ?? {});
+    const { projectIds, ...filters } = aggregatedBoardQuerySchema.parse(req.query ?? {});
     const user = (req as any).authUser;
     let allowed = restrictProjectIds(user, projectIds ? projectIds.split(",") : undefined);
 
@@ -28,6 +27,6 @@ export async function boardRoutes(app: FastifyInstance) {
       allowed = (allowed ?? []).filter((id) => active.has(id));
     }
 
-    return getAggregatedBoard(allowed, { priority, tag, search });
+    return getAggregatedBoard(allowed, filters);
   });
 }

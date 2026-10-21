@@ -11,7 +11,12 @@ import { StorageSettingsModal } from "./components/StorageSettingsModal";
 import { EmailSettingsModal } from "./components/EmailSettingsModal";
 import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
-import { FilterBar, type BoardFiltersState } from "./components/FilterBar";
+import {
+  FilterBar,
+  UNASSIGNED_FILTER,
+  type AssigneeOption,
+  type BoardFiltersState,
+} from "./components/FilterBar";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { NotificationsBell } from "./components/NotificationsBell";
 import type { BoardTask } from "./components/TaskCard";
@@ -36,6 +41,8 @@ function emptyBoard(): Board {
 
 const EMPTY_BOARD: Board = emptyBoard();
 const EMPTY_FILTERS: BoardFiltersState = {
+  assignedToMe: false,
+  assignee: null,
   priorities: [],
   blockedOnly: false,
   search: "",
@@ -54,7 +61,7 @@ function getStoredSidebarCollapsed(): boolean {
   }
 }
 
-function filterBoard(board: Board, filters: BoardFiltersState): Board {
+function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: string | null): Board {
   const titles = new Map<string, string>();
   for (const status of TASK_STATUSES) {
     for (const t of board[status] as BoardTask[]) titles.set(t.id, t.title);
@@ -71,7 +78,14 @@ function filterBoard(board: Board, filters: BoardFiltersState): Board {
     // le colonne. Il filtro "Mostra sotto-task" le rende visibili nella loro
     // colonna con il badge del parent. Vedi API_CONTRACT.md §4 e BACKLOG.md
     // (nota 2026-09-23).
-    if (t.parentId && !filters.showSubtasks) return false;
+    // Con "Assegnati a me" le sotto-task assegnate all'utente compaiono come
+    // card anche se il parent non e' suo, altrimenti resterebbero invisibili.
+    const byPerson = filters.assignedToMe || filters.assignee !== null;
+    if (t.parentId && !filters.showSubtasks && !byPerson) return false;
+    if (filters.assignedToMe && (!currentUserId || t.assigneeId !== currentUserId)) return false;
+    if (filters.assignee === UNASSIGNED_FILTER ? t.assigneeId !== null : filters.assignee && t.assigneeId !== filters.assignee) {
+      return false;
+    }
     if (filters.priorities.length > 0 && !filters.priorities.includes(t.priority)) return false;
     if (filters.blockedOnly && !((t.blockedByOpenCount ?? 0) > 0)) return false;
     if (filters.tag && !t.tags.includes(filters.tag)) return false;
@@ -84,6 +98,17 @@ function filterBoard(board: Board, filters: BoardFiltersState): Board {
     testing: applyFilters(board.testing as BoardTask[]),
     done: applyFilters(board.done as BoardTask[]),
   };
+}
+
+/** Assegnatari presenti nei task caricati, per il filtro della FilterBar. */
+function collectAssignees(board: Board): AssigneeOption[] {
+  const map = new Map<string, string>();
+  for (const status of TASK_STATUSES) {
+    for (const t of board[status] as BoardTask[]) {
+      if (t.assigneeId) map.set(t.assigneeId, t.assigneeName ?? t.assigneeId);
+    }
+  }
+  return Array.from(map, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function collectTags(board: Board): string[] {
@@ -243,8 +268,13 @@ export function App() {
     [filters.search, filters.tag, t],
   );
 
-  const filteredBoard = useMemo(() => filterBoard(board, filters), [board, filters]);
+  const currentUserId = currentUser?.id ?? null;
+  const filteredBoard = useMemo(
+    () => filterBoard(board, filters, currentUserId),
+    [board, filters, currentUserId],
+  );
   const availableTags = useMemo(() => collectTags(board), [board]);
+  const availableAssignees = useMemo(() => collectAssignees(board), [board]);
 
   if (!loggedIn) {
     return (
@@ -406,6 +436,7 @@ export function App() {
               filters={filters}
               onChange={setFilters}
               availableTags={availableTags}
+              availableAssignees={availableAssignees}
               projects={selectedProjectId === "all" ? projects : undefined}
               selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
               onSelectedProjectIdsChange={

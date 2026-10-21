@@ -41,9 +41,37 @@ function tagsToCsv(tags: string[] | undefined): string | undefined {
   return tags.filter(Boolean).join(",");
 }
 
+const USER_NAME_SELECT = { select: { firstName: true, lastName: true, email: true } } as const;
+
+/** Relazioni da includere in ogni query su Task per esporre `assigneeName`/`ownerName`. */
+const TASK_INCLUDE = {
+  assignee: USER_NAME_SELECT,
+  owner: USER_NAME_SELECT,
+} as const;
+
+/** Filtri per persona comuni a lista e board (es. "assegnati a me"). */
+interface PeopleFilters {
+  assigneeId?: string;
+  ownerId?: string;
+}
+
+function applyPeopleFilters(where: any, filters: PeopleFilters) {
+  if (filters.assigneeId) where.assigneeId = filters.assigneeId;
+  if (filters.ownerId) where.ownerId = filters.ownerId;
+}
+
+function userDisplayName(user: { firstName: string; lastName: string; email: string } | null | undefined) {
+  if (!user) return null;
+  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+}
+
 function serializeTask(task: any): any {
-  const { tags, ...rest } = task;
+  const { tags, assignee, owner, ...rest } = task;
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
+  out.assigneeId = task.assigneeId ?? null;
+  out.assigneeName = userDisplayName(assignee);
+  out.ownerId = task.ownerId ?? null;
+  out.ownerName = userDisplayName(owner);
   if (task.dueDate) out.dueDate = new Date(task.dueDate).toISOString();
   if (task.createdAt) out.createdAt = new Date(task.createdAt).toISOString();
   if (task.updatedAt) out.updatedAt = new Date(task.updatedAt).toISOString();
@@ -165,6 +193,7 @@ export interface TaskInput {
   tags?: string[];
   dueDate?: string | null;
   parentId?: string | null;
+  assigneeId?: string | null;
 }
 
 function validateComplexity(complexity: unknown) {
@@ -199,6 +228,28 @@ async function validateParent(projectId: string, parentId: string, taskId?: stri
   }
 }
 
+/**
+ * Un task puo' essere assegnato solo a un admin o a un manager associato al
+ * progetto: chiunque altro non potrebbe comunque vederlo.
+ */
+async function validateAssignee(projectId: string, assigneeId: string) {
+  const user = await prisma.user.findFirst({
+    where: {
+      id: assigneeId,
+      OR: [{ role: "admin" }, { projects: { some: { projectId } } }],
+    },
+    select: { id: true },
+  });
+  if (!user) {
+    throw new ApiErrorException("VALIDATION_ERROR", "L'assegnatario deve essere un admin o un membro del progetto");
+  }
+}
+
+/** Owner di un task appena creato: solo un utente REST, non MCP/sistema. */
+function actorUserId(actor: Actor): string | null {
+  return actor.type === "user" ? actor.id : null;
+}
+
 export async function getTaskOrThrow(taskId: string) {
   const task = await prisma.task.findUnique({ where: { id: taskId } });
   if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
@@ -213,6 +264,7 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
   }
   validateComplexity(input.complexity);
   if (input.parentId) await validateParent(projectId, input.parentId);
+  if (input.assigneeId) await validateAssignee(projectId, input.assigneeId);
 
   const maxPosition = await prisma.task.aggregate({
     where: { projectId, status: "draft" },
@@ -231,7 +283,10 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
       dueDate: input.dueDate ? new Date(input.dueDate) : null,
       position: (maxPosition._max.position ?? -1) + 1,
       parentId: input.parentId ?? null,
+      assigneeId: input.assigneeId ?? null,
+      ownerId: actorUserId(actor),
     },
+    include: TASK_INCLUDE,
   });
 
   await emitEvent({
@@ -247,12 +302,13 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
 
 export async function listTasks(
   projectId: string,
-  filters: { status?: TaskStatus; priority?: TaskPriority; tag?: string; search?: string }
+  filters: { status?: TaskStatus; priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters
 ) {
   await getProjectOrThrow(projectId);
   const where: any = { projectId };
   if (filters.status) where.status = filters.status;
   if (filters.priority) where.priority = filters.priority;
+  applyPeopleFilters(where, filters);
   if (filters.search) {
     where.OR = [
       { title: { contains: filters.search } },
@@ -260,7 +316,11 @@ export async function listTasks(
     ];
   }
 
-  let tasks = await prisma.task.findMany({ where, orderBy: [{ status: "asc" }, { position: "asc" }] });
+  let tasks = await prisma.task.findMany({
+    where,
+    orderBy: [{ status: "asc" }, { position: "asc" }],
+    include: TASK_INCLUDE,
+  });
 
   if (filters.tag) {
     tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
@@ -275,7 +335,7 @@ export async function listTasks(
 }
 
 export async function getTask(taskId: string) {
-  const task = await prisma.task.findUnique({ where: { id: taskId } });
+  const task = await prisma.task.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
   if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
 
   const [blockedBy, blocking, commentsCount, attachmentsCount, subtasks] = await Promise.all([
@@ -309,6 +369,7 @@ export interface TaskUpdateInput {
   tags?: string[];
   dueDate?: string | null;
   parentId?: string | null;
+  assigneeId?: string | null;
 }
 
 const MAX_CHANGE_VALUE_LENGTH = 200;
@@ -332,6 +393,14 @@ function diffTask(before: any, after: any): TaskFieldChange[] {
     const to = changeValue(after[field]);
     if (from !== to) changes.push({ field, from, to });
   }
+  // L'assegnatario e' registrato col nome: l'id non direbbe nulla nel log.
+  if ((before.assigneeId ?? null) !== (after.assigneeId ?? null)) {
+    changes.push({
+      field: "assigneeId",
+      from: changeValue(userDisplayName(before.assignee)),
+      to: changeValue(userDisplayName(after.assignee)),
+    });
+  }
   if ((before.description ?? "") !== (after.description ?? "")) {
     changes.push({ field: "description", from: null, to: null });
   }
@@ -339,7 +408,8 @@ function diffTask(before: any, after: any): TaskFieldChange[] {
 }
 
 export async function updateTask(taskId: string, input: TaskUpdateInput, actor: Actor = SYSTEM_ACTOR) {
-  const existing = await getTaskOrThrow(taskId);
+  const existing = await prisma.task.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
+  if (!existing) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
 
   if (input.title !== undefined && (input.title.trim().length === 0 || input.title.length > 300)) {
     throw new ApiErrorException("VALIDATION_ERROR", "title deve avere tra 1 e 300 caratteri");
@@ -355,6 +425,7 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
       );
     }
   }
+  if (input.assigneeId) await validateAssignee(existing.projectId, input.assigneeId);
 
   const data: any = {};
   if (input.title !== undefined) data.title = input.title;
@@ -365,8 +436,9 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
   if (input.tags !== undefined) data.tags = tagsToCsv(input.tags);
   if (input.dueDate !== undefined) data.dueDate = input.dueDate ? new Date(input.dueDate) : null;
   if (input.parentId !== undefined) data.parentId = input.parentId;
+  if (input.assigneeId !== undefined) data.assigneeId = input.assigneeId;
 
-  const task = await prisma.task.update({ where: { id: taskId }, data });
+  const task = await prisma.task.update({ where: { id: taskId }, data, include: TASK_INCLUDE });
 
   const changes = diffTask(existing, task);
   if (changes.length > 0) {
@@ -454,7 +526,11 @@ export async function moveTask(
     targetPosition = (maxPosition._max.position ?? -1) + 1;
   }
 
-  const updated = await prisma.task.update({ where: { id: taskId }, data: { status, position: targetPosition } });
+  const updated = await prisma.task.update({
+    where: { id: taskId },
+    data: { status, position: targetPosition },
+    include: TASK_INCLUDE,
+  });
 
   // Un riordino nella stessa colonna passa da qui: non e' un cambio di stato
   // e non deve generare una notifica.
@@ -477,11 +553,12 @@ export async function moveTask(
 
 export async function getBoard(
   projectId: string,
-  filters: { priority?: TaskPriority; tag?: string; search?: string } = {}
+  filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
 ) {
   await getProjectOrThrow(projectId);
   const where: any = { projectId };
   if (filters.priority) where.priority = filters.priority;
+  applyPeopleFilters(where, filters);
   if (filters.search) {
     where.OR = [
       { title: { contains: filters.search } },
@@ -489,7 +566,11 @@ export async function getBoard(
     ];
   }
 
-  let tasks = await prisma.task.findMany({ where, orderBy: [{ status: "asc" }, { position: "asc" }] });
+  let tasks = await prisma.task.findMany({
+    where,
+    orderBy: [{ status: "asc" }, { position: "asc" }],
+    include: TASK_INCLUDE,
+  });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
   const [blockedMap, subtaskMap] = await Promise.all([
@@ -509,12 +590,13 @@ export async function getBoard(
 
 export async function getAggregatedBoard(
   projectIds: string[] | undefined,
-  filters: { priority?: TaskPriority; tag?: string; search?: string } = {}
+  filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
 ) {
   const where: any = {
     project: projectIds ? { id: { in: projectIds } } : { archived: false },
   };
   if (filters.priority) where.priority = filters.priority;
+  applyPeopleFilters(where, filters);
   if (filters.search) {
     where.OR = [
       { title: { contains: filters.search } },
@@ -525,7 +607,7 @@ export async function getAggregatedBoard(
   let tasks = await prisma.task.findMany({
     where,
     orderBy: [{ status: "asc" }, { position: "asc" }],
-    include: { project: true },
+    include: { project: true, ...TASK_INCLUDE },
   });
   if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
 
@@ -566,6 +648,8 @@ export async function createSubtasks(
     }
     validateComplexity(input.complexity);
   }
+  const assigneeIds = new Set(inputs.map((i) => i.assigneeId).filter((id): id is string => !!id));
+  for (const assigneeId of assigneeIds) await validateAssignee(projectId, assigneeId);
 
   const maxPosition = await prisma.task.aggregate({
     where: { projectId, status: "draft" },
@@ -587,7 +671,10 @@ export async function createSubtasks(
           tags: tagsToCsv(input.tags) ?? "",
           dueDate: input.dueDate ? new Date(input.dueDate) : null,
           position: nextPosition++,
+          assigneeId: input.assigneeId ?? null,
+          ownerId: actorUserId(actor),
         },
+        include: TASK_INCLUDE,
       })
     )
   );
@@ -690,7 +777,7 @@ export async function listBlockers(taskId: string) {
   await getTaskOrThrow(taskId);
   const deps = await prisma.taskDependency.findMany({
     where: { taskId },
-    include: { blockedByTask: true },
+    include: { blockedByTask: { include: TASK_INCLUDE } },
   });
   const blockers = deps.map((d) => serializeTask(d.blockedByTask));
   const allResolved = blockers.every((b) => b.status === "done");

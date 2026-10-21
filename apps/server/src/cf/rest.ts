@@ -16,6 +16,7 @@ import {
   deleteUser,
   getAuthUser,
   isAdmin,
+  listProjectAssignees,
   listProjectsForUser,
   listUsers,
   restrictProjectIds,
@@ -302,6 +303,12 @@ export function buildRestApp() {
     await assertProjectAccess(c.get("user"), projectId);
     const filters = taskFiltersQuerySchema.parse(c.req.query());
     return c.json(await listTasks(projectId, filters));
+  });
+
+  app.get("/projects/:projectId/assignees", async (c) => {
+    const { projectId } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    return c.json(await listProjectAssignees(projectId));
   });
 
   app.post("/projects/:projectId/tasks", async (c) => {

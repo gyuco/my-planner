@@ -877,6 +877,22 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 }
 
 .filter-search::placeholder { color: var(--ink-300); }
+
+.filter-select {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font-family: inherit;
+  font-size: 0.875rem;
+  background: var(--surface);
+  color: var(--ink-800);
+  max-width: 100%;
+}
+.filter-select:focus {
+  outline: none;
+  border-color: var(--indigo-300);
+  box-shadow: var(--shadow-focus);
+}
 .filter-search:focus {
   outline: none;
   border-color: var(--indigo-300);
@@ -1265,6 +1281,21 @@ body.dnd-dragging * {
 }
 
 .task-card-footer:empty { display: none; }
+
+.task-card-assignee {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-500);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 
 .task-card-blocked {
   color: var(--danger);

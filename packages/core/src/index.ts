@@ -53,6 +53,14 @@ export interface UserAccount {
   projects: Array<{ id: string; name: string }>;
 }
 
+/** Utente assegnabile a un task (GET /projects/:projectId/assignees). */
+export interface TaskAssignee {
+  id: string;
+  email: string;
+  /** Nome e cognome, oppure l'email se non compilati. */
+  name: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -104,6 +112,13 @@ export interface Task {
   complexity: TaskComplexity | null;
   tags: string[];
   dueDate: string | null;
+  // Utente assegnatario (null se non assegnato). Nomi = nome e cognome,
+  // oppure email.
+  assigneeId: string | null;
+  assigneeName: string | null;
+  // Owner: chi ha creato il task (null se creato via MCP o prima del campo).
+  ownerId: string | null;
+  ownerName: string | null;
   createdAt: string;
   updatedAt: string;
   projectName?: string;
@@ -234,11 +249,13 @@ export type TaskTrackedField =
   | "complexity"
   | "tags"
   | "dueDate"
-  | "parentId";
+  | "parentId"
+  | "assigneeId";
 
 /**
  * Singola modifica di un campo. Per `description` i valori non vengono
- * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null.
+ * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null. Per
+ * `assigneeId` `from`/`to` contengono il nome dell'utente, non l'id.
  */
 export interface TaskFieldChange {
   field: TaskTrackedField;

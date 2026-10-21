@@ -21,12 +21,16 @@ export const taskFiltersQuerySchema = z.object({
   priority: taskPrioritySchema.optional(),
   tag: z.string().optional(),
   search: z.string().optional(),
+  assigneeId: z.string().min(1).optional(),
+  ownerId: z.string().min(1).optional(),
 });
 
 export const boardFiltersQuerySchema = z.object({
   priority: taskPrioritySchema.optional(),
   tag: z.string().optional(),
   search: z.string().optional(),
+  assigneeId: z.string().min(1).optional(),
+  ownerId: z.string().min(1).optional(),
 });
 
 export const aggregatedBoardQuerySchema = boardFiltersQuerySchema.extend({
@@ -42,6 +46,7 @@ export const taskInputSchema = z.object({
   tags: z.array(z.string()).optional(),
   dueDate: z.string().datetime().nullable().optional(),
   parentId: z.string().nullable().optional(),
+  assigneeId: z.string().min(1).nullable().optional(),
 });
 
 export const taskUpdateInputSchema = z.object({
@@ -53,6 +58,7 @@ export const taskUpdateInputSchema = z.object({
   tags: z.array(z.string()).optional(),
   dueDate: z.string().datetime().nullable().optional(),
   parentId: z.string().nullable().optional(),
+  assigneeId: z.string().min(1).nullable().optional(),
 });
 
 export const createSubtasksInputSchema = z.object({
@@ -66,6 +72,7 @@ export const createSubtasksInputSchema = z.object({
         complexity: complexitySchema,
         tags: z.array(z.string()).optional(),
         dueDate: z.string().datetime().nullable().optional(),
+        assigneeId: z.string().min(1).nullable().optional(),
       })
     )
     .min(1),

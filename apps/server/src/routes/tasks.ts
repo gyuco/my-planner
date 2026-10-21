@@ -14,7 +14,7 @@ import {
   createSubtasks,
   getTaskOrThrow,
 } from "../services/taskService.js";
-import { assertProjectAccess, assertTaskAccess } from "../services/userService.js";
+import { assertProjectAccess, assertTaskAccess, listProjectAssignees } from "../services/userService.js";
 import { userActor } from "../services/notificationService.js";
 import {
   taskFiltersQuerySchema,
@@ -30,8 +30,13 @@ export async function taskRoutes(app: FastifyInstance) {
   app.get("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
-    const { status, priority, tag, search } = taskFiltersQuerySchema.parse(req.query ?? {});
-    return listTasks(projectId, { status, priority, tag, search });
+    return listTasks(projectId, taskFiltersQuerySchema.parse(req.query ?? {}));
+  });
+
+  app.get("/projects/:projectId/assignees", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    return listProjectAssignees(projectId);
   });
 
   app.post("/projects/:projectId/tasks", { onRequest: [app.authenticate] }, async (req, reply) => {
