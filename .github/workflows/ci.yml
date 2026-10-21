@@ -1,13 +1,13 @@
 name: CI
 
 on:
-  # La CI gira solo su `master`: i push su `develop` (e sugli altri branch) non
+  # La CI gira solo su `main`: i push su `develop` (e sugli altri branch) non
   # consumano minuti di Actions. Per la pull request viene considerato il
-  # branch di destinazione (base), quindi gira solo sulle PR dirette a master.
+  # branch di destinazione (base), quindi gira solo sulle PR dirette a main.
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
   # Permette di rilanciare manualmente il workflow (e quindi il deploy) dal
   # tab Actions, utile quando la CI fallisce per cause esterne o per un
   # deploy di emergenza.
@@ -71,12 +71,12 @@ jobs:
       - name: Bundle Worker (dry-run)
         run: npm run --workspace apps/server cf:dry-run
 
-  # Deploy su Cloudflare (CF15): su push a master o workflow_dispatch da master.
+  # Deploy su Cloudflare (CF15): su push a main o workflow_dispatch da main.
   # Richiede i secrets CLOUDFLARE_API_TOKEN e CLOUDFLARE_ACCOUNT_ID configurati
   # nel repository. Applica le migrazioni D1 remote, deploya il Worker e il
   # frontend su Pages in produzione.
   deploy-cloudflare:
-    if: github.ref == 'refs/heads/master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [build-and-test, cloudflare]
     runs-on: ubuntu-latest
     env:
@@ -115,7 +115,7 @@ jobs:
 
       - name: Deploy frontend su Cloudflare Pages (produzione)
         # `pages:deploy` senza `--branch` può creare un preview deployment:
-        # per la produzione serve esplicitamente `--branch master`.
+        # per la produzione serve esplicitamente `--branch main`.
         run: npm run --workspace apps/web pages:deploy:prod
 
   e2e:

@@ -79,7 +79,7 @@ npm run --workspace apps/server cf:deploy
 # -> https://my-planner.<account>.workers.dev  (REST /... e MCP /mcp)
 
 # 5. Frontend su Pages
-npx wrangler pages project create my-planner-web --production-branch master
+npx wrangler pages project create my-planner-web --production-branch main
 VITE_MCP_HTTP_BASE_URL="https://my-planner.<account>.workers.dev" \
   npm run --workspace apps/web pages:deploy:prod
 # -> https://my-planner-web.pages.dev   (la Function /api/* inoltra al Worker)
@@ -108,7 +108,7 @@ Note di architettura:
 - L'URL MCP mostrato in UI deriva da `VITE_MCP_HTTP_BASE_URL` (build Pages). Nello stack
   Node/Docker, senza quella variabile, resta `<host UI>:3100` come prima.
 - CF15/CF17: `.github/workflows/ci.yml` valida il Worker (typecheck, migrazioni D1 locali,
-  bundle `wrangler deploy --dry-run`) e lo deploya su `master`; gli e2e Playwright girano
+  bundle `wrangler deploy --dry-run`) e lo deploya su `main`; gli e2e Playwright girano
   contro il Worker con `E2E_CF=1 MCP_HTTP_BASE=http://localhost:3050 npm run --workspace apps/web test:e2e`.
 
 ### Runbook aggiornamenti
@@ -158,9 +158,9 @@ e `apps/server/migrations/` (D1/Worker). Vanno aggiornate entrambe.
 - D1: le migrazioni sono solo forward; per dati usa Time Travel
   (`npx --workspace apps/server wrangler d1 time-travel info DB --remote`).
 
-**CI automatica**: su push a `master`, il job `deploy-cloudflare` applica migrazioni D1,
+**CI automatica**: su push a `main`, il job `deploy-cloudflare` applica migrazioni D1,
 deploya Worker e Pages in produzione (`pages:deploy:prod`). Lo stesso job può essere
-rilanciato manualmente dal tab **Actions → CI → Run workflow** selezionando `master`
+rilanciato manualmente dal tab **Actions → CI → Run workflow** selezionando `main`
 (`workflow_dispatch`).
 
 Prerequisiti una tantum nel repository GitHub:
