@@ -1,18 +1,29 @@
 import type { FastifyInstance } from "fastify";
 import { getBoard, getAggregatedBoard } from "../services/taskService.js";
+import { getProjectStats } from "../services/statsService.js";
 import {
   assertProjectAccess,
   isAdmin,
   listProjectsForUser,
   restrictProjectIds,
 } from "../services/userService.js";
-import { boardFiltersQuerySchema, aggregatedBoardQuerySchema } from "../lib/validation.js";
+import {
+  boardFiltersQuerySchema,
+  aggregatedBoardQuerySchema,
+  projectStatsQuerySchema,
+} from "../lib/validation.js";
 
 export async function boardRoutes(app: FastifyInstance) {
   app.get("/projects/:projectId/board", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
     return getBoard(projectId, boardFiltersQuerySchema.parse(req.query ?? {}));
+  });
+
+  app.get("/projects/:projectId/stats", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    return getProjectStats(projectId, projectStatsQuerySchema.parse(req.query ?? {}));
   });
 
   app.get("/board", { onRequest: [app.authenticate] }, async (req) => {

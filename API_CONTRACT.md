@@ -308,6 +308,24 @@ Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il 
 { "draft": [{ "...task", "projectId": "...", "projectName": "..." }], "todo": [...], "in_progress": [...], "testing": [...], "done": [...] }
 ```
 
+### `GET /projects/:projectId/stats` (solo REST/UI — non esposto via MCP)
+- Auth: JWT, con lo stesso controllo di accesso al progetto della board
+- Query: `type?`, `priority?`, `assigneeId?` (`none` = non assegnati), `tag?`, `includeSubtasks?` (`true`/`false`, default `false`), `from?` (ISO, default: 30 giorni fa)
+- 200: `ProjectStats` (vedi `packages/core`). Descrive lo stato attuale dei task che passano i filtri. `availableTags`/`availableAssignees` sono calcolati su tutti i task del progetto. `closedInPeriod` conta i task attualmente `done` con un evento `task.status_changed` → `done` successivo a `from`:
+```json
+{
+  "total": 4, "open": 3, "done": 1, "blocked": 0, "overdue": 0,
+  "complexityTotal": 8, "complexityDone": 3,
+  "closedInPeriod": 1, "periodFrom": "2026-09-21T00:00:00.000Z",
+  "byStatus": { "draft": 2, "todo": 0, "in_progress": 1, "testing": 0, "done": 1 },
+  "byStatusPriority": { "draft": { "low": 0, "medium": 0, "high": 1, "urgent": 1 }, "...": {} },
+  "byStatusType": { "draft": { "bug": 1, "feature": 1, "analysis": 0 }, "...": {} },
+  "byAssignee": [{ "assigneeId": null, "name": null, "byStatus": { "draft": 2, "...": 0 }, "open": 3 }],
+  "availableTags": ["api", "ui"],
+  "availableAssignees": [{ "id": "...", "name": "Ada Dev" }]
+}
+```
+
 ---
 
 ## 6. REST — Allegati (B11)
