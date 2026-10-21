@@ -22,6 +22,7 @@ import type {
   ActivityLogResponse,
   TaskEventType,
   TaskAssignee,
+  ProjectStats,
 } from "@my-planner/core";
 import { clearToken, getToken } from "./auth";
 import { apiDownloadErrorMessage, apiErrorMessage, apiSessionExpiredMessage } from "./i18n";
@@ -230,6 +231,29 @@ function buildQuery(filters?: BoardFilters): string {
 
 export function getProjectBoard(projectId: string, filters?: BoardFilters): Promise<Board> {
   return apiFetch(`/projects/${projectId}/board${buildQuery(filters)}`);
+}
+
+/** Filtri di GET /projects/:projectId/stats. `assigneeId: "none"` = non assegnati. */
+export interface ProjectStatsFilters {
+  type?: TaskType;
+  priority?: TaskPriority;
+  assigneeId?: string;
+  tag?: string;
+  includeSubtasks?: boolean;
+  /** Inizio del periodo per i task chiusi (ISO). */
+  from?: string;
+}
+
+export function getProjectStats(projectId: string, filters: ProjectStatsFilters = {}): Promise<ProjectStats> {
+  const params = new URLSearchParams();
+  if (filters.type) params.set("type", filters.type);
+  if (filters.priority) params.set("priority", filters.priority);
+  if (filters.assigneeId) params.set("assigneeId", filters.assigneeId);
+  if (filters.tag) params.set("tag", filters.tag);
+  if (filters.includeSubtasks) params.set("includeSubtasks", "true");
+  if (filters.from) params.set("from", filters.from);
+  const qs = params.toString();
+  return apiFetch(`/projects/${projectId}/stats${qs ? `?${qs}` : ""}`);
 }
 
 export function getAggregatedBoard(

@@ -394,3 +394,39 @@ export interface Board {
   testing: Task[];
   done: Task[];
 }
+
+/** Riga del carico per assegnatario in `ProjectStats` (assigneeId null = non assegnati). */
+export interface ProjectStatsAssignee {
+  assigneeId: string | null;
+  name: string | null;
+  byStatus: Record<TaskStatus, number>;
+  open: number;
+}
+
+/**
+ * Statistiche di un progetto (GET /projects/:projectId/stats): fotografia
+ * dello stato attuale dei task che soddisfano i filtri. Solo
+ * `closedInPeriod` usa lo storico (eventi `task.status_changed` verso done).
+ */
+export interface ProjectStats {
+  total: number;
+  open: number;
+  done: number;
+  /** Task non done con almeno un bloccante non done. */
+  blocked: number;
+  /** Task non done con dueDate passata. */
+  overdue: number;
+  /** Somma della complessita' (task senza complessita' esclusi). */
+  complexityTotal: number;
+  complexityDone: number;
+  /** Task attualmente done chiusi (ultimo passaggio a done) dopo `periodFrom`. */
+  closedInPeriod: number;
+  periodFrom: string;
+  byStatus: Record<TaskStatus, number>;
+  byStatusPriority: Record<TaskStatus, Record<TaskPriority, number>>;
+  byStatusType: Record<TaskStatus, Record<TaskType, number>>;
+  byAssignee: ProjectStatsAssignee[];
+  /** Valori disponibili per i filtri, calcolati su tutti i task del progetto. */
+  availableTags: string[];
+  availableAssignees: Array<{ id: string; name: string }>;
+}

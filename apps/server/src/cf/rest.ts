@@ -52,6 +52,7 @@ import { getStorageSettings, updateStorageSettings } from "../services/storageSe
 import { getEmailSettings, sendTestEmail, updateEmailSettings } from "../services/emailSettingsService.js";
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { activityFiltersFromQuery, listActivity, listActivityActors } from "../services/activityService.js";
+import { getProjectStats } from "../services/statsService.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
 import {
@@ -75,6 +76,7 @@ import {
   notificationsQuerySchema,
   markNotificationsReadInputSchema,
   activityQuerySchema,
+  projectStatsQuerySchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
@@ -379,6 +381,12 @@ export function buildRestApp() {
     await assertProjectAccess(c.get("user"), projectId);
     const filters = boardFiltersQuerySchema.parse(c.req.query());
     return c.json(await getBoard(projectId, filters));
+  });
+
+  app.get("/projects/:projectId/stats", async (c) => {
+    const { projectId } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    return c.json(await getProjectStats(projectId, projectStatsQuerySchema.parse(c.req.query())));
   });
 
   app.get("/board", async (c) => {

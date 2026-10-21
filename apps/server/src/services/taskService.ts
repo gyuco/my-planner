@@ -29,7 +29,7 @@ function emptyBoard(): Record<TaskStatus, any[]> {
   return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Record<TaskStatus, any[]>;
 }
 
-function tagsToArray(tags: string): string[] {
+export function tagsToArray(tags: string): string[] {
   return tags
     .split(",")
     .map((t) => t.trim())
@@ -60,7 +60,7 @@ function applyPeopleFilters(where: any, filters: PeopleFilters) {
   if (filters.ownerId) where.ownerId = filters.ownerId;
 }
 
-function userDisplayName(user: { firstName: string; lastName: string; email: string } | null | undefined) {
+export function userDisplayName(user: { firstName: string; lastName: string; email: string } | null | undefined) {
   if (!user) return null;
   return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 }
@@ -123,7 +123,7 @@ function applySubtaskCounts(serialized: any, counts: SubtaskCounts | undefined) 
   serialized.subtaskStatusCounts = counts?.byStatus ?? emptySubtaskStatusCounts();
 }
 
-async function computeBlockedByOpenCount(taskIds: string[]) {
+export async function computeBlockedByOpenCount(taskIds: string[]) {
   if (taskIds.length === 0) return new Map<string, number>();
   const deps = await prisma.taskDependency.findMany({
     where: { taskId: { in: taskIds } },
@@ -156,7 +156,7 @@ export async function createProject(name: string) {
   return prisma.project.create({ data: { name } });
 }
 
-async function getProjectOrThrow(projectId: string) {
+export async function getProjectOrThrow(projectId: string) {
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) throw new ApiErrorException("NOT_FOUND", "Progetto non trovato");
   return project;

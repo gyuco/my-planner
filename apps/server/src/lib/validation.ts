@@ -37,6 +37,19 @@ export const aggregatedBoardQuerySchema = boardFiltersQuerySchema.extend({
   projectIds: z.string().optional(),
 });
 
+/** Filtri di GET /projects/:projectId/stats (vedi services/statsService.ts). */
+export const projectStatsQuerySchema = z.object({
+  type: taskTypeSchema.optional(),
+  priority: taskPrioritySchema.optional(),
+  assigneeId: z.string().min(1).optional(),
+  tag: z.string().min(1).optional(),
+  includeSubtasks: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  from: z.coerce.date().optional(),
+});
+
 export const taskInputSchema = z.object({
   title: z.string().min(1).max(300),
   description: z.string().optional(),

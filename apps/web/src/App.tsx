@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Board, Project } from "@my-planner/core";
 import { TASK_STATUSES } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
@@ -23,6 +23,9 @@ import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ActivityPage } from "./pages/ActivityPage";
+
+// Recharts pesa: caricato solo quando si apre la tab Statistiche.
+const StatsPage = lazy(() => import("./pages/StatsPage"));
 import { displayName, userInitials } from "./lib/user";
 import { LogOutIcon, MenuIcon, PlusIcon, ShieldIcon } from "./components/Icons";
 import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
@@ -141,8 +144,9 @@ export function App() {
   const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
-  // Vista corrente dell'area principale: la board (default), il profilo o il log attivita'.
-  const [view, setView] = useState<"board" | "profile" | "activity">("board");
+  // Vista corrente dell'area principale: la board (default), le statistiche
+  // del progetto, il profilo o il log attivita'.
+  const [view, setView] = useState<"board" | "stats" | "profile" | "activity">("board");
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
@@ -172,7 +176,9 @@ export function App() {
       return;
     }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
-    if (selectedProjectId === "all") {
+    if (view === "stats" && currentProject) {
+      document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
+    } else if (selectedProjectId === "all") {
       document.title = `${t.app.allProjects} · My Planner`;
     } else if (currentProject) {
       document.title = `${currentProject.name} · My Planner`;
@@ -325,7 +331,8 @@ export function App() {
         isAdmin={isAdmin}
         onSelect={(id) => {
           setSelectedProjectId(id);
-          setView("board");
+          // Cambiando progetto si resta sulle statistiche (non esistono per la vista aggregata).
+          setView((v) => (v === "stats" && id !== "all" ? "stats" : "board"));
           setSidebarOpen(false);
         }}
         onCreateProject={() => setShowCreateProject(true)}
@@ -432,26 +439,56 @@ export function App() {
           />
         ) : (
           <>
-            <FilterBar
-              filters={filters}
-              onChange={setFilters}
-              availableTags={availableTags}
-              availableAssignees={availableAssignees}
-              projects={selectedProjectId === "all" ? projects : undefined}
-              selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
-              onSelectedProjectIdsChange={
-                selectedProjectId === "all" ? setAggregatedProjectIds : undefined
-              }
-            />
+            {currentProject && (
+              <div className="view-tabs" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === "board"}
+                  className={`view-tab${view === "board" ? " active" : ""}`}
+                  onClick={() => setView("board")}
+                >
+                  {t.app.tabBoard}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={view === "stats"}
+                  className={`view-tab${view === "stats" ? " active" : ""}`}
+                  onClick={() => setView("stats")}
+                >
+                  {t.app.tabStats}
+                </button>
+              </div>
+            )}
+            {view === "stats" && currentProject ? (
+              <Suspense fallback={<p className="stats-muted stats-page">{t.stats.loading}</p>}>
+                <StatsPage projectId={currentProject.id} />
+              </Suspense>
+            ) : (
+              <>
+                <FilterBar
+                  filters={filters}
+                  onChange={setFilters}
+                  availableTags={availableTags}
+                  availableAssignees={availableAssignees}
+                  projects={selectedProjectId === "all" ? projects : undefined}
+                  selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
+                  onSelectedProjectIdsChange={
+                    selectedProjectId === "all" ? setAggregatedProjectIds : undefined
+                  }
+                />
 
-            {loadError && <div className="board-error">{loadError}</div>}
+                {loadError && <div className="board-error">{loadError}</div>}
 
-            <KanbanBoard
-              board={filteredBoard}
-              showProject={selectedProjectId === "all"}
-              onBoardChange={loadBoard}
-              onTaskClick={handleTaskClick}
-            />
+                <KanbanBoard
+                  board={filteredBoard}
+                  showProject={selectedProjectId === "all"}
+                  onBoardChange={loadBoard}
+                  onTaskClick={handleTaskClick}
+                />
+              </>
+            )}
           </>
         )}
       </div>

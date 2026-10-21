@@ -68,7 +68,7 @@ Tool esposti, con parità funzionale rispetto alla UI:
 - Notifiche (email, push, Slack)
 - Gantt, roadmap, calendario, sprint con velocity
 - Integrazioni esterne (GitHub, Jira, Google Calendar)
-- Report e dashboard di analytics
+- Report e dashboard di analytics avanzati (storico, cumulative flow, cycle time). Le statistiche base sullo stato attuale dei task di un progetto sono incluse: tab "Statistiche", `GET /projects/:projectId/stats`.
 - App mobile nativa
 - Automazioni e regole condizionali
 
