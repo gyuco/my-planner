@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { S3_BASE_URL, E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD } from "../playwright.config";
-import { createProjectViaApi, createTaskViaApi, loginViaUi, selectProjectInSidebar, API_BASE_S3 } from "./helpers";
+import { createProjectViaApi, createTaskViaApi, loginViaUi, openDrawerSection, selectProjectInSidebar, API_BASE_S3 } from "./helpers";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesDir = path.join(__dirname, ".fixtures");
@@ -41,6 +41,7 @@ async function uploadAndDownload(
   const drawer = page.locator(".drawer");
   await expect(drawer).toBeVisible();
 
+  await openDrawerSection(drawer, "Attachments");
   const fileInput = drawer.locator('input[type="file"]');
   await fileInput.setInputFiles(fixtureFile);
 

@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { E2E_BOOTSTRAP_EMAIL, E2E_BOOTSTRAP_PASSWORD } from "../playwright.config";
 
 /** Base REST del backend "local" avviato da playwright.config.ts (webServer). */
@@ -36,6 +36,14 @@ export async function selectProjectInSidebar(page: Page, name: string) {
 }
 
 /** Ottiene un JWT valido chiamando direttamente /auth/login (per setup via API, senza UI). */
+/** Apre una sezione richiudibile del drawer task (chiuse di default) cliccandone il titolo. */
+export async function openDrawerSection(drawer: Locator, title: string) {
+  const section = drawer.locator("details.drawer-collapsible", { has: drawer.page().locator("summary h3", { hasText: title }) });
+  if ((await section.getAttribute("open")) === null) {
+    await section.locator("summary").click();
+  }
+}
+
 export async function getJwt(base = API_BASE): Promise<string> {
   const res = await fetch(`${base}/auth/login`, {
     method: "POST",
