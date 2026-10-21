@@ -506,12 +506,14 @@ describe("taskService — assegnatario, owner e filtri per persona", () => {
     expect(all.draft).toHaveLength(3);
   });
 
-  it("il cambio assegnatario finisce nel log col nome", async () => {
+  it("il cambio assegnatario e' un evento task.assigned col nome, non un task.updated", async () => {
     const { project, manager } = await setupPeople();
     const task = await createTask(project.id, { title: "Da assegnare" });
     await updateTask(task.id, { assigneeId: manager.id });
-    const event = await prisma.taskEvent.findFirst({ where: { taskId: task.id, type: "task.updated" } });
-    expect(JSON.parse(event!.data).changes).toEqual([{ field: "assigneeId", from: null, to: "Mario Rossi" }]);
+    const events = await prisma.taskEvent.findMany({ where: { taskId: task.id }, orderBy: { id: "asc" } });
+    expect(events.map((e) => e.type)).toEqual(["task.created", "task.assigned"]);
+    expect(JSON.parse(events[1].data).assigneeName).toBe("Mario Rossi");
+    expect(events[1].recipientId).toBe(manager.id);
   });
 
   it("cancellare l'utente lascia i task senza assegnatario e owner", async () => {

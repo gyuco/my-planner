@@ -89,6 +89,7 @@ function toLogItem(row: any): ActivityLogItem {
     relatedTaskId: data.relatedTaskId ?? null,
     relatedTaskTitle: data.relatedTaskTitle ?? null,
     fileName: data.fileName ?? null,
+    assigneeName: data.assigneeName ?? null,
   };
 }
 

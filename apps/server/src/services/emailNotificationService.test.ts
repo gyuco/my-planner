@@ -3,7 +3,7 @@ import type { UserAccount } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { setBackgroundRunner, setSmtpSocketFactory } from "../lib/email/provider.js";
 import { setSecretKeyProvider } from "../lib/secretBox.js";
-import { addComment, createProject, createTask } from "./taskService.js";
+import { addComment, createProject, createTask, moveTask, updateTask } from "./taskService.js";
 import { createUser } from "./userService.js";
 import {
   getActiveEmailConfig,
@@ -139,29 +139,63 @@ describe("emailNotificationService", () => {
     expect(smtp.connections).toHaveLength(0);
   });
 
-  it("invia a chi vede la notifica: admin e manager del progetto, mai l'autore", async () => {
+  it("invia solo all'assegnatario, mai all'autore ne' agli altri utenti", async () => {
     const smtp = createFakeSmtp();
     setSmtpSocketFactory(smtp.factory);
     await updateEmailSettings(smtpInput);
 
     const project = await createProject("Alpha");
-    const other = await createProject("Beta");
     const author = await createTestUser("author@test.it");
     await createTestUser("admin2@test.it");
-    await createTestUser("manager@test.it", "manager", [project.id]);
-    await createTestUser("outsider@test.it", "manager", [other.id]);
+    const manager = await createTestUser("manager@test.it", "manager", [project.id]);
 
-    await createTask(project.id, { title: "Nuovo task" }, userActor(author));
+    await createTask(project.id, { title: "Nuovo task", assigneeId: manager.id }, userActor(author));
     await flush();
 
     const [session] = smtp.sessions;
     expect(session.messages).toHaveLength(1);
-    expect(session.messages[0].to.sort()).toEqual(["admin2@test.it", "manager@test.it"]);
+    expect(session.messages[0].to).toEqual(["manager@test.it"]);
     expect(smtp.connections[0]).toEqual({ host: "smtp.example.com", port: 465, security: "tls" });
 
     const body = decodeMimeBodies(session.messages[0].data);
-    expect(body).toContain('Test author ha creato il task "Nuovo task"');
+    expect(body).toContain('Test author ti ha assegnato il nuovo task "Nuovo task"');
     expect(body).toContain("https://planner.example.com");
+  });
+
+  it("senza assegnatario o se agisce l'assegnatario non invia nulla", async () => {
+    const smtp = createFakeSmtp();
+    setSmtpSocketFactory(smtp.factory);
+    await updateEmailSettings(smtpInput);
+    const project = await createProject("Alpha");
+    const author = await createTestUser("author@test.it");
+    await createTestUser("other@test.it");
+
+    const free = await createTask(project.id, { title: "Libero" }, userActor(author));
+    await moveTask(free.id, "todo", undefined, userActor(author));
+    const own = await createTask(project.id, { title: "Mio", assigneeId: author.id }, userActor(author));
+    await moveTask(own.id, "todo", undefined, userActor(author));
+    await flush();
+
+    expect(smtp.connections).toHaveLength(0);
+  });
+
+  it("invia al nuovo assegnatario e al cambio di stato fatto da altri", async () => {
+    const smtp = createFakeSmtp();
+    setSmtpSocketFactory(smtp.factory);
+    await updateEmailSettings(smtpInput);
+    const project = await createProject("Alpha");
+    const author = await createTestUser("author@test.it");
+    const assignee = await createTestUser("assignee@test.it");
+
+    const task = await createTask(project.id, { title: "Task" }, userActor(author));
+    await updateTask(task.id, { assigneeId: assignee.id }, userActor(author));
+    await moveTask(task.id, "todo", undefined, userActor(author));
+    await flush();
+
+    const messages = smtp.sessions.flatMap((s) => s.messages);
+    expect(messages.map((m) => m.to)).toEqual([["assignee@test.it"], ["assignee@test.it"]]);
+    expect(decodeMimeBodies(messages[0].data)).toContain('Test author ti ha assegnato il task "Task"');
+    expect(decodeMimeBodies(messages[1].data)).toContain('Test author ha spostato "Task" da Bozza a Da fare');
   });
 
   it("include l'estratto del commento, con HTML escapato", async () => {
@@ -169,9 +203,9 @@ describe("emailNotificationService", () => {
     setSmtpSocketFactory(smtp.factory);
     await updateEmailSettings(smtpInput);
     const author = await createTestUser("author@test.it");
-    await createTestUser("other@test.it");
+    const assignee = await createTestUser("other@test.it");
     const project = await createProject("Progetto");
-    const task = await createTask(project.id, { title: "Task" });
+    const task = await createTask(project.id, { title: "Task", assigneeId: assignee.id });
     await flush();
     background = [];
 
@@ -190,11 +224,11 @@ describe("emailNotificationService", () => {
     setSmtpSocketFactory(smtp.factory);
     await updateEmailSettings(smtpInput);
     const author = await createTestUser("author@test.it");
-    await createTestUser("other@test.it");
+    const assignee = await createTestUser("other@test.it");
     const project = await createProject("Progetto");
     const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    const task = await createTask(project.id, { title: "Resiste" }, userActor(author));
+    const task = await createTask(project.id, { title: "Resiste", assigneeId: assignee.id }, userActor(author));
     await flush();
 
     expect(task.title).toBe("Resiste");

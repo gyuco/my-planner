@@ -245,6 +245,16 @@ async function validateAssignee(projectId: string, assigneeId: string) {
   }
 }
 
+/**
+ * Destinatario delle notifiche di un evento sul task: l'assegnatario, se
+ * esiste e non e' lui l'autore dell'azione (nessuno si notifica da solo).
+ */
+function notifyAssignee(assigneeId: string | null | undefined, actor: Actor): string | null {
+  if (!assigneeId) return null;
+  if (actor.type === "user" && actor.id === assigneeId) return null;
+  return assigneeId;
+}
+
 /** Owner di un task appena creato: solo un utente REST, non MCP/sistema. */
 function actorUserId(actor: Actor): string | null {
   return actor.type === "user" ? actor.id : null;
@@ -294,6 +304,7 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
     taskId: task.id,
     type: "task.created",
     actor,
+    recipientId: notifyAssignee(task.assigneeId, actor),
     data: { title: task.title, parentId: task.parentId },
   });
 
@@ -393,14 +404,6 @@ function diffTask(before: any, after: any): TaskFieldChange[] {
     const to = changeValue(after[field]);
     if (from !== to) changes.push({ field, from, to });
   }
-  // L'assegnatario e' registrato col nome: l'id non direbbe nulla nel log.
-  if ((before.assigneeId ?? null) !== (after.assigneeId ?? null)) {
-    changes.push({
-      field: "assigneeId",
-      from: changeValue(userDisplayName(before.assignee)),
-      to: changeValue(userDisplayName(after.assignee)),
-    });
-  }
   if ((before.description ?? "") !== (after.description ?? "")) {
     changes.push({ field: "description", from: null, to: null });
   }
@@ -448,6 +451,18 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
       type: "task.updated",
       actor,
       data: { title: task.title, parentId: task.parentId, changes },
+    });
+  }
+
+  // Cambio assegnatario: evento a parte, che notifica il nuovo assegnatario.
+  if ((existing.assigneeId ?? null) !== (task.assigneeId ?? null)) {
+    await emitEvent({
+      projectId: task.projectId,
+      taskId: task.id,
+      type: "task.assigned",
+      actor,
+      recipientId: notifyAssignee(task.assigneeId, actor),
+      data: { title: task.title, parentId: task.parentId, assigneeName: userDisplayName(task.assignee) },
     });
   }
 
@@ -540,6 +555,7 @@ export async function moveTask(
       taskId: updated.id,
       type: "task.status_changed",
       actor,
+      recipientId: notifyAssignee(updated.assigneeId, actor),
       data: {
         title: updated.title,
         from: existing.status as TaskStatus,
@@ -687,6 +703,7 @@ export async function createSubtasks(
       taskId: task.id,
       type: "task.created",
       actor,
+      recipientId: notifyAssignee(task.assigneeId, actor),
       data: { title: task.title, parentId },
     });
   }
@@ -800,6 +817,7 @@ export async function addComment(taskId: string, body: string, actor: Actor = SY
     taskId: task.id,
     type: "comment.created",
     actor,
+    recipientId: notifyAssignee(task.assigneeId, actor),
     data: { title: task.title, excerpt: body.slice(0, 200) },
   });
 

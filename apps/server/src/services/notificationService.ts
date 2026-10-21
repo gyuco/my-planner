@@ -14,12 +14,12 @@ import { prisma } from "../lib/prisma.js";
  * Notifiche locali basate su un event log append-only.
  *
  * Scelte di fondo (vedi BACKLOG/nota di design):
- *  - nessun fan-out: una riga per azione, non una per destinatario;
+ *  - nessun fan-out: una riga per azione, con al massimo un destinatario
+ *    (`recipientId` = l'assegnatario del task, deciso in scrittura);
  *  - `id` autoincrementale = cursore di lettura per utente
  *    (`NotificationState.lastSeenEventId`);
- *  - il filtro "non le mie azioni" e i permessi di progetto sono applicati
- *    in lettura, cosi' aggiungere/rimuovere un manager da un progetto non
- *    richiede backfill di notifiche.
+ *  - i permessi di progetto sono applicati in lettura, cosi' rimuovere un
+ *    manager da un progetto gli toglie anche le notifiche relative.
  *
  * Gli eventi vengono scritti dal service layer (taskService), quindi coprono
  * automaticamente REST Node, REST Cloudflare e MCP.
@@ -56,6 +56,8 @@ export interface TaskEventData {
   relatedTaskTitle?: string;
   /** Nome file (`attachment.*`). */
   fileName?: string;
+  /** Nuovo assegnatario (`task.assigned`), null se rimosso. */
+  assigneeName?: string | null;
 }
 
 export interface RecordTaskEventInput {
@@ -63,6 +65,8 @@ export interface RecordTaskEventInput {
   taskId: string | null;
   type: TaskEventType;
   actor: Actor;
+  /** Utente da notificare (in-app + email); omesso/null = nessuno. */
+  recipientId?: string | null;
   data: TaskEventData;
 }
 
@@ -79,6 +83,7 @@ export async function recordTaskEvent(input: RecordTaskEventInput) {
       type: input.type,
       actorId: input.actor.type === "user" ? input.actor.id : null,
       actorType: input.actor.type,
+      recipientId: input.recipientId ?? null,
       data: JSON.stringify(input.data),
     },
   });
@@ -86,17 +91,17 @@ export async function recordTaskEvent(input: RecordTaskEventInput) {
 
 /**
  * Filtro di visibilita' condiviso da lista, conteggio e mark-as-read:
+ *  - solo gli eventi destinati all'utente (`recipientId`, mai le sue azioni:
+ *    il destinatario viene scelto escludendo l'autore);
  *  - solo i tipi che generano notifica (il resto e' solo log attivita');
  *  - eventi di progetti accessibili (admin: tutti, manager: assegnati);
- *  - niente progetti archiviati;
- *  - esclude le azioni dell'utente corrente. `actorId` e' nullable (MCP /
- *    sistema), quindi serve l'OR esplicito: un `not` secco scarterebbe i NULL.
+ *  - niente progetti archiviati.
  */
 function visibilityFilter(user: AuthUser): Record<string, unknown> {
   const where: Record<string, unknown> = {
+    recipientId: user.id,
     type: { in: [...NOTIFICATION_EVENT_TYPES] },
     project: { archived: false },
-    OR: [{ actorId: null }, { actorId: { not: user.id } }],
   };
   if (user.role !== "admin") where.projectId = { in: user.projectIds };
   return where;

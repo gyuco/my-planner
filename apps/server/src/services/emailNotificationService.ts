@@ -8,8 +8,9 @@ import type { RecordTaskEventInput } from "./notificationService.js";
 /**
  * Email per gli eventi di notifica (stessi eventi della campanella in-app).
  *
- * Destinatari = chi vedrebbe la notifica in-app: admin + manager associati
- * al progetto, escluso l'autore dell'azione, progetti archiviati esclusi.
+ * Destinatario = chi riceve la notifica in-app: l'assegnatario del task
+ * (`recipientId`, mai l'autore dell'azione), se ha ancora accesso al
+ * progetto. Progetti archiviati esclusi.
  *
  * Mai bloccante: senza config SMTP valida non parte nulla, e l'invio vero
  * avviene in background, quindi errori SMTP o timeout non toccano la
@@ -40,11 +41,12 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-async function findRecipients(projectId: string, actorId: string | null): Promise<string[]> {
+async function findRecipients(projectId: string, recipientId: string | null | undefined): Promise<string[]> {
+  if (!recipientId) return [];
   const users = await prisma.user.findMany({
     where: {
+      id: recipientId,
       OR: [{ role: "admin" }, { projects: { some: { projectId } } }],
-      ...(actorId ? { id: { not: actorId } } : {}),
     },
     select: { email: true },
   });
@@ -76,7 +78,10 @@ export function renderTaskEventEmail(
   let summary: string;
   switch (input.type) {
     case "task.created":
-      summary = `${ctx.actorName} ha creato il task "${title}"`;
+      summary = `${ctx.actorName} ti ha assegnato il nuovo task "${title}"`;
+      break;
+    case "task.assigned":
+      summary = `${ctx.actorName} ti ha assegnato il task "${title}"`;
       break;
     case "task.status_changed":
       summary = `${ctx.actorName} ha spostato "${title}" da ${statusLabel(input.data.from)} a ${statusLabel(input.data.to)}`;
@@ -89,7 +94,7 @@ export function renderTaskEventEmail(
   }
 
   const excerpt = input.data.excerpt?.trim() || null;
-  const footer = "Ricevi questa email perché hai accesso al progetto su my-planner.";
+  const footer = "Ricevi questa email perché sei l'assegnatario del task su my-planner.";
 
   const text = [
     summary,
@@ -124,7 +129,7 @@ async function deliverTaskEventEmail(config: ActiveEmailConfig, input: RecordTas
   });
   if (!project || project.archived) return;
 
-  const recipients = await findRecipients(input.projectId, input.actor.type === "user" ? input.actor.id : null);
+  const recipients = await findRecipients(input.projectId, input.recipientId);
   if (recipients.length === 0) return;
 
   const rendered = renderTaskEventEmail(input, {

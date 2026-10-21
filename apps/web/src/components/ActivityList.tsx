@@ -3,13 +3,14 @@ import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskStatus, TaskT
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n/en";
 
-type ActivityKey = keyof Dictionary["activity"]["messages"];
+type ActivityKey = keyof Dictionary["activity"]["typeLabels"];
 
 /** Tipo evento -> chiave dei testi i18n (messaggi ed etichette del filtro). */
 export const ACTIVITY_KEYS: Record<TaskEventType, ActivityKey> = {
   "task.created": "created",
   "task.updated": "updated",
   "task.status_changed": "statusChanged",
+  "task.assigned": "assigned",
   "task.deleted": "deleted",
   "comment.created": "commented",
   "dependency.added": "dependencyAdded",
@@ -27,7 +28,7 @@ function toneOf(type: TaskEventType): string {
   if (type === "task.status_changed") return "status";
   if (type === "comment.created") return "comment";
   if (type === "task.deleted" || type.endsWith(".removed") || type.endsWith(".deleted")) return "removed";
-  if (type === "task.updated") return "updated";
+  if (type === "task.updated" || type === "task.assigned") return "updated";
   return "created";
 }
 
@@ -59,7 +60,12 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
   }
 
   function messageOf(item: ActivityLogItem): string {
-    return fill(t.activity.messages[ACTIVITY_KEYS[item.type]], {
+    const template =
+      item.type === "task.assigned" && !item.assigneeName
+        ? t.activity.messages.unassigned
+        : t.activity.messages[ACTIVITY_KEYS[item.type]];
+    return fill(template, {
+      assignee: item.assigneeName ?? "",
       actor: actorOf(item),
       title: item.taskTitle,
       from: item.from ? statusLabel[item.from] ?? item.from : "?",
@@ -70,7 +76,7 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
   }
 
   function changeValue(change: TaskFieldChange, value: string | null): string {
-    if (value === null) return change.field === "assigneeId" ? t.assignee.unassigned : "—";
+    if (value === null) return "—";
     if (change.field === "dueDate") return formatDate(value);
     if (change.field === "type" && (TASK_TYPES as readonly string[]).includes(value)) {
       return t.taskType[value as TaskType];

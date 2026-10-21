@@ -91,7 +91,7 @@ describe("activityService — eventi registrati", () => {
     const author = await createTestUser("author@test.it");
     const other = await createTestUser("other@test.it");
     const project = await createProject("Progetto");
-    const task = await createTask(project.id, { title: "T" }, userActor(author.id));
+    const task = await createTask(project.id, { title: "T", assigneeId: other.id }, userActor(author.id));
     await updateTask(task.id, { title: "T2" }, userActor(author.id));
 
     const notifications = await listNotifications(authUserOf(other), 30);
