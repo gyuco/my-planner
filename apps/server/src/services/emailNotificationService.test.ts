@@ -198,6 +198,21 @@ describe("emailNotificationService", () => {
     expect(decodeMimeBodies(messages[1].data)).toContain('Test author ha spostato "Task" da Bozza a Da fare');
   });
 
+  it("include il link diretto al task quando appUrl e' configurato", async () => {
+    const smtp = createFakeSmtp();
+    setSmtpSocketFactory(smtp.factory);
+    await updateEmailSettings({ ...smtpInput, appUrl: "https://planner.example.com/" });
+    const author = await createTestUser("author@test.it");
+    const assignee = await createTestUser("other@test.it");
+    const project = await createProject("Progetto");
+    const task = await createTask(project.id, { title: "Task" }, userActor(author));
+    await updateTask(task.id, { assigneeId: assignee.id }, userActor(author));
+    await flush();
+
+    const body = decodeMimeBodies(smtp.sessions.at(-1)!.messages[0].data);
+    expect(body).toContain(`https://planner.example.com/projects/${project.id}?task=${task.id}`);
+  });
+
   it("include l'estratto del commento, con HTML escapato", async () => {
     const smtp = createFakeSmtp();
     setSmtpSocketFactory(smtp.factory);

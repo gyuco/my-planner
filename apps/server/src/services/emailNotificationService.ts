@@ -93,6 +93,13 @@ export function renderTaskEventEmail(
       summary = `${ctx.actorName} ha aggiornato "${title}"`;
   }
 
+  // Link diretto al task (schema URL del frontend: /projects/:id?task=:id);
+  // senza taskId o appUrl resta la home / nessun link.
+  const link = ctx.appUrl
+    ? input.taskId
+      ? `${ctx.appUrl}/projects/${encodeURIComponent(input.projectId)}?task=${encodeURIComponent(input.taskId)}`
+      : ctx.appUrl
+    : null;
   const excerpt = input.data.excerpt?.trim() || null;
   const footer = "Ricevi questa email perché sei l'assegnatario del task su my-planner.";
 
@@ -100,7 +107,7 @@ export function renderTaskEventEmail(
     summary,
     `Progetto: ${ctx.projectName}`,
     ...(excerpt ? ["", excerpt] : []),
-    ...(ctx.appUrl ? ["", `Apri my-planner: ${ctx.appUrl}`] : []),
+    ...(link ? ["", `${input.taskId ? "Apri il task" : "Apri my-planner"}: ${link}`] : []),
     "",
     "--",
     footer,
@@ -112,7 +119,9 @@ export function renderTaskEventEmail(
     excerpt
       ? `<blockquote style="margin:0;padding:8px 12px;border-left:3px solid #ccc;color:#333;white-space:pre-wrap">${escapeHtml(excerpt)}</blockquote>`
       : "",
-    ctx.appUrl ? `<p><a href="${escapeHtml(ctx.appUrl)}">Apri my-planner</a></p>` : "",
+    link
+      ? `<p><a href="${escapeHtml(link)}">${input.taskId ? "Apri il task" : "Apri my-planner"}</a></p>`
+      : "",
     `<p style="color:#999;font-size:12px">${escapeHtml(footer)}</p>`,
   ].join("\n");
 

@@ -67,6 +67,23 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ---
 
+## 1b. Schema URL del frontend
+
+Il frontend (SPA) espone URL stabili e condivisibili; il server deve servire `index.html` per qualsiasi path non-`/api` (nginx `try_files`, Vite dev, Cloudflare Pages).
+
+| URL | Vista |
+|---|---|
+| `/projects/all` | Board aggregata |
+| `/projects/:projectId` | Board del progetto |
+| `/projects/:projectId/stats` | Statistiche del progetto (non esistono per `all`) |
+| `/activity` | Log attività |
+| `/profile` | Profilo utente |
+| `<qualsiasi vista>?task=:taskId` | Apre il drawer del task sopra la vista corrente |
+
+Path sconosciuti o progetti non accessibili/archiviati → redirect al primo progetto (altrimenti `/projects/all`) con avviso. Un `?task=` inesistente o non accessibile (`GET /tasks/:taskId` → 403/404) viene rimosso con avviso. Le email di notifica, se `appUrl` è configurato, linkano `${appUrl}/projects/:projectId?task=:taskId`.
+
+---
+
 ## 2. Autenticazione
 
 ### REST — JWT

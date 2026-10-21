@@ -1,4 +1,5 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { AuthUser, Board, Project } from "@my-planner/core";
 import { TASK_STATUSES } from "@my-planner/core";
 import { KanbanBoard } from "./components/KanbanBoard";
@@ -33,10 +34,12 @@ import {
   getAggregatedBoard,
   getMe,
   getProjectBoard,
+  getTask,
   listProjects,
   setUnauthorizedHandler,
 } from "./api";
 import { useI18n } from "./i18n";
+import { parseRoute, projectPath } from "./lib/routes";
 
 function emptyBoard(): Board {
   return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Board;
@@ -129,7 +132,6 @@ export function App() {
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | "all" | null>(null);
   const [board, setBoard] = useState<Board>(EMPTY_BOARD);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
@@ -140,17 +142,46 @@ export function App() {
   const [showEmailSettings, setShowEmailSettings] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
   const [filters, setFilters] = useState<BoardFiltersState>(EMPTY_FILTERS);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [openTaskProjectId, setOpenTaskProjectId] = useState<string | null>(null);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  const [routeNotice, setRouteNotice] = useState<string | null>(null);
+  // Task aperto nel drawer: l'id sta nell'URL (?task=), il progetto viene
+  // risolto da noi (click) o da GET /tasks/:id (deep link).
+  const [resolvedTask, setResolvedTask] = useState<{ taskId: string; projectId: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getStoredSidebarCollapsed);
-  // Vista corrente dell'area principale: la board (default), le statistiche
-  // del progetto, il profilo o il log attivita'.
-  const [view, setView] = useState<"board" | "stats" | "profile" | "activity">("board");
   // null = tutti i progetti inclusi nella vista aggregata (comportamento di default).
   const [aggregatedProjectIds, setAggregatedProjectIds] = useState<string[] | null>(null);
 
   const isAdmin = currentUser?.role === "admin";
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const route = useMemo(() => parseRoute(location.pathname), [location.pathname]);
+  const view = route.view;
+  const taskParam = useMemo(() => new URLSearchParams(location.search).get("task"), [location.search]);
+  // Il progetto selezionato e' valido solo se presente tra quelli accessibili
+  // (o "all"): altrimenti l'effetto di redirect sotto riporta al default.
+  const routeProjectId = route.valid ? route.projectId : null;
+  const selectedProjectId =
+    routeProjectId === "all" || (routeProjectId !== null && projects.some((p) => p.id === routeProjectId))
+      ? routeProjectId
+      : null;
+  // Ultimo progetto visitato: serve per tornare alla board da profilo/attivita'.
+  const lastProjectRef = useRef<string | "all" | null>(null);
+  useEffect(() => {
+    if (selectedProjectId) lastProjectRef.current = selectedProjectId;
+  }, [selectedProjectId]);
+
+  const setTaskParam = useCallback(
+    (taskId: string | null, replace: boolean) => {
+      const params = new URLSearchParams(location.search);
+      if (taskId) params.set("task", taskId);
+      else params.delete("task");
+      const search = params.toString();
+      navigate({ pathname: location.pathname, search: search ? `?${search}` : "" }, { replace });
+    },
+    [navigate, location.pathname, location.search],
+  );
 
   useEffect(() => {
     try {
@@ -187,16 +218,25 @@ export function App() {
     }
   }, [loggedIn, projects, selectedProjectId, view, t]);
 
-  const handleLogout = useCallback(() => {
+  // Azzera la sessione senza toccare l'URL: dopo una scadenza del token il
+  // re-login riporta sulla pagina (o sul task) che si stava aprendo.
+  const resetSession = useCallback(() => {
     clearToken();
     setLoggedIn(false);
     setCurrentUser(null);
     setProjects([]);
-    setSelectedProjectId(null);
+    setProjectsLoaded(false);
     setBoard(EMPTY_BOARD);
     setShowUsers(false);
-    setView("board");
+    setResolvedTask(null);
+    setRouteNotice(null);
   }, []);
+
+  const handleLogout = useCallback(() => {
+    resetSession();
+    lastProjectRef.current = null;
+    navigate("/", { replace: true });
+  }, [resetSession, navigate]);
 
   // Rilegge ruolo e progetti assegnati dal server: dopo un cambio fatto da un
   // admin (o al reload) la UI riflette subito i permessi correnti.
@@ -211,9 +251,9 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setUnauthorizedHandler(handleLogout);
+    setUnauthorizedHandler(resetSession);
     return () => setUnauthorizedHandler(null);
-  }, [handleLogout]);
+  }, [resetSession]);
 
   useEffect(() => {
     if (loggedIn) refreshSession();
@@ -223,11 +263,7 @@ export function App() {
     try {
       const list = await listProjects(false);
       setProjects(list);
-      setSelectedProjectId((current) => {
-        if (current === "all") return current;
-        if (current && list.some((p) => p.id === current)) return current;
-        return list[0]?.id ?? "all";
-      });
+      setProjectsLoaded(true);
     } catch {
       setLoadError(t.app.loadProjectsError);
     }
@@ -261,7 +297,9 @@ export function App() {
 
   const refreshProject = useCallback(
     async (projectId: string) => {
-      setSelectedProjectId(projectId);
+      if (projectId !== selectedProjectId) {
+        navigate(projectPath(projectId, view === "stats" ? "stats" : "board"));
+      }
       try {
         const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
         const data = await getProjectBoard(projectId, boardFilters);
@@ -271,7 +309,7 @@ export function App() {
         setLoadError(t.app.loadBoardError);
       }
     },
-    [filters.search, filters.tag, t],
+    [filters.search, filters.tag, t, navigate, selectedProjectId, view],
   );
 
   const currentUserId = currentUser?.id ?? null;
@@ -281,6 +319,41 @@ export function App() {
   );
   const availableTags = useMemo(() => collectTags(board), [board]);
   const availableAssignees = useMemo(() => collectAssignees(board), [board]);
+
+  // Path sconosciuto o progetto non accessibile/archiviato: redirect al default
+  // (primo progetto, altrimenti vista aggregata) mantenendo l'eventuale ?task=.
+  useEffect(() => {
+    if (!loggedIn || !projectsLoaded) return;
+    if (view === "profile" || view === "activity") return;
+    if (selectedProjectId) return;
+    const target = projects[0]?.id ?? "all";
+    const unknownProject = route.projectId !== null && route.projectId !== "all";
+    if (unknownProject && lastProjectRef.current !== route.projectId) {
+      setRouteNotice(t.app.projectNotFound);
+    }
+    navigate({ pathname: projectPath(target), search: location.search }, { replace: true });
+  }, [loggedIn, projectsLoaded, view, selectedProjectId, projects, route.projectId, location.search, navigate, t]);
+
+  // Deep link ?task=: risolve il progetto del task (e verifica l'accesso).
+  useEffect(() => {
+    if (!loggedIn || !taskParam || resolvedTask?.taskId === taskParam) return;
+    let cancelled = false;
+    getTask(taskParam)
+      .then((task) => {
+        if (!cancelled) setResolvedTask({ taskId: task.id, projectId: task.projectId });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setRouteNotice(t.app.taskNotFound);
+        setTaskParam(null, true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loggedIn, taskParam, resolvedTask, setTaskParam, t]);
+
+  const openTaskId = taskParam && resolvedTask?.taskId === taskParam ? taskParam : null;
+  const openTaskProjectId = openTaskId ? resolvedTask?.projectId ?? null : null;
 
   if (!loggedIn) {
     return (
@@ -294,15 +367,27 @@ export function App() {
 
   const currentProject = projects.find((p) => p.id === selectedProjectId) ?? null;
 
+  // Apre il drawer scrivendo ?task= nell'URL (push: "indietro" lo chiude).
+  // `toBoard`: da profilo/attivita'/statistiche torna prima alla board.
+  function openTask(taskId: string, projectId: string, toBoard = false) {
+    setResolvedTask({ taskId, projectId });
+    setRouteNotice(null);
+    const pathname =
+      toBoard && view !== "board"
+        ? projectPath(selectedProjectId ?? lastProjectRef.current ?? projectId)
+        : location.pathname;
+    navigate({ pathname, search: `?task=${encodeURIComponent(taskId)}` });
+  }
+
   function handleTaskClick(task: BoardTask) {
-    setOpenTaskId(task.id);
-    setOpenTaskProjectId(task.projectId);
+    openTask(task.id, task.projectId);
   }
 
   // Navigazione dentro il drawer: aprire una sotto-task o risalire al parent
   // sostituisce semplicemente il task mostrato, stesso progetto.
   function handleOpenTask(taskId: string) {
-    setOpenTaskId(taskId);
+    if (resolvedTask) setResolvedTask({ taskId, projectId: resolvedTask.projectId });
+    setTaskParam(taskId, true);
   }
 
   const settingsProject = projects.find((p) => p.id === settingsProjectId) ?? null;
@@ -330,9 +415,9 @@ export function App() {
         activityActive={view === "activity"}
         isAdmin={isAdmin}
         onSelect={(id) => {
-          setSelectedProjectId(id);
           // Cambiando progetto si resta sulle statistiche (non esistono per la vista aggregata).
-          setView((v) => (v === "stats" && id !== "all" ? "stats" : "board"));
+          setRouteNotice(null);
+          navigate(projectPath(id, view === "stats" ? "stats" : "board"));
           setSidebarOpen(false);
         }}
         onCreateProject={() => setShowCreateProject(true)}
@@ -343,7 +428,8 @@ export function App() {
         onOpenEmailSettings={() => setShowEmailSettings(true)}
         onOpenUsers={() => setShowUsers(true)}
         onOpenActivity={() => {
-          setView("activity");
+          setRouteNotice(null);
+          navigate("/activity");
           setSidebarOpen(false);
         }}
       />
@@ -376,9 +462,7 @@ export function App() {
             <div className="topbar-group">
               <NotificationsBell
                 onOpenTask={(taskId, projectId) => {
-                  setView("board");
-                  setOpenTaskId(taskId);
-                  setOpenTaskProjectId(projectId);
+                  openTask(taskId, projectId, true);
                   setSidebarOpen(false);
                 }}
               />
@@ -390,7 +474,11 @@ export function App() {
                   type="button"
                   className={`topbar-avatar${view === "profile" ? " active" : ""}`}
                   onClick={() => {
-                    setView((v) => (v === "profile" ? "board" : "profile"));
+                    navigate(
+                      view === "profile"
+                        ? projectPath(lastProjectRef.current ?? projects[0]?.id ?? "all")
+                        : "/profile",
+                    );
                     setSidebarOpen(false);
                   }}
                   aria-label={`${t.profile.open}: ${displayName(currentUser)}`}
@@ -423,15 +511,14 @@ export function App() {
           <ActivityPage
             projects={projects}
             onOpenTask={(taskId, projectId) => {
-              setOpenTaskId(taskId);
-              setOpenTaskProjectId(projectId);
+              openTask(taskId, projectId);
             }}
           />
         ) : view === "profile" && currentUser ? (
           <ProfilePage
             user={currentUser}
             projects={projects}
-            onBack={() => setView("board")}
+            onBack={() => navigate(projectPath(lastProjectRef.current ?? projects[0]?.id ?? "all"))}
             onUserUpdated={(user) => {
               setCurrentUser(user);
               saveUser(user);
@@ -446,7 +533,7 @@ export function App() {
                   role="tab"
                   aria-selected={view === "board"}
                   className={`view-tab${view === "board" ? " active" : ""}`}
-                  onClick={() => setView("board")}
+                  onClick={() => currentProject && navigate(projectPath(currentProject.id))}
                 >
                   {t.app.tabBoard}
                 </button>
@@ -455,7 +542,7 @@ export function App() {
                   role="tab"
                   aria-selected={view === "stats"}
                   className={`view-tab${view === "stats" ? " active" : ""}`}
-                  onClick={() => setView("stats")}
+                  onClick={() => currentProject && navigate(projectPath(currentProject.id, "stats"))}
                 >
                   {t.app.tabStats}
                 </button>
@@ -479,6 +566,12 @@ export function App() {
                   }
                 />
 
+                {routeNotice && (
+                  <div className="board-error" role="alert">
+                    {routeNotice}
+                    <button onClick={() => setRouteNotice(null)}>&times;</button>
+                  </div>
+                )}
                 {loadError && <div className="board-error">{loadError}</div>}
 
                 <KanbanBoard
@@ -512,10 +605,7 @@ export function App() {
         <TaskDrawer
           taskId={openTaskId}
           projectId={openTaskProjectId}
-          onClose={() => {
-            setOpenTaskId(null);
-            setOpenTaskProjectId(null);
-          }}
+          onClose={() => setTaskParam(null, true)}
           onChanged={loadBoard}
           onOpenTask={handleOpenTask}
         />

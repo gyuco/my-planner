@@ -1,5 +1,7 @@
 import type { Project } from "@my-planner/core";
 import { useI18n } from "../i18n";
+import { copyText } from "../lib/clipboard";
+import { absoluteUrl, projectPath } from "../lib/routes";
 
 interface SidebarProps {
   projects: Project[];
@@ -69,6 +71,14 @@ export function Sidebar({
               aria-label={`${t.sidebar.refreshProjectTitle} ${p.name}`}
             >
               ↻
+            </button>
+            <button
+              className="icon-button sidebar-project-link"
+              onClick={() => copyText(absoluteUrl(projectPath(p.id)))}
+              title={t.sidebar.copyProjectLinkTitle}
+              aria-label={`${t.sidebar.copyProjectLinkTitle} ${p.name}`}
+            >
+              🔗
             </button>
             <button
               className="icon-button sidebar-project-settings"

@@ -148,6 +148,11 @@ Creazione, rinomina, archiviazione.
 Board scrollabile, drawer/modali e form leggibili su viewport mobile.
 - Priorità: medium · Complessità: 5 · Dipendenze: F4, F6, F7
 
+### F13 — URL condivisibili (deep link)
+Routing react-router: `/projects/all`, `/projects/:id`, `/projects/:id/stats`, `/activity`, `/profile`; task aperto nel drawer via `?task=:id` (progetto risolto da `GET /tasks/:id`). Pulsante "Copia link" nel drawer e nella sidebar, redirect con avviso per progetto/task inesistenti o non accessibili, link diretto al task nelle email di notifica (richiede `appUrl`).
+- Priorità: high · Complessità: 5 · Dipendenze: F3, F6
+- Stato: completata
+
 ---
 
 ## INFRA
@@ -208,6 +213,11 @@ Board aggregata multi-progetto (incl. selezione sottoinsieme progetti), creazion
 ### T9 — E2E Playwright: responsive mobile
 Board/drawer/form su viewport mobile (device emulation Playwright).
 - Priorità: low · Complessità: 3 · Dipendenze: F12
+
+### T11 — E2E Playwright: deep link
+Apertura diretta di progetto/statistiche/task, "indietro" chiude il drawer, deep link da non loggato, task/progetto inesistenti, path sconosciuto.
+- Priorità: medium · Complessità: 3 · Dipendenze: F13
+- Stato: completata
 
 ---
 
