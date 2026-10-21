@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginViaUi, createProjectViaApi, createTaskViaApi, selectProjectInSidebar } from "./helpers";
+import { loginViaUi, createProjectViaApi, createTaskViaApi, openDrawerSection, selectProjectInSidebar } from "./helpers";
 
 test.describe("T5 - dipendenze, blocco stato", () => {
   test("dipendenza A bloccato da B, blocco/sblocco via drag e via select", async ({
@@ -23,6 +23,7 @@ test.describe("T5 - dipendenze, blocco stato", () => {
 
     // Aggiunge dipendenza verso B
     await drawer.locator("select").first().waitFor(); // select stato
+    await openDrawerSection(drawer, "Dependencies");
     const blockerSelect = drawer.locator(".drawer-inline-form select");
     await blockerSelect.selectOption({ label: "Task B (blocker)" });
     await drawer.getByRole("button", { name: "Add" }).first().click();

@@ -40,13 +40,26 @@ interface CollapsibleSectionProps {
   title: string;
   /** Mostrato accanto al titolo, utile a sezione chiusa (es. numero di elementi). */
   count?: number;
+  open: boolean;
+  onToggle: (open: boolean) => void;
   children: React.ReactNode;
 }
 
-/** Sezione del drawer richiudibile: chiusa di default, il contenuto resta montato. */
-function CollapsibleSection({ title, count, children }: CollapsibleSectionProps) {
+/**
+ * Sezione del drawer richiudibile. Lo stato aperto/chiuso e' controllato dal
+ * drawer: `load()` smonta il corpo durante il refresh e un <details> non
+ * controllato si richiuderebbe dopo ogni azione (es. aggiunta dipendenza).
+ */
+function CollapsibleSection({ title, count, open, onToggle, children }: CollapsibleSectionProps) {
   return (
-    <details className="drawer-section drawer-collapsible">
+    <details
+      className="drawer-section drawer-collapsible"
+      open={open}
+      onToggle={(e) => {
+        const next = e.currentTarget.open;
+        if (next !== open) onToggle(next);
+      }}
+    >
       <summary>
         <svg className="drawer-collapsible-chevron" viewBox="0 0 20 20" aria-hidden="true">
           <path d="M7 5l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -58,6 +71,8 @@ function CollapsibleSection({ title, count, children }: CollapsibleSectionProps)
     </details>
   );
 }
+
+type DrawerSection = "dependencies" | "subtasks" | "attachments" | "activity";
 
 function toDateInputValue(iso: string | null): string {
   if (!iso) return "";
@@ -97,6 +112,20 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
   const [editingDescription, setEditingDescription] = useState(false);
   const [newSubtaskTitles, setNewSubtaskTitles] = useState("");
   const [addingSubtasks, setAddingSubtasks] = useState(false);
+  const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
+
+  function sectionProps(section: DrawerSection) {
+    return {
+      open: openSections.has(section),
+      onToggle: (open: boolean) =>
+        setOpenSections((prev) => {
+          const next = new Set(prev);
+          if (open) next.add(section);
+          else next.delete(section);
+          return next;
+        }),
+    };
+  }
 
   // Log attivita' del solo task mostrato. Con il drawer aperto si aggiorna
   // da solo (polling) e subito dopo ogni azione fatta qui (vedi effetto sotto).
@@ -456,6 +485,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
             </section>
 
             <CollapsibleSection
+              {...sectionProps("dependencies")}
               title={t.taskDrawer.dependencies}
               count={(task.blockedBy ?? []).length + (task.blocking ?? []).length}
             >
@@ -501,7 +531,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
             </CollapsibleSection>
 
             {!task.parentId && (
-              <CollapsibleSection title={t.taskDrawer.subtasks} count={(task.subtasks ?? []).length}>
+              <CollapsibleSection {...sectionProps("subtasks")} title={t.taskDrawer.subtasks} count={(task.subtasks ?? []).length}>
                 <ul className="drawer-list">
                   {(task.subtasks ?? []).map((s) => (
                     <li key={s.id}>
@@ -556,7 +586,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
               </form>
             </section>
 
-            <CollapsibleSection title={t.taskDrawer.attachments} count={attachments.length}>
+            <CollapsibleSection {...sectionProps("attachments")} title={t.taskDrawer.attachments} count={attachments.length}>
               <ul className="drawer-list">
                 {attachments.map((a) => (
                   <li key={a.id}>
@@ -578,7 +608,7 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
               <input type="file" onChange={handleUpload} disabled={uploading} />
             </CollapsibleSection>
 
-            <CollapsibleSection title={t.activity.taskSection}>
+            <CollapsibleSection {...sectionProps("activity")} title={t.activity.taskSection}>
               {activity.error && <p className="activity-error">{activity.error}</p>}
               {activity.loading ? (
                 <p className="drawer-empty">{t.taskDrawer.loading}</p>
