@@ -3,6 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createProjectMcpServer } from "./server.js";
 import { createProject, createTask, addDependency } from "../services/taskService.js";
+import { updateEmailSettings } from "../services/emailSettingsService.js";
 
 /**
  * Test in-process dei tool MCP (T2): istanzia createProjectMcpServer(projectId)
@@ -62,6 +63,17 @@ describe("createProjectMcpServer — tool scoping e domain errors", () => {
     });
     const task = parseToolResult(result);
     expect(task.projectId).toBe(projectA.id);
+  });
+
+  it("get_task include `url` solo se l'URL pubblico dell'app e' configurato", async () => {
+    const task = await createTask(projectA.id, { title: "Task A" });
+
+    const before = parseToolResult(await clientA.callTool({ name: "get_task", arguments: { taskId: task.id } }));
+    expect(before.url).toBeUndefined();
+
+    await updateEmailSettings({ enabled: false, port: 465, security: "tls", appUrl: "https://planner.example.com/" });
+    const after = parseToolResult(await clientA.callTool({ name: "get_task", arguments: { taskId: task.id } }));
+    expect(after.url).toBe(`https://planner.example.com/projects/${projectA.id}?task=${task.id}`);
   });
 
   it("get_task su un task di un altro progetto restituisce FORBIDDEN", async () => {

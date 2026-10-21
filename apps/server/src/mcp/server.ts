@@ -19,6 +19,7 @@ import {
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
 import { listProjectAssignees } from "../services/userService.js";
+import { buildTaskUrl, getAppUrl } from "../services/emailSettingsService.js";
 import type { Actor } from "../services/notificationService.js";
 
 /** Il token MCP identifica un progetto, non un utente: gli eventi non sono "miei". */
@@ -102,12 +103,15 @@ export function createProjectMcpServer(projectId: string) {
     "get_task",
     "Recupera un task del progetto associato al token. Se il task ha sotto-task, la risposta include " +
       "subtaskCount/openSubtaskCount/subtaskStatusCounts e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
-      "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro.",
+      "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro. " +
+      "Se l'URL pubblico dell'app e' configurato, la risposta include `url`: link diretto al task nella UI.",
     { taskId: z.string() },
     async ({ taskId }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return getTask(taskId);
+        const task = await getTask(taskId);
+        const appUrl = await getAppUrl();
+        return appUrl ? { ...task, url: buildTaskUrl(appUrl, task.projectId, task.id) } : task;
       })
   );
 

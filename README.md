@@ -26,6 +26,10 @@ npm run --workspace apps/server prisma:migrate
 npm run dev
 ```
 
+## Link condivisibili
+
+Ogni progetto, vista e task ha un URL stabile (es. `/projects/<id>?task=<id>`): usa "Copia link" nel drawer del task o nella sidebar. Schema completo in [API_CONTRACT.md](./API_CONTRACT.md) §1b.
+
 ## Migrazioni Prisma: dev vs CI/produzione/docker
 
 Due comandi distinti in `apps/server/package.json`, da non confondere:

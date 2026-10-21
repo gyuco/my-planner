@@ -453,6 +453,7 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 
 /* L'ingranaggio e il refresh appaiono solo all'hover della riga: meno rumore visivo. */
 .sidebar-project-settings,
+.sidebar-project-link,
 .sidebar-project-refresh {
   flex-shrink: 0;
   width: 1.75rem;
@@ -465,6 +466,8 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 }
 
 .sidebar-project-row:hover .sidebar-project-settings,
+.sidebar-project-row:hover .sidebar-project-link,
+.sidebar-project-link:focus-visible,
 .sidebar-project-settings:focus-visible,
 .sidebar-project-row:hover .sidebar-project-refresh,
 .sidebar-project-refresh:focus-visible { opacity: 1; }
@@ -2165,6 +2168,17 @@ body.dnd-dragging * {
 
 .drawer-header-title .badge { font-size: 0.68rem; }
 
+.drawer-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.drawer-copy-link {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+}
+
 /* Bordo superiore colorato secondo il tipo di ticket. */
 .drawer.drawer-type-bug { border-top: 4px solid var(--danger); }
 .drawer.drawer-type-feature { border-top: 4px solid var(--success); }
@@ -2601,6 +2615,7 @@ body.dnd-dragging * {
   }
 
   .sidebar-project-settings,
+  .sidebar-project-link,
   .sidebar-project-refresh { opacity: 1; }
 
   .sidebar-nav { flex-direction: column; }

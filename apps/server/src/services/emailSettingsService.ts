@@ -53,6 +53,16 @@ async function findRow() {
   return prisma.emailSettings.findUnique({ where: { id: SINGLETON_ID } });
 }
 
+/** URL pubblico dell'app (impostazioni notifiche email) o null se non configurato. */
+export async function getAppUrl(): Promise<string | null> {
+  return (await findRow())?.appUrl ?? null;
+}
+
+/** Link diretto a un task, secondo lo schema URL del frontend (API_CONTRACT.md §1b). */
+export function buildTaskUrl(appUrl: string, projectId: string, taskId: string): string {
+  return `${appUrl}/projects/${encodeURIComponent(projectId)}?task=${encodeURIComponent(taskId)}`;
+}
+
 export async function getEmailSettings(): Promise<EmailSettings> {
   return toPublic(await findRow());
 }

@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { copyText } from "../lib/clipboard";
+import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus, TaskType } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
@@ -119,7 +121,15 @@ export function TaskDrawer({
   const [editingDescription, setEditingDescription] = useState(false);
   const [newSubtaskTitles, setNewSubtaskTitles] = useState("");
   const [addingSubtasks, setAddingSubtasks] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
+
+  async function handleCopyLink() {
+    if (await copyText(absoluteUrl(taskPath(projectId, taskId)))) {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1800);
+    }
+  }
 
   function sectionProps(section: DrawerSection) {
     return {
@@ -359,9 +369,14 @@ export function TaskDrawer({
             <h2>{t.taskDrawer.details}</h2>
             {task && <span className={`badge badge-type task-type-${type}`}>{t.taskType[type]}</span>}
           </div>
-          <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
-            &times;
-          </button>
+          <div className="drawer-header-actions">
+            <button type="button" className="drawer-copy-link" onClick={handleCopyLink}>
+              {linkCopied ? `✓ ${t.taskDrawer.linkCopied}` : `🔗 ${t.taskDrawer.copyLink}`}
+            </button>
+            <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
+              &times;
+            </button>
+          </div>
         </div>
 
         {loading && <p>{t.taskDrawer.loading}</p>}
