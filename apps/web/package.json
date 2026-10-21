@@ -13,7 +13,7 @@
     "test:e2e": "playwright test",
     "pages:dev": "npm run build && wrangler pages dev",
     "pages:deploy": "npm run build && wrangler pages deploy",
-    "pages:deploy:prod": "npm run build && wrangler pages deploy --branch master"
+    "pages:deploy:prod": "npm run build && wrangler pages deploy --branch main"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
