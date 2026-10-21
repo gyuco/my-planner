@@ -115,6 +115,16 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 ### Scoping dei progetti
 - `GET /projects` restituisce tutti i progetti per l'admin, solo quelli assegnati per il manager.
 - Tutte le route project-scoped (`/projects/:projectId/*`, `/tasks/:taskId/*`, `/attachments/:attachmentId/*`, `/board`) verificano l'accesso al progetto della risorsa; per il manager `/board` è limitata ai progetti assegnati.
+
+### Assegnatario e owner dei task
+- Ogni task ha un assegnatario opzionale (`assigneeId`, `assigneeName`) e un owner (`ownerId`, `ownerName`) = utente che lo ha creato via REST (`null` se creato via MCP o prima dell'introduzione del campo; backfill dall'evento `task.created`).
+- Non limitano la visibilità: chi accede al progetto vede tutti i task. Servono come filtri (`assigneeId`, `ownerId` su liste e board; in UI il filtro "Assegnati a me").
+- Assegnatari ammessi: tutti gli admin e i manager associati al progetto (altrimenti 400 `VALIDATION_ERROR`). `assigneeId: null` toglie l'assegnatario.
+- L'owner non è modificabile. Cancellare un utente lascia i suoi task senza assegnatario/owner.
+
+### `GET /projects/:projectId/assignees`
+- Auth: JWT, accesso al progetto
+- 200: `[{ id, email, name }]` — admin e manager del progetto (`name` = nome e cognome, oppure email)
 - `POST /projects`, `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
 ### MCP — token di progetto
@@ -190,7 +200,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### `GET /projects/:projectId/tasks`
 - Auth: JWT
-- Query: `status?`, `priority?`, `tag?` (singolo tag), `search?` (case-insensitive su titolo+descrizione)
+- Query: `status?`, `priority?`, `tag?` (singolo tag), `search?` (case-insensitive su titolo+descrizione), `assigneeId?`, `ownerId?`
 - 200: `Task[]`
 
 ### `GET /tasks/:taskId`
@@ -209,7 +219,8 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
   "complexity": "1|2|3|5|8|13|21|null",
   "tags": ["string"],
   "dueDate": "ISO8601|null",
-  "parentId": "string|null"
+  "parentId": "string|null",
+  "assigneeId": "string|null (default null)"
 }
 ```
 - 201: `Task`
@@ -218,7 +229,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### `POST /tasks/:taskId/subtasks`
 - Crea in blocco più sotto-task di `taskId` in un'unica chiamata (tutto o niente: se una riga non è valida non viene creato nulla)
-- Body: `{ "subtasks": [{ "title": "...", "description"?, "type"?, "priority"?, "complexity"?, "tags"?, "dueDate"? }] }` (almeno 1 elemento)
+- Body: `{ "subtasks": [{ "title": "...", "description"?, "type"?, "priority"?, "complexity"?, "tags"?, "dueDate"?, "assigneeId"? }] }` (almeno 1 elemento)
 - 201: `Task[]` (le sotto-task create, tutte con `parentId = taskId`)
 - 400 `VALIDATION_ERROR`, 404 `NOT_FOUND` (parent inesistente)
 
@@ -276,7 +287,7 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 
 ### `GET /projects/:projectId/board`
 - Auth: JWT
-- Query: `priority?`, `tag?`, `search?`
+- Query: `priority?`, `tag?`, `search?`, `assigneeId?`, `ownerId?`
 - 200:
 ```json
 {
@@ -291,7 +302,7 @@ Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il 
 
 ### `GET /board` (aggregata, solo REST/UI — mai MCP)
 - Auth: JWT
-- Query: `projectIds?` (CSV, se omesso = tutti i progetti non archiviati), `priority?`, `tag?`, `search?`
+- Query: `projectIds?` (CSV, se omesso = tutti i progetti non archiviati), `priority?`, `tag?`, `search?`, `assigneeId?`, `ownerId?`
 - 200: stessa forma di sopra, con in più `projectId`/`projectName` su ogni card:
 ```json
 { "draft": [{ "...task", "projectId": "...", "projectName": "..." }], "todo": [...], "in_progress": [...], "testing": [...], "done": [...] }
@@ -389,7 +400,7 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 Stessa tabella `TaskEvent` delle notifiche, esposta per intero (incluse le azioni dell'utente corrente). Vedi `apps/server/src/services/activityService.ts`.
 
 Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_changed`, `task.deleted`, `comment.created`, `dependency.added`, `dependency.removed`, `attachment.added`, `attachment.deleted`.
-- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|type|priority|complexity|tags|dueDate|parentId`. Per `description` i valori non vengono salvati (`from`/`to` null). Valori troncati a 200 caratteri.
+- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|type|priority|complexity|tags|dueDate|parentId|assigneeId`. Per `description` i valori non vengono salvati (`from`/`to` null); per `assigneeId` `from`/`to` sono i nomi degli utenti. Valori troncati a 200 caratteri.
 - `dependency.*` è registrato sul task bloccato, con `relatedTaskId`/`relatedTaskTitle` del task che blocca.
 - `attachment.*` riporta `fileName`.
 - Riordino nella stessa colonna e `add_dependency` idempotente su dipendenza già esistente non generano eventi.
@@ -423,8 +434,12 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 ### Task
 
 **`list_tasks`**
-- Input: `{ status: z.enum(["draft","todo","in_progress","testing","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional() }`
+- Input: `{ status: z.enum(["draft","todo","in_progress","testing","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional(), assigneeId: z.string().optional(), ownerId: z.string().optional() }`
 - Output: `Task[]`
+
+**`list_assignees`**
+- Input: `{}`
+- Output: `[{ id, email, name }]` — utenti assegnabili ai task del progetto (admin e membri), da usare come `assigneeId`
 
 **`get_task`**
 - Input: `{ taskId: z.string() }`
@@ -443,8 +458,10 @@ z.object({
   tags: z.array(z.string()).default([]),
   dueDate: z.string().datetime().nullable().optional(),
   parentId: z.string().nullable().optional(),
+  assigneeId: z.string().nullable().optional(),
 })
 ```
+- `assigneeId`: admin o manager del progetto (vedi `list_assignees`); omesso = non assegnato. I task creati via MCP hanno `ownerId: null`
 - `parentId` crea direttamente una sotto-task di un task esistente (che non deve essere a sua volta una sotto-task: un solo livello di annidamento)
 - Output: `Task`
 - Errori: `VALIDATION_ERROR`, `NOT_FOUND` (`parentId` inesistente/altro progetto)

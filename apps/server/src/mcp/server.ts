@@ -18,6 +18,7 @@ import {
   createSubtasks,
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
+import { listProjectAssignees } from "../services/userService.js";
 import type { Actor } from "../services/notificationService.js";
 
 /** Il token MCP identifica un progetto, non un utente: gli eventi non sono "miei". */
@@ -84,8 +85,17 @@ export function createProjectMcpServer(projectId: string) {
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
+      assigneeId: z.string().optional(),
+      ownerId: z.string().optional(),
     },
     async (input) => withErrors(() => listTasks(projectId, input))
+  );
+
+  server.tool(
+    "list_assignees",
+    "Elenca gli utenti a cui si possono assegnare i task del progetto (admin e membri del progetto): usa l'id come assigneeId",
+    {},
+    async () => withErrors(() => listProjectAssignees(projectId))
   );
 
   server.tool(
@@ -114,6 +124,7 @@ export function createProjectMcpServer(projectId: string) {
       tags: z.array(z.string()).default([]),
       dueDate: z.string().datetime().nullable().optional(),
       parentId: z.string().nullable().optional(),
+      assigneeId: z.string().nullable().optional(),
     },
     async (input) => withErrors(() => createTask(projectId, input, MCP_ACTOR))
   );
@@ -134,6 +145,7 @@ export function createProjectMcpServer(projectId: string) {
             complexity: complexitySchema,
             tags: z.array(z.string()).default([]),
             dueDate: z.string().datetime().nullable().optional(),
+            assigneeId: z.string().nullable().optional(),
           })
         )
         .min(1),
@@ -159,6 +171,7 @@ export function createProjectMcpServer(projectId: string) {
       tags: z.array(z.string()).optional(),
       dueDate: z.string().datetime().nullable().optional(),
       parentId: z.string().nullable().optional(),
+      assigneeId: z.string().nullable().optional(),
     },
     async ({ taskId, ...rest }) =>
       withErrors(async () => {

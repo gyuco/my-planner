@@ -70,7 +70,7 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
   }
 
   function changeValue(change: TaskFieldChange, value: string | null): string {
-    if (value === null) return "—";
+    if (value === null) return change.field === "assigneeId" ? t.assignee.unassigned : "—";
     if (change.field === "dueDate") return formatDate(value);
     if (change.field === "type" && (TASK_TYPES as readonly string[]).includes(value)) {
       return t.taskType[value as TaskType];

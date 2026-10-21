@@ -22,6 +22,7 @@ import { useI18n } from "../i18n";
 import { useActivityFeed } from "../lib/activity";
 import { ActivityList } from "./ActivityList";
 import { TaskTypePicker } from "./TaskTypePicker";
+import { AssigneeSelect } from "./AssigneeSelect";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const ACTIVITY_POLL_INTERVAL_MS = 10_000;
@@ -79,7 +80,13 @@ function toDateInputValue(iso: string | null): string {
   return iso.slice(0, 10);
 }
 
-export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }: TaskDrawerProps) {
+export function TaskDrawer({
+  taskId,
+  projectId,
+  onClose,
+  onChanged,
+  onOpenTask,
+}: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const STATUS_LABEL: Record<TaskStatus, string> = {
     draft: t.board.draft,
@@ -191,6 +198,17 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
         tags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       });
+      setTask((prev) => (prev ? { ...prev, ...updated } : updated));
+      onChanged();
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
+    }
+  }
+
+  async function handleChangeAssignee(assigneeId: string | null) {
+    if (!task || assigneeId === task.assigneeId) return;
+    try {
+      const updated = await updateTask(taskId, { assigneeId });
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
     } catch (err) {
@@ -435,6 +453,13 @@ export function TaskDrawer({ taskId, projectId, onClose, onChanged, onOpenTask }
                     {t.taskDrawer.noDescription}
                   </div>
                 )}
+              </div>
+              <div className="modal-row">
+                <AssigneeSelect projectId={projectId} value={task.assigneeId} onChange={handleChangeAssignee} />
+                <label>
+                  {t.taskDrawer.ownerLabel}
+                  <input value={task.ownerName ?? t.taskDrawer.ownerUnknown} readOnly disabled />
+                </label>
               </div>
               <div className="modal-row">
                 <label>

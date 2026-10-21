@@ -33,6 +33,15 @@ function colorForProject(projectId: string): string {
   return PROJECT_COLOR_PALETTE[hash % PROJECT_COLOR_PALETTE.length];
 }
 
+/** Iniziali per l'avatar dell'assegnatario: nome e cognome, oppure l'email. */
+function initials(name: string): string {
+  const parts = name.split(/[\s@.]+/).filter(Boolean);
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join("");
+}
+
 interface TaskCardProps {
   task: BoardTask;
   showProject?: boolean;
@@ -202,6 +211,15 @@ export function TaskCard({
         )}
         {task.dueDate && (
           <span className="task-card-due">{new Date(task.dueDate).toLocaleDateString(dateLocale)}</span>
+        )}
+        {task.assigneeName && (
+          <span
+            className="task-card-assignee"
+            title={t.assignee.assignedTo.replace("{name}", task.assigneeName)}
+            aria-label={t.assignee.assignedTo.replace("{name}", task.assigneeName)}
+          >
+            {initials(task.assigneeName)}
+          </span>
         )}
       </div>
     </div>

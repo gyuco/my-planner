@@ -4,6 +4,7 @@ import type { TaskPriority, TaskComplexity, TaskType } from "@my-planner/core";
 import { ApiRequestError, createTask, uploadAttachment } from "../api";
 import { useI18n } from "../i18n";
 import { TaskTypePicker } from "./TaskTypePicker";
+import { AssigneeSelect } from "./AssigneeSelect";
 
 interface CreateTaskModalProps {
   projectId: string;
@@ -21,6 +22,7 @@ function formatSize(bytes: number): string {
 
 export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskModalProps) {
   const { t } = useI18n();
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [type, setType] = useState<TaskType>("feature");
@@ -104,6 +106,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
         complexity: complexity === "" ? null : complexity,
         tags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
+        assigneeId,
       });
 
       onCreated();
@@ -143,6 +146,12 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
           {t.createTask.descriptionLabel}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
         </label>
+
+        <AssigneeSelect
+          projectId={projectId}
+          value={assigneeId}
+          onChange={setAssigneeId}
+        />
 
         <div className={`advanced-section${advancedOpen ? " is-open" : ""}`}>
           <button

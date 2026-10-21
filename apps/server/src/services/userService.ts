@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import {
   ApiErrorException,
   type AuthUser,
+  type TaskAssignee,
   type UserAccount,
   type UserRole,
 } from "@my-planner/core";
@@ -86,6 +87,23 @@ export async function assertAttachmentAccess(
   if (!attachment) throw new ApiErrorException("NOT_FOUND", "Allegato non trovato");
   await assertProjectAccess(user, attachment.task.projectId);
   return { taskId: attachment.taskId, projectId: attachment.task.projectId };
+}
+
+/**
+ * Assegnatari possibili per i task di un progetto: tutti gli admin piu' i
+ * manager associati al progetto (stessa regola validata da taskService).
+ */
+export async function listProjectAssignees(projectId: string): Promise<TaskAssignee[]> {
+  const users = await prisma.user.findMany({
+    where: { OR: [{ role: "admin" }, { projects: { some: { projectId } } }] },
+    select: { id: true, firstName: true, lastName: true, email: true },
+    orderBy: { email: "asc" },
+  });
+  return users.map((u) => ({
+    id: u.id,
+    email: u.email,
+    name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email,
+  }));
 }
 
 /** Progetti visibili all'utente (tutti per l'admin, solo gli assegnati per il manager). */
