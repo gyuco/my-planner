@@ -7,6 +7,7 @@ import {
   type TaskComplexity,
   type TaskFieldChange,
   type TaskStatus,
+  type TaskType,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
@@ -158,6 +159,7 @@ export async function unarchiveProject(projectId: string) {
 export interface TaskInput {
   title: string;
   description?: string;
+  type?: TaskType;
   priority?: TaskPriority;
   complexity?: TaskComplexity | null;
   tags?: string[];
@@ -222,6 +224,7 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
       projectId,
       title: input.title,
       description: input.description ?? "",
+      type: input.type ?? "feature",
       priority: input.priority ?? "medium",
       complexity: input.complexity ?? null,
       tags: tagsToCsv(input.tags) ?? "",
@@ -300,6 +303,7 @@ export async function getTask(taskId: string) {
 export interface TaskUpdateInput {
   title?: string;
   description?: string;
+  type?: TaskType;
   priority?: TaskPriority;
   complexity?: TaskComplexity | null;
   tags?: string[];
@@ -322,7 +326,7 @@ function changeValue(value: unknown): string | null {
  */
 function diffTask(before: any, after: any): TaskFieldChange[] {
   const changes: TaskFieldChange[] = [];
-  const fields = ["title", "priority", "complexity", "tags", "dueDate", "parentId"] as const;
+  const fields = ["title", "type", "priority", "complexity", "tags", "dueDate", "parentId"] as const;
   for (const field of fields) {
     const from = changeValue(before[field]);
     const to = changeValue(after[field]);
@@ -355,6 +359,7 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
   const data: any = {};
   if (input.title !== undefined) data.title = input.title;
   if (input.description !== undefined) data.description = input.description;
+  if (input.type !== undefined) data.type = input.type;
   if (input.priority !== undefined) data.priority = input.priority;
   if (input.complexity !== undefined) data.complexity = input.complexity;
   if (input.tags !== undefined) data.tags = tagsToCsv(input.tags);
@@ -576,6 +581,7 @@ export async function createSubtasks(
           parentId,
           title: input.title,
           description: input.description ?? "",
+          type: input.type ?? "feature",
           priority: input.priority ?? "medium",
           complexity: input.complexity ?? null,
           tags: tagsToCsv(input.tags) ?? "",

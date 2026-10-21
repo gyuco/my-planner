@@ -1,4 +1,5 @@
-import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskStatus } from "@my-planner/core";
+import { TASK_TYPES } from "@my-planner/core";
+import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskStatus, TaskType } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n/en";
 
@@ -71,6 +72,9 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
   function changeValue(change: TaskFieldChange, value: string | null): string {
     if (value === null) return "—";
     if (change.field === "dueDate") return formatDate(value);
+    if (change.field === "type" && (TASK_TYPES as readonly string[]).includes(value)) {
+      return t.taskType[value as TaskType];
+    }
     return value;
   }
 

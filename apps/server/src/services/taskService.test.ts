@@ -72,6 +72,7 @@ describe("taskService — task CRUD", () => {
     const task = await createTask(project.id, { title: "Fare qualcosa" });
     expect(task.title).toBe("Fare qualcosa");
     expect(task.priority).toBe("medium");
+    expect(task.type).toBe("feature");
     expect(task.status).toBe("draft");
     expect(task.tags).toEqual([]);
     expect(task.description).toBe("");
@@ -83,6 +84,14 @@ describe("taskService — task CRUD", () => {
     await expect(createTask(project.id, { title: "a".repeat(301) })).rejects.toMatchObject({
       code: "VALIDATION_ERROR",
     });
+  });
+
+  it("salva e aggiorna il tipo di ticket", async () => {
+    const project = await setupProject();
+    const task = await createTask(project.id, { title: "Crash al login", type: "bug" });
+    expect(task.type).toBe("bug");
+    const updated = await updateTask(task.id, { type: "analysis" });
+    expect(updated.type).toBe("analysis");
   });
 
   it("rifiuta complexity non-Fibonacci", async () => {

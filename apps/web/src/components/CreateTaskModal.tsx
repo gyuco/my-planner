@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
-import type { TaskPriority, TaskComplexity } from "@my-planner/core";
+import type { TaskPriority, TaskComplexity, TaskType } from "@my-planner/core";
 import { ApiRequestError, createTask, uploadAttachment } from "../api";
 import { useI18n } from "../i18n";
+import { TaskTypePicker } from "./TaskTypePicker";
 
 interface CreateTaskModalProps {
   projectId: string;
@@ -22,6 +23,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
   const { t } = useI18n();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [type, setType] = useState<TaskType>("feature");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [complexity, setComplexity] = useState<TaskComplexity | "">("");
   const [tagsInput, setTagsInput] = useState("");
@@ -97,6 +99,7 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
       const task = await createTask(projectId, {
         title,
         description,
+        type,
         priority,
         complexity: complexity === "" ? null : complexity,
         tags,
@@ -125,6 +128,11 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
     <div className="modal-overlay" onClick={onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h2>{t.createTask.title}</h2>
+
+        <div className="field">
+          <span className="field-label">{t.taskType.label}</span>
+          <TaskTypePicker value={type} onChange={setType} />
+        </div>
 
         <label>
           {t.createTask.titleLabel}

@@ -7,6 +7,7 @@ import type {
   TaskPriority,
   TaskStatus,
   TaskComplexity,
+  TaskType,
   TaskDependency,
   Comment,
   Attachment,
@@ -243,6 +244,7 @@ export function getAggregatedBoard(
 export interface CreateTaskInput {
   title: string;
   description?: string;
+  type?: TaskType;
   priority?: TaskPriority;
   complexity?: TaskComplexity | null;
   tags?: string[];
@@ -260,6 +262,7 @@ export function createTask(projectId: string, input: CreateTaskInput): Promise<T
 export interface CreateSubtaskInput {
   title: string;
   description?: string;
+  type?: TaskType;
   priority?: TaskPriority;
   complexity?: TaskComplexity | null;
   tags?: string[];
@@ -296,6 +299,7 @@ export function getTask(taskId: string): Promise<Task> {
 export interface UpdateTaskInput {
   title?: string;
   description?: string;
+  type?: TaskType;
   priority?: TaskPriority;
   complexity?: TaskComplexity | null;
   tags?: string[];

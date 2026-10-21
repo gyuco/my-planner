@@ -204,6 +204,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 {
   "title": "string (required, 1..300)",
   "description": "string (markdown, default \"\")",
+  "type": "bug|feature|analysis (default feature)",
   "priority": "low|medium|high|urgent (default medium)",
   "complexity": "1|2|3|5|8|13|21|null",
   "tags": ["string"],
@@ -217,7 +218,7 @@ Mapping MCP: i tool non restituiscono HTTP status; usano sempre lo stesso `code`
 
 ### `POST /tasks/:taskId/subtasks`
 - Crea in blocco più sotto-task di `taskId` in un'unica chiamata (tutto o niente: se una riga non è valida non viene creato nulla)
-- Body: `{ "subtasks": [{ "title": "...", "description"?, "priority"?, "complexity"?, "tags"?, "dueDate"? }] }` (almeno 1 elemento)
+- Body: `{ "subtasks": [{ "title": "...", "description"?, "type"?, "priority"?, "complexity"?, "tags"?, "dueDate"? }] }` (almeno 1 elemento)
 - 201: `Task[]` (le sotto-task create, tutte con `parentId = taskId`)
 - 400 `VALIDATION_ERROR`, 404 `NOT_FOUND` (parent inesistente)
 
@@ -388,7 +389,7 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 Stessa tabella `TaskEvent` delle notifiche, esposta per intero (incluse le azioni dell'utente corrente). Vedi `apps/server/src/services/activityService.ts`.
 
 Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_changed`, `task.deleted`, `comment.created`, `dependency.added`, `dependency.removed`, `attachment.added`, `attachment.deleted`.
-- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|priority|complexity|tags|dueDate|parentId`. Per `description` i valori non vengono salvati (`from`/`to` null). Valori troncati a 200 caratteri.
+- `task.updated` è emesso solo se almeno un campo cambia davvero (diff prima/dopo); `changes: [{ field, from, to }]` con `field` ∈ `title|description|type|priority|complexity|tags|dueDate|parentId`. Per `description` i valori non vengono salvati (`from`/`to` null). Valori troncati a 200 caratteri.
 - `dependency.*` è registrato sul task bloccato, con `relatedTaskId`/`relatedTaskTitle` del task che blocca.
 - `attachment.*` riporta `fileName`.
 - Riordino nella stessa colonna e `add_dependency` idempotente su dipendenza già esistente non generano eventi.
@@ -436,6 +437,7 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 z.object({
   title: z.string().min(1).max(300),
   description: z.string().default(""),
+  type: z.enum(["bug","feature","analysis"]).default("feature"),
   priority: z.enum(["low","medium","high","urgent"]).default("medium"),
   complexity: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(5),z.literal(8),z.literal(13),z.literal(21)]).nullable().optional(),
   tags: z.array(z.string()).default([]),
@@ -448,7 +450,7 @@ z.object({
 - Errori: `VALIDATION_ERROR`, `NOT_FOUND` (`parentId` inesistente/altro progetto)
 
 **`create_subtasks`**
-- Input: `{ parentId: z.string(), subtasks: z.array({ title, description?, priority?, complexity?, tags?, dueDate? }).min(1) }`
+- Input: `{ parentId: z.string(), subtasks: z.array({ title, description?, type?, priority?, complexity?, tags?, dueDate? }).min(1) }`
 - Crea in blocco un gruppo di sotto-task sotto `parentId` in un'unica chiamata — pensato per scomporre un task grande (es. 13 elementi) senza 13 chiamate separate a `create_task`. Tutto o niente.
 - Output: `Task[]`
 - Errori: `VALIDATION_ERROR`, `NOT_FOUND`, `FORBIDDEN`
