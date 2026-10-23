@@ -2358,15 +2358,21 @@ body.dnd-dragging * {
 
 .drawer-description-empty { color: var(--ink-300); font-style: italic; }
 
-.drawer-description-preview :first-child { margin-top: 0; }
-.drawer-description-preview :last-child { margin-bottom: 0; }
+.drawer-description-preview :first-child,
+.comment-body :first-child { margin-top: 0; }
+.drawer-description-preview :last-child,
+.comment-body :last-child { margin-bottom: 0; }
 .drawer-description-preview h1,
 .drawer-description-preview h2,
-.drawer-description-preview h3 {
+.drawer-description-preview h3,
+.comment-body h1,
+.comment-body h2,
+.comment-body h3 {
   letter-spacing: -0.02em;
   color: var(--ink-900);
 }
-.drawer-description-preview pre {
+.drawer-description-preview pre,
+.comment-body pre {
   background: var(--ink-900);
   color: #e4e1f2;
   padding: 0.85rem 1rem;
@@ -2375,7 +2381,8 @@ body.dnd-dragging * {
   font-size: 0.82rem;
   line-height: 1.55;
 }
-.drawer-description-preview code {
+.drawer-description-preview code,
+.comment-body code {
   background: var(--indigo-50);
   color: var(--indigo-700);
   padding: 0.1rem 0.35rem;
@@ -2383,20 +2390,29 @@ body.dnd-dragging * {
   font-family: var(--font-mono);
   font-size: 0.85em;
 }
-.drawer-description-preview pre code { background: none; color: inherit; padding: 0; }
-.drawer-description-preview blockquote {
+.drawer-description-preview pre code,
+.comment-body pre code { background: none; color: inherit; padding: 0; }
+.drawer-description-preview blockquote,
+.comment-body blockquote {
   margin: 0;
   padding: 0.25rem 0 0.25rem 1rem;
   border-left: 3px solid var(--indigo-300);
   color: var(--ink-500);
 }
 .drawer-description-preview ul,
-.drawer-description-preview ol { padding-left: 1.4rem; }
-.drawer-description-preview a { color: var(--indigo-600); text-underline-offset: 2px; }
-.drawer-description-preview table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+.drawer-description-preview ol,
+.comment-body ul,
+.comment-body ol { padding-left: 1.4rem; }
+.drawer-description-preview a,
+.comment-body a { color: var(--indigo-600); text-underline-offset: 2px; }
+.drawer-description-preview table,
+.comment-body table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
 .drawer-description-preview th,
-.drawer-description-preview td { border: 1px solid var(--line); padding: 0.4rem 0.7rem; }
-.drawer-description-preview th { background: var(--line-soft); font-weight: 700; }
+.drawer-description-preview td,
+.comment-body th,
+.comment-body td { border: 1px solid var(--line); padding: 0.4rem 0.7rem; }
+.drawer-description-preview th,
+.comment-body th { background: var(--line-soft); font-weight: 700; }
 
 /* --- Liste dentro il drawer ---------------------------------------------- */
 
@@ -2494,6 +2510,16 @@ body.dnd-dragging * {
 }
 
 .comment-date { font-size: 0.7rem; color: var(--ink-300); font-weight: 600; }
+
+.comment-body {
+  width: 100%;
+  line-height: 1.6;
+  font-size: 0.9rem;
+  color: var(--ink-700);
+  overflow-wrap: anywhere;
+}
+
+.comment-body p { margin: 0.4rem 0; }
 
 .attachment-size { color: var(--ink-300); font-size: 0.78rem; font-weight: 500; }
 

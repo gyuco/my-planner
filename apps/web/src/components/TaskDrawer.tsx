@@ -611,7 +611,10 @@ export function TaskDrawer({
                 {comments.map((c) => (
                   <li key={c.id}>
                     <div className="comment-date">{formatDateTime(c.createdAt)}</div>
-                    <div>{c.body}</div>
+                    <div
+                      className="comment-body"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(c.body) }}
+                    />
                   </li>
                 ))}
                 {comments.length === 0 && <li className="drawer-empty">{t.taskDrawer.noComments}</li>}
