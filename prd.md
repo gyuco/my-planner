@@ -47,7 +47,7 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
 
 ### Allegati — storage pluggabile
 - Backend **locale** (filesystem) o **cloud** (S3-compatibile), scelto via configurazione
-- Limiti: max **20MB** per file; tipi ammessi: immagini, PDF, documenti Office, testo/markdown, zip. Eseguibili e script bloccati.
+- Limiti: max **20MB** per file (**50MB** per i video); tipi ammessi: immagini, video (mp4, m4v, mov, webm, mkv, avi), PDF, documenti Office, testo/markdown, zip. Eseguibili e script bloccati.
 
 ### Server MCP
 Transport: **stdio** (Claude Code/Desktop locali) e **HTTP** (uso remoto). Autenticazione via token di progetto.

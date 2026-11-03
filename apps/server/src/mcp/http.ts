@@ -15,11 +15,11 @@ import "../lib/email/index.js";
  */
 // bodyLimit più alto del default (1MB): via MCP gli allegati arrivano come
 // base64 inline nel body JSON-RPC (attach_file, vedi API_CONTRACT.md §7),
-// quindi il body puo' superare abbondantemente i 20MB del file originale
-// una volta codificato in base64 (~+33%) + overhead JSON-RPC. Il limite
-// applicativo dei 20MB resta comunque applicato dal service layer
+// quindi il body puo' superare abbondantemente il file originale (fino a
+// 50MB per i video) una volta codificato in base64 (~+33%) + overhead
+// JSON-RPC. Il limite applicativo resta applicato dal service layer
 // (attachmentService.validateAttachment) sul contenuto decodificato.
-const app = Fastify({ logger: true, bodyLimit: 30 * 1024 * 1024 });
+const app = Fastify({ logger: true, bodyLimit: 75 * 1024 * 1024 });
 
 app.setErrorHandler((err, _req, reply) => {
   if (err instanceof ApiErrorException) {

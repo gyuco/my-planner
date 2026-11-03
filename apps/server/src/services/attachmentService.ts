@@ -12,6 +12,13 @@ import { SYSTEM_ACTOR, type Actor } from "./notificationService.js";
  */
 
 export const MAX_ATTACHMENT_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
+// I video hanno un limite dedicato piu' alto. Resta sotto i 100MB di body
+// e i 128MB di memoria dei Worker Cloudflare: l'upload e' bufferizzato.
+export const MAX_VIDEO_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+/** Limite massimo assoluto per un upload, usato per i limiti di trasporto (multipart/body). */
+export const MAX_UPLOAD_SIZE_BYTES = Math.max(MAX_ATTACHMENT_SIZE_BYTES, MAX_VIDEO_ATTACHMENT_SIZE_BYTES);
+
+const VIDEO_EXTENSIONS = new Set(["mp4", "m4v", "mov", "webm", "mkv", "avi"]);
 
 // Estensione -> MIME accettati per quell'estensione (informativo; la
 // validazione principale è su whitelist di estensione + controllo magic-byte
@@ -37,6 +44,8 @@ const ALLOWED_EXTENSIONS = new Set([
   "md",
   // zip
   "zip",
+  // video
+  ...VIDEO_EXTENSIONS,
 ]);
 
 const BLOCKED_EXTENSIONS = new Set([
@@ -85,18 +94,21 @@ function hasExecutableMagic(buffer: Buffer): boolean {
 }
 
 export function validateAttachment(fileName: string, size: number, buffer: Buffer): void {
-  if (size > MAX_ATTACHMENT_SIZE_BYTES) {
-    throw new ApiErrorException(
-      "ATTACHMENT_TOO_LARGE",
-      `Il file supera la dimensione massima consentita di 20MB (${size} byte)`
-    );
-  }
-
   const ext = getExtension(fileName);
   if (!ext || BLOCKED_EXTENSIONS.has(ext) || !ALLOWED_EXTENSIONS.has(ext)) {
     throw new ApiErrorException(
       "ATTACHMENT_TYPE_NOT_ALLOWED",
-      `Tipo di file "${ext || fileName}" non ammesso (ammessi: immagini, PDF, Office, testo/markdown, zip)`
+      `Tipo di file "${ext || fileName}" non ammesso (ammessi: immagini, video, PDF, Office, testo/markdown, zip)`
+    );
+  }
+
+  const isVideo = VIDEO_EXTENSIONS.has(ext);
+  const maxSize = isVideo ? MAX_VIDEO_ATTACHMENT_SIZE_BYTES : MAX_ATTACHMENT_SIZE_BYTES;
+  if (size > maxSize) {
+    const maxMb = maxSize / (1024 * 1024);
+    throw new ApiErrorException(
+      "ATTACHMENT_TOO_LARGE",
+      `Il file supera la dimensione massima consentita di ${maxMb}MB${isVideo ? " per i video" : ""} (${size} byte)`
     );
   }
 

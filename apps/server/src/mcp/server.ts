@@ -265,7 +265,7 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "attach_file",
-    "Allega un file a taskId; il contenuto va passato come base64 inline (limite 20MB sul contenuto decodificato)",
+    "Allega un file a taskId; il contenuto va passato come base64 inline (limite sul contenuto decodificato: 20MB, 50MB per i video mp4/m4v/mov/webm/mkv/avi)",
     {
       taskId: z.string(),
       fileName: z.string(),
