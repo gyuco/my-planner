@@ -117,6 +117,7 @@ export const en = {
     creating: "Creating...",
     createError: "Error creating the task",
     attachmentUploadError: "Task created, but some attachments failed to upload",
+    created: "Task created",
   },
   createProject: {
     title: "New project",
@@ -316,6 +317,13 @@ export const en = {
     addSubtaskError: "Error creating the subtask",
     parentOf: "Subtask of:",
     openParent: "Open parent task",
+    saved: "Changes saved",
+    statusChanged: "Status updated",
+    deleteTask: "Delete task",
+    deleting: "Deleting...",
+    deleteConfirm: "Delete the task \"{title}\"? This cannot be undone.",
+    deleted: "Task deleted",
+    deleteError: "Error while deleting the task",
   },
   profile: {
     title: "Profile",

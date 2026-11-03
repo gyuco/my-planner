@@ -119,6 +119,7 @@ export const es: Dictionary = {
     creating: "Creando...",
     createError: "Error al crear la tarea",
     attachmentUploadError: "Tarea creada, pero algunos adjuntos no se pudieron subir",
+    created: "Tarea creada",
   },
   createProject: {
     title: "Nuevo proyecto",
@@ -319,6 +320,13 @@ export const es: Dictionary = {
     addSubtaskError: "Error al crear la subtarea",
     parentOf: "Subtarea de:",
     openParent: "Abrir tarea principal",
+    saved: "Cambios guardados",
+    statusChanged: "Estado actualizado",
+    deleteTask: "Eliminar tarea",
+    deleting: "Eliminando...",
+    deleteConfirm: "¿Eliminar la tarea \"{title}\"? Esta acción no se puede deshacer.",
+    deleted: "Tarea eliminada",
+    deleteError: "Error al eliminar la tarea",
   },
   profile: {
     title: "Perfil",

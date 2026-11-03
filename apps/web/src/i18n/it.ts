@@ -119,6 +119,7 @@ export const it: Dictionary = {
     creating: "Creazione...",
     createError: "Errore durante la creazione del task",
     attachmentUploadError: "Task creato, ma alcuni allegati non sono stati caricati",
+    created: "Task creato",
   },
   createProject: {
     title: "Nuovo progetto",
@@ -318,6 +319,13 @@ export const it: Dictionary = {
     addSubtaskError: "Errore durante la creazione della sotto-task",
     parentOf: "Sotto-task di:",
     openParent: "Apri task genitore",
+    saved: "Modifiche salvate",
+    statusChanged: "Stato aggiornato",
+    deleteTask: "Elimina task",
+    deleting: "Eliminazione...",
+    deleteConfirm: "Eliminare il task \"{title}\"? L'operazione non è reversibile.",
+    deleted: "Task eliminato",
+    deleteError: "Errore durante l'eliminazione del task",
   },
   profile: {
     title: "Profilo",
