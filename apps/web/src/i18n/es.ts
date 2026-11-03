@@ -327,6 +327,12 @@ export const es: Dictionary = {
     deleteConfirm: "¿Eliminar la tarea \"{title}\"? Esta acción no se puede deshacer.",
     deleted: "Tarea eliminada",
     deleteError: "Error al eliminar la tarea",
+    previewImage: "Vista previa de imagen",
+    playVideo: "Reproducir vídeo",
+    previewError: "No se pudo cargar la vista previa",
+    videoUnsupported: "Tu navegador no puede reproducir este vídeo: descárgalo para verlo.",
+    previous: "Anterior",
+    next: "Siguiente",
   },
   profile: {
     title: "Perfil",

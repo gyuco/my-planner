@@ -494,7 +494,12 @@ export function sendTestEmail(to?: string): Promise<{ ok: true; to: string }> {
  * un semplice link <a href>: si scarica come blob autenticato e si innesca
  * il salvataggio via un link temporaneo.
  */
-export async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
+/**
+ * Scarica il contenuto di un allegato come Blob (con header JWT). Usato sia
+ * per il download sia per le anteprime immagine/video (object URL).
+ * `type` forza il MIME del Blob quando il server non ne ha uno affidabile.
+ */
+export async function fetchAttachmentBlob(attachmentId: string, type?: string): Promise<Blob> {
   const token = getToken();
   const res = await fetch(`/api/attachments/${attachmentId}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -503,6 +508,11 @@ export async function downloadAttachment(attachmentId: string, fileName: string)
     throw new ApiRequestError(apiDownloadErrorMessage(res.status), res.status);
   }
   const blob = await res.blob();
+  return type && blob.type !== type ? new Blob([blob], { type }) : blob;
+}
+
+export async function downloadAttachment(attachmentId: string, fileName: string): Promise<void> {
+  const blob = await fetchAttachmentBlob(attachmentId);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

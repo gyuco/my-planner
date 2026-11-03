@@ -326,6 +326,12 @@ export const it: Dictionary = {
     deleteConfirm: "Eliminare il task \"{title}\"? L'operazione non è reversibile.",
     deleted: "Task eliminato",
     deleteError: "Errore durante l'eliminazione del task",
+    previewImage: "Anteprima immagine",
+    playVideo: "Riproduci video",
+    previewError: "Impossibile caricare l'anteprima",
+    videoUnsupported: "Il browser non riesce a riprodurre questo video: scaricalo per guardarlo.",
+    previous: "Precedente",
+    next: "Successivo",
   },
   profile: {
     title: "Profilo",

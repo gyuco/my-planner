@@ -25,6 +25,8 @@ import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { useActivityFeed } from "../lib/activity";
 import { ActivityList } from "./ActivityList";
+import { AttachmentThumb, MediaLightbox } from "./AttachmentPreview";
+import { previewKind } from "../lib/attachmentPreview";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
 
@@ -126,6 +128,7 @@ export function TaskDrawer({
   const [addingSubtasks, setAddingSubtasks] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
 
   async function handleCopyLink() {
@@ -402,6 +405,13 @@ export function TaskDrawer({
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  const mediaAttachments = useMemo(() => attachments.filter((a) => previewKind(a) !== null), [attachments]);
+
+  function openPreview(attachmentId: string) {
+    const idx = mediaAttachments.findIndex((a) => a.id === attachmentId);
+    if (idx !== -1) setLightboxIndex(idx);
   }
 
   const availableBlockers = projectTasks.filter(
@@ -691,8 +701,11 @@ export function TaskDrawer({
               <ul className="drawer-list">
                 {attachments.map((a) => (
                   <li key={a.id}>
-                    <span>
-                      {a.fileName} <span className="attachment-size">({formatSize(a.size)})</span>
+                    <span className="attachment-row-main">
+                      {previewKind(a) && <AttachmentThumb attachment={a} onOpen={() => openPreview(a.id)} />}
+                      <span>
+                        {a.fileName} <span className="attachment-size">({formatSize(a.size)})</span>
+                      </span>
                     </span>
                     <span className="drawer-list-actions">
                       <button type="button" onClick={() => handleDownload(a)}>
@@ -732,6 +745,17 @@ export function TaskDrawer({
           </div>
         )}
       </aside>
+      {lightboxIndex !== null && mediaAttachments[lightboxIndex] && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <MediaLightbox
+            items={mediaAttachments}
+            index={lightboxIndex}
+            onIndexChange={setLightboxIndex}
+            onClose={() => setLightboxIndex(null)}
+            onDownload={handleDownload}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -324,6 +324,12 @@ export const en = {
     deleteConfirm: "Delete the task \"{title}\"? This cannot be undone.",
     deleted: "Task deleted",
     deleteError: "Error while deleting the task",
+    previewImage: "Preview image",
+    playVideo: "Play video",
+    previewError: "Unable to load the preview",
+    videoUnsupported: "Your browser cannot play this video: download it to watch it.",
+    previous: "Previous",
+    next: "Next",
   },
   profile: {
     title: "Profile",

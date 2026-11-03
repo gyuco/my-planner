@@ -3237,3 +3237,132 @@ body.dnd-dragging * {
 @media (max-width: 640px) {
   .toast-stack { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
 }
+
+/* -------------------------------------------------------------------------
+   Anteprime allegati (miniature + lightbox immagini/video)
+   ------------------------------------------------------------------------- */
+.attachment-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.attachment-thumb {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-400);
+  cursor: zoom-in;
+}
+
+.attachment-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-thumb-video {
+  cursor: pointer;
+  color: #fff;
+  background: linear-gradient(135deg, var(--indigo-600), var(--violet-500));
+  border-color: transparent;
+}
+
+.attachment-thumb-video svg { width: 20px; height: 20px; }
+
+.attachment-thumb:hover { box-shadow: 0 0 0 2px var(--indigo-300); }
+
+.attachment-thumb-placeholder { font-size: 0.8rem; font-weight: 700; }
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 9, 18, 0.92);
+  animation: fade-in 0.15s var(--ease);
+}
+
+.lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+}
+
+.lightbox-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.lightbox-counter { color: rgba(255, 255, 255, 0.6); font-weight: 400; }
+
+.lightbox-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox-stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3.5rem 1.5rem;
+  margin: 0 auto;
+  max-width: 100%;
+}
+
+.lightbox-stage img,
+.lightbox-stage video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  background: #000;
+}
+
+.lightbox-message { color: rgba(255, 255, 255, 0.8); }
+
+.lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox-nav:hover { background: rgba(255, 255, 255, 0.26); }
+.lightbox-prev { left: 0.75rem; }
+.lightbox-next { right: 0.75rem; }
+
+@media (max-width: 640px) {
+  .lightbox-stage { padding: 0 0.5rem 1rem; }
+  .lightbox-nav { top: auto; bottom: 1rem; transform: none; }
+}
