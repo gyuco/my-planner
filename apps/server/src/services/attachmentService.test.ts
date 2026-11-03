@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { validateAttachment, MAX_ATTACHMENT_SIZE_BYTES } from "./attachmentService.js";
+import {
+  validateAttachment,
+  MAX_ATTACHMENT_SIZE_BYTES,
+  MAX_VIDEO_ATTACHMENT_SIZE_BYTES,
+} from "./attachmentService.js";
 
 describe("attachmentService — validateAttachment", () => {
   it("accetta un file di tipo/dimensione validi", () => {
@@ -11,6 +15,31 @@ describe("attachmentService — validateAttachment", () => {
     expect(() => validateAttachment("big.pdf", size, Buffer.from("x"))).toThrowError(
       expect.objectContaining({ code: "ATTACHMENT_TOO_LARGE" })
     );
+  });
+
+  it.each(["demo.mp4", "clip.MOV", "screen.webm", "rec.m4v", "video.mkv", "old.avi"])(
+    "accetta il video %s",
+    (name) => {
+      expect(() => validateAttachment(name, 1024, Buffer.from("\x00\x00\x00\x18ftypmp42"))).not.toThrow();
+    }
+  );
+
+  it("accetta un video oltre 20MB fino a 50MB", () => {
+    expect(() =>
+      validateAttachment("demo.mp4", MAX_VIDEO_ATTACHMENT_SIZE_BYTES, Buffer.from("x"))
+    ).not.toThrow();
+  });
+
+  it("rifiuta un video oltre 50MB con ATTACHMENT_TOO_LARGE", () => {
+    expect(() =>
+      validateAttachment("demo.mp4", MAX_VIDEO_ATTACHMENT_SIZE_BYTES + 1, Buffer.from("x"))
+    ).toThrowError(expect.objectContaining({ code: "ATTACHMENT_TOO_LARGE" }));
+  });
+
+  it("non estende il limite video ai file non video", () => {
+    expect(() =>
+      validateAttachment("big.pdf", MAX_ATTACHMENT_SIZE_BYTES + 1024, Buffer.from("x"))
+    ).toThrowError(expect.objectContaining({ code: "ATTACHMENT_TOO_LARGE" }));
   });
 
   it("accetta un file esattamente a 20MB", () => {

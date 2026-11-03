@@ -55,7 +55,7 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `DEPENDENCY_BLOCKED` | 409 | Tentativo di move a `in_progress` con dipendenze non `done` |
 | `CIRCULAR_DEPENDENCY` | 409 | Dipendenza creerebbe un ciclo (diretto o indiretto) |
 | `INVALID_STATUS_TRANSITION` | 409 | Riservato per usi futuri — **v1 non lo emette**: tutte le transizioni `draft ↔ todo ↔ in_progress ↔ testing ↔ done` sono ammesse in entrambe le direzioni (si può riaprire un task tornando da `done` a `in_progress`), l'unico vincolo è `DEPENDENCY_BLOCKED` per entrare in `in_progress` |
-| `ATTACHMENT_TOO_LARGE` | 413 | File > 20MB |
+| `ATTACHMENT_TOO_LARGE` | 413 | File > 20MB (> 50MB per i video) |
 | `ATTACHMENT_TYPE_NOT_ALLOWED` | 415 | Tipo file non ammesso |
 | `CONFLICT` | 409 | Altri conflitti generici (es. nome progetto duplicato, se applicabile) |
 | `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
@@ -352,7 +352,7 @@ Ogni `Task` include `blockedByOpenCount` (numero di dipendenze non-done, per il 
 ### `POST /tasks/:taskId/attachments`
 - Auth: JWT
 - `multipart/form-data`, campo file `file`
-- Validazioni: dimensione ≤ 20MB, MIME/estensione in whitelist (immagini: png/jpg/jpeg/gif/webp; PDF; Office: doc/docx/xls/xlsx/ppt/pptx; testo/markdown: txt/md; zip). Eseguibili/script sempre rifiutati anche se rinominati (check MIME reale, non solo estensione).
+- Validazioni: dimensione ≤ 20MB (≤ 50MB per i video), MIME/estensione in whitelist (immagini: png/jpg/jpeg/gif/webp; video: mp4/m4v/mov/webm/mkv/avi; PDF; Office: doc/docx/xls/xlsx/ppt/pptx; testo/markdown: txt/md; zip). Eseguibili/script sempre rifiutati anche se rinominati (check MIME reale, non solo estensione).
 - 201: `Attachment` (senza contenuto binario, solo metadati)
 - 413 `ATTACHMENT_TOO_LARGE`
 - 415 `ATTACHMENT_TYPE_NOT_ALLOWED`
@@ -564,7 +564,7 @@ z.object({
 
 **`attach_file`**
 - Input: `{ taskId: z.string(), fileName: z.string(), mimeType: z.string(), contentBase64: z.string() }`
-  (via MCP il file arriva come base64 inline — non c'è multipart; il limite 20MB si applica al contenuto decodificato)
+  (via MCP il file arriva come base64 inline — non c'è multipart; il limite 20MB (50MB per i video) si applica al contenuto decodificato)
 - Output: `Attachment`
 - Errori: `ATTACHMENT_TOO_LARGE`, `ATTACHMENT_TYPE_NOT_ALLOWED`
 

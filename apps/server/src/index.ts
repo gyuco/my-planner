@@ -19,7 +19,7 @@ import { activityRoutes } from "./routes/activity.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { getAuthUser } from "./services/userService.js";
-import { MAX_ATTACHMENT_SIZE_BYTES } from "./services/attachmentService.js";
+import { MAX_UPLOAD_SIZE_BYTES } from "./services/attachmentService.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -45,11 +45,11 @@ const app = Fastify({ logger: true });
 app.register(jwt, { secret: process.env.JWT_SECRET });
 
 // Limite fastify-multipart volutamente più alto del limite applicativo
-// (MAX_ATTACHMENT_SIZE_BYTES, 20MB) cosi' che sia il service layer
+// (MAX_UPLOAD_SIZE_BYTES: 20MB, 50MB per i video) cosi' che sia il service layer
 // (attachmentService.validateAttachment) a restituire l'errore tipizzato
 // ATTACHMENT_TOO_LARGE, condiviso con MCP, invece di un errore generico
 // di fastify-multipart.
-app.register(multipart, { limits: { fileSize: MAX_ATTACHMENT_SIZE_BYTES + 1024 * 1024 } });
+app.register(multipart, { limits: { fileSize: MAX_UPLOAD_SIZE_BYTES + 1024 * 1024 } });
 
 app.decorate("authenticate", async function (req: any, reply: any) {
   try {
