@@ -38,6 +38,9 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Blocco sincrono contro doppio submit: `saving` disattiva il pulsante solo
+  // al render successivo, un doppio click/Invio rapido passerebbe comunque.
+  const submittingRef = useRef(false);
 
   // Quanti parametri avanzati sono stati personalizzati: mostrato come badge
   // accanto al toggle, così restano "fuori dai piedi" ma non invisibili.
@@ -93,6 +96,8 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     setSaving(true);
     try {
@@ -126,11 +131,12 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.createTask.createError);
       setSaving(false);
+      submittingRef.current = false;
     }
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={saving ? undefined : onClose}>
       <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmit}>
         <h2>{t.createTask.title}</h2>
 

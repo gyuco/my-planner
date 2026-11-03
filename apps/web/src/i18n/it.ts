@@ -332,6 +332,7 @@ export const it: Dictionary = {
     videoUnsupported: "Il browser non riesce a riprodurre questo video: scaricalo per guardarlo.",
     previous: "Precedente",
     next: "Successivo",
+    saving: "Salvataggio...",
   },
   profile: {
     title: "Profilo",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copyText } from "../lib/clipboard";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
@@ -128,6 +128,13 @@ export function TaskDrawer({
   const [addingSubtasks, setAddingSubtasks] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Blocco sincrono contro salvataggi concorrenti (doppio click su Salva, o
+  // blur + click insieme). Se arriva una richiesta mentre una e' in corso,
+  // la si ripete a fine salvataggio con lo stato piu' recente del form.
+  const savingRef = useRef(false);
+  const saveQueuedRef = useRef(false);
+  const saveFieldsRef = useRef<(overrides?: { type?: TaskType; explicit?: boolean }) => Promise<void>>();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
 
@@ -224,6 +231,12 @@ export function TaskDrawer({
       if (overrides.explicit) toast.success(t.taskDrawer.saved);
       return;
     }
+    if (savingRef.current) {
+      saveQueuedRef.current = true;
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
     try {
       const updated = await updateTask(taskId, {
         title,
@@ -239,8 +252,17 @@ export function TaskDrawer({
       toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+      if (saveQueuedRef.current) {
+        saveQueuedRef.current = false;
+        // Prossimo tick: lascia applicare setTask prima del confronto "changed".
+        setTimeout(() => saveFieldsRef.current?.());
+      }
     }
   }
+  saveFieldsRef.current = saveFields;
 
   async function handleChangeAssignee(assigneeId: string | null) {
     if (!task || assigneeId === task.assigneeId) return;
@@ -587,8 +609,14 @@ export function TaskDrawer({
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={() => saveFields()} />
                 </label>
               </div>
-              <button type="button" className="drawer-save-button" onClick={() => saveFields({ explicit: true })}>
-                {t.taskDrawer.save}
+              <button
+                type="button"
+                className="drawer-save-button"
+                onClick={() => saveFields({ explicit: true })}
+                disabled={saving}
+                aria-busy={saving}
+              >
+                {saving ? t.taskDrawer.saving : t.taskDrawer.save}
               </button>
             </section>
 
