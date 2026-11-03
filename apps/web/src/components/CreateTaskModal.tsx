@@ -3,6 +3,7 @@ import { FIBONACCI_COMPLEXITY } from "@my-planner/core";
 import type { TaskPriority, TaskComplexity, TaskType } from "@my-planner/core";
 import { ApiRequestError, createTask, uploadAttachment } from "../api";
 import { useI18n } from "../i18n";
+import { useToast } from "../lib/toast";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
 
@@ -22,6 +23,7 @@ function formatSize(bytes: number): string {
 
 export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskModalProps) {
   const { t } = useI18n();
+  const toast = useToast();
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -109,20 +111,20 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
         assigneeId,
       });
 
-      onCreated();
-
+      // Il task esiste gia': da qui in poi la modal si chiude comunque, un
+      // eventuale problema sugli allegati viene segnalato via toast.
+      let attachmentsFailed = false;
       if (files.length > 0) {
         const results = await Promise.allSettled(files.map((file) => uploadAttachment(task.id, file)));
-        if (results.some((r) => r.status === "rejected")) {
-          setError(t.createTask.attachmentUploadError);
-          return;
-        }
+        attachmentsFailed = results.some((r) => r.status === "rejected");
       }
 
+      onCreated();
+      if (attachmentsFailed) toast.error(t.createTask.attachmentUploadError);
+      else toast.success(t.createTask.created);
       onClose();
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.createTask.createError);
-    } finally {
       setSaving(false);
     }
   }

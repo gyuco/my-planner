@@ -3148,3 +3148,92 @@ body.dnd-dragging * {
   .stats-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .stats-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* -------------------------------------------------------------------------
+   Eliminazione task (drawer)
+   ------------------------------------------------------------------------- */
+.drawer-delete-task {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+  color: var(--danger);
+  background: var(--danger-bg);
+  border-color: transparent;
+}
+
+.drawer-delete-task:hover:not(:disabled) {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* -------------------------------------------------------------------------
+   Toast (conferme / errori globali)
+   ------------------------------------------------------------------------- */
+.toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(360px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink-900);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--info);
+  box-shadow: 0 10px 30px rgba(20, 19, 28, 0.16);
+  font-size: 0.88rem;
+  pointer-events: auto;
+  animation: toast-in 180ms ease-out;
+}
+
+.toast-success { border-left-color: var(--success); }
+.toast-error { border-left-color: var(--danger); }
+
+.toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--info);
+}
+
+.toast-success .toast-icon { background: var(--success); }
+.toast-error .toast-icon { background: var(--danger); }
+
+.toast-message { flex: 1; }
+
+.toast-close {
+  flex: none;
+  padding: 0 0.3rem;
+  border: none;
+  background: transparent;
+  color: var(--ink-400);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .toast-stack { left: 1rem; right: 1rem; bottom: 1rem; max-width: none; }
+}

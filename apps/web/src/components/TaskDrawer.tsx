@@ -10,6 +10,7 @@ import {
   addDependency,
   createSubtasks,
   deleteAttachment,
+  deleteTask,
   downloadAttachment,
   getTask,
   listAttachments,
@@ -21,6 +22,7 @@ import {
   uploadAttachment,
 } from "../api";
 import { useI18n } from "../i18n";
+import { useToast } from "../lib/toast";
 import { useActivityFeed } from "../lib/activity";
 import { ActivityList } from "./ActivityList";
 import { TaskTypePicker } from "./TaskTypePicker";
@@ -90,6 +92,7 @@ export function TaskDrawer({
   onOpenTask,
 }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
+  const toast = useToast();
   const STATUS_LABEL: Record<TaskStatus, string> = {
     draft: t.board.draft,
     todo: t.board.todo,
@@ -122,6 +125,7 @@ export function TaskDrawer({
   const [newSubtaskTitles, setNewSubtaskTitles] = useState("");
   const [addingSubtasks, setAddingSubtasks] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
 
   async function handleCopyLink() {
@@ -192,24 +196,44 @@ export function TaskDrawer({
     load();
   }, [load]);
 
-  async function saveFields(overrides: { type?: TaskType } = {}) {
+  /**
+   * Salva i campi del form. I campi salvano anche su blur: senza confronto col
+   * task corrente ogni uscita da un input farebbe una PATCH (e un toast) a vuoto.
+   * `explicit` = click su "Salva": conferma anche se non c'e' nulla da salvare.
+   */
+  async function saveFields(overrides: { type?: TaskType; explicit?: boolean } = {}) {
     if (!task) return;
+    const tags = tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const nextType = overrides.type ?? type;
+    const nextComplexity = complexity === "" ? null : complexity;
+    const changed =
+      title !== task.title ||
+      description !== task.description ||
+      nextType !== task.type ||
+      priority !== task.priority ||
+      nextComplexity !== (task.complexity ?? null) ||
+      tags.join(",") !== task.tags.join(",") ||
+      dueDate !== toDateInputValue(task.dueDate);
+    if (!changed) {
+      if (overrides.explicit) toast.success(t.taskDrawer.saved);
+      return;
+    }
     try {
-      const tags = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
       const updated = await updateTask(taskId, {
         title,
         description,
-        type: overrides.type ?? type,
+        type: nextType,
         priority,
-        complexity: complexity === "" ? null : complexity,
+        complexity: nextComplexity,
         tags,
         dueDate: dueDate ? new Date(dueDate).toISOString() : null,
       });
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
     }
@@ -221,6 +245,7 @@ export function TaskDrawer({
       const updated = await updateTask(taskId, { assigneeId });
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
     }
@@ -234,6 +259,7 @@ export function TaskDrawer({
       const updated = await moveTask(taskId, status);
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
+      toast.success(t.taskDrawer.statusChanged);
     } catch (err) {
       if (err instanceof ApiRequestError && err.code === "DEPENDENCY_BLOCKED") {
         setStatusError(err.message);
@@ -254,6 +280,7 @@ export function TaskDrawer({
       setSelectedBlocker("");
       await load();
       onChanged();
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.addDependencyError);
     }
@@ -264,6 +291,7 @@ export function TaskDrawer({
       await removeDependency(taskId, blockedByTaskId);
       await load();
       onChanged();
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.removeDependencyError);
     }
@@ -290,6 +318,7 @@ export function TaskDrawer({
       setNewSubtaskTitles("");
       await load();
       onChanged();
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.addSubtaskError);
     } finally {
@@ -302,6 +331,7 @@ export function TaskDrawer({
       await moveTask(subtaskId, done ? "done" : "draft");
       await load();
       onChanged();
+      toast.success(t.taskDrawer.statusChanged);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.statusChangeError);
     }
@@ -326,6 +356,7 @@ export function TaskDrawer({
     try {
       const attachment = await uploadAttachment(taskId, file);
       setAttachments((prev) => [...prev, attachment]);
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.uploadError);
     } finally {
@@ -346,8 +377,24 @@ export function TaskDrawer({
     try {
       await deleteAttachment(attachmentId);
       setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+      toast.success(t.taskDrawer.saved);
     } catch (err) {
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.deleteAttachmentError);
+    }
+  }
+
+  async function handleDeleteTask() {
+    if (!task) return;
+    if (!window.confirm(t.taskDrawer.deleteConfirm.replace("{title}", task.title))) return;
+    setDeleting(true);
+    try {
+      await deleteTask(taskId);
+      toast.success(t.taskDrawer.deleted);
+      onChanged();
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : t.taskDrawer.deleteError);
+      setDeleting(false);
     }
   }
 
@@ -373,6 +420,17 @@ export function TaskDrawer({
             <button type="button" className="drawer-copy-link" onClick={handleCopyLink}>
               {linkCopied ? `✓ ${t.taskDrawer.linkCopied}` : `🔗 ${t.taskDrawer.copyLink}`}
             </button>
+            {task && (
+              <button
+                type="button"
+                className="drawer-delete-task"
+                onClick={handleDeleteTask}
+                disabled={deleting}
+                title={t.taskDrawer.deleteTask}
+              >
+                {deleting ? t.taskDrawer.deleting : `🗑 ${t.taskDrawer.deleteTask}`}
+              </button>
+            )}
             <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
               &times;
             </button>
@@ -519,7 +577,7 @@ export function TaskDrawer({
                   <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} onBlur={() => saveFields()} />
                 </label>
               </div>
-              <button type="button" className="drawer-save-button" onClick={() => saveFields()}>
+              <button type="button" className="drawer-save-button" onClick={() => saveFields({ explicit: true })}>
                 {t.taskDrawer.save}
               </button>
             </section>
