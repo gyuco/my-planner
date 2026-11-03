@@ -330,6 +330,7 @@ export const en = {
     videoUnsupported: "Your browser cannot play this video: download it to watch it.",
     previous: "Previous",
     next: "Next",
+    saving: "Saving...",
   },
   profile: {
     title: "Profile",

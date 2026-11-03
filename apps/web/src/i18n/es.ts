@@ -333,6 +333,7 @@ export const es: Dictionary = {
     videoUnsupported: "Tu navegador no puede reproducir este vídeo: descárgalo para verlo.",
     previous: "Anterior",
     next: "Siguiente",
+    saving: "Guardando...",
   },
   profile: {
     title: "Perfil",
