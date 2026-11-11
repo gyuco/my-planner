@@ -3398,3 +3398,76 @@ body.dnd-dragging * {
 .profile-avatar-actions button:not(.link-button) { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
 .profile-avatar-actions .link-button { color: var(--ink-500); font-weight: 500; }
 .profile-avatar-actions .link-button:hover { color: var(--danger); }
+
+/* --- Ritaglio avatar ------------------------------------------------------ */
+.avatar-crop-modal { max-width: 360px; align-items: center; text-align: center; }
+.avatar-crop-modal .modal-actions { align-self: stretch; }
+
+.avatar-crop-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: var(--ink-900);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+.avatar-crop-viewport:active { cursor: grabbing; }
+.avatar-crop-viewport img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+/* Maschera circolare: fuori dal cerchio l'immagine e' velata. */
+.avatar-crop-viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgba(28, 26, 23, 0.55);
+  outline: 2px solid rgba(255, 253, 249, 0.85);
+  outline-offset: -2px;
+  pointer-events: none;
+}
+
+.avatar-crop-zoom {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  font-size: 0.82rem;
+  color: var(--ink-500);
+}
+.avatar-crop-zoom input { flex: 1; accent-color: var(--accent-500); }
+
+.avatar-crop-modal .avatar-crop-confirm {
+  background: var(--accent-500);
+  border-color: var(--accent-500);
+  color: #fff;
+}
+.avatar-crop-modal .avatar-crop-confirm:hover:not(:disabled) { background: var(--accent-600); }
+
+/* Foto dell'assegnatario sulla card. */
+.task-card-assignee { overflow: hidden; }
+.task-card-assignee:has(.avatar-img) { background: var(--surface); }
+
+/* Lo slider non deve ereditare lo stile dei campi testo della modale. */
+.modal .avatar-crop-zoom input[type="range"] {
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Su mobile la modale di ritaglio resta una card centrata, non a tutto schermo. */
+@media (max-width: 700px) {
+  .avatar-crop-modal {
+    height: auto;
+    max-width: 360px;
+    border-radius: var(--r-lg);
+  }
+}

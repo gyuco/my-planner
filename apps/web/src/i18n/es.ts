@@ -337,6 +337,11 @@ export const es: Dictionary = {
     saving: "Guardando...",
   },
   profile: {
+    avatarCropTitle: "Recortar foto",
+    avatarCropHint: "Arrastra para mover, usa el control o la rueda para hacer zoom.",
+    avatarZoom: "Zoom",
+    avatarCropApply: "Guardar foto",
+    avatarCropCancel: "Cancelar",
     avatarUpload: "Subir foto",
     avatarChange: "Cambiar foto",
     avatarRemove: "Quitar foto",

@@ -126,6 +126,11 @@ export function getMyAvatar(): Promise<{ dataUrl: string | null }> {
   return apiFetch("/auth/me/avatar");
 }
 
+/** Avatar di un utente visibile (es. assegnatario sulle card). */
+export function getUserAvatar(userId: string): Promise<{ dataUrl: string | null }> {
+  return apiFetch(`/avatars/${encodeURIComponent(userId)}`);
+}
+
 /** Carica un avatar gia' ridimensionato (data URL PNG/JPEG/WebP). */
 export function uploadMyAvatar(dataUrl: string): Promise<AuthUser> {
   return apiFetch("/auth/me/avatar", { method: "PUT", body: JSON.stringify({ dataUrl }) });

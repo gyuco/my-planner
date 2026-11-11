@@ -127,6 +127,12 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - Auth: JWT
 - 200: utente nella forma di `GET /auth/me` con `avatarVersion: null`.
 
+`GET /avatars/:userId`
+- Auth: JWT
+- 200: `{ "dataUrl": string | null }` — avatar di un altro utente, usato per gli assegnatari sulle card. Visibile a se stessi, agli admin e a chi condivide almeno un progetto con l'utente (gli admin, che accedono a tutti i progetti, sono visibili a tutti).
+- 403 `FORBIDDEN` se l'utente non è visibile; 404 `NOT_FOUND` se non esiste.
+- I `Task` restituiti da REST/MCP includono `assigneeAvatarVersion: number | null` (timestamp dell'ultimo upload dell'assegnatario) per la cache lato client.
+
 ### Gestione utenti (solo `admin`)
 `GET /users`
 - 200: lista di `{ id, email, firstName, lastName, role, createdAt, projectIds, projects: [{ id, name }] }` (nessun hash password).

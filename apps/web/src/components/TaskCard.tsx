@@ -1,6 +1,7 @@
 import { suggestParentStatus, type Task, type TaskPriority, type TaskStatus } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import { AlertIcon, ListChecksIcon, LockIcon, SubtaskIcon } from "./Icons";
+import { UserAvatarContent } from "../lib/avatar";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
 export interface BoardTask extends Task {
@@ -209,7 +210,11 @@ export function TaskCard({
             title={t.assignee.assignedTo.replace("{name}", task.assigneeName)}
             aria-label={t.assignee.assignedTo.replace("{name}", task.assigneeName)}
           >
-            {initials(task.assigneeName)}
+            <UserAvatarContent
+              userId={task.assigneeId}
+              version={task.assigneeAvatarVersion}
+              fallback={initials(task.assigneeName)}
+            />
           </span>
         )}
       </div>

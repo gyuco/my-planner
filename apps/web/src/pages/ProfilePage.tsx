@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { AuthUser, Project } from "@my-planner/core";
 import { ApiRequestError, changeMyPassword, deleteMyAvatar, updateMyProfile, uploadMyAvatar } from "../api";
-import { OwnAvatarContent, imageFileToAvatarDataUrl, primeAvatarCache } from "../lib/avatar";
+import { OwnAvatarContent, primeAvatarCache } from "../lib/avatar";
+import { AvatarCropModal } from "../components/AvatarCropModal";
 import { useI18n } from "../i18n";
 import { displayName } from "../lib/user";
 
@@ -34,6 +35,8 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  // File scelto in attesa di ritaglio: apre AvatarCropModal.
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   // Se l'utente cambia (refresh sessione, modifica dal pannello admin) i campi
   // tornano a riflettere i valori persistiti.
@@ -76,24 +79,29 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
     }
   }
 
-  async function handleAvatarFile(file: File | undefined) {
+  function handleAvatarFile(file: File | undefined) {
+    if (avatarInputRef.current) avatarInputRef.current.value = "";
     if (!file) return;
     setAvatarError(null);
     if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
       setAvatarError(t.profile.avatarInvalid);
       return;
     }
+    setCropFile(file);
+  }
+
+  async function handleCropConfirm(dataUrl: string) {
     setAvatarBusy(true);
     try {
-      const dataUrl = await imageFileToAvatarDataUrl(file);
       const updated = await uploadMyAvatar(dataUrl);
-      primeAvatarCache(updated, dataUrl);
+      primeAvatarCache(updated.id, updated.avatarVersion, dataUrl);
       onUserUpdated(updated);
+      setCropFile(null);
     } catch (err) {
       setAvatarError(err instanceof ApiRequestError ? err.message : t.profile.avatarError);
+      setCropFile(null);
     } finally {
       setAvatarBusy(false);
-      if (avatarInputRef.current) avatarInputRef.current.value = "";
     }
   }
 
@@ -139,6 +147,14 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
 
   return (
     <div className="profile-page">
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          busy={avatarBusy}
+          onCancel={() => setCropFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
       <button type="button" className="profile-back" onClick={onBack}>
         ← {t.profile.backToBoard}
       </button>

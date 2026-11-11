@@ -334,6 +334,11 @@ export const en = {
     saving: "Saving...",
   },
   profile: {
+    avatarCropTitle: "Crop photo",
+    avatarCropHint: "Drag to reposition, use the slider or scroll to zoom.",
+    avatarZoom: "Zoom",
+    avatarCropApply: "Save photo",
+    avatarCropCancel: "Cancel",
     avatarUpload: "Upload photo",
     avatarChange: "Change photo",
     avatarRemove: "Remove photo",

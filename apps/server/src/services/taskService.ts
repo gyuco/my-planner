@@ -45,7 +45,9 @@ const USER_NAME_SELECT = { select: { firstName: true, lastName: true, email: tru
 
 /** Relazioni da includere in ogni query su Task per esporre `assigneeName`/`ownerName`. */
 const TASK_INCLUDE = {
-  assignee: USER_NAME_SELECT,
+  // Per l'assegnatario serve anche la versione dell'avatar (mostrato sulle
+  // card); il data URL dell'immagine non viene mai caricato qui.
+  assignee: { select: { firstName: true, lastName: true, email: true, avatarUpdatedAt: true } },
   owner: USER_NAME_SELECT,
 } as const;
 
@@ -70,6 +72,7 @@ function serializeTask(task: any): any {
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
   out.assigneeId = task.assigneeId ?? null;
   out.assigneeName = userDisplayName(assignee);
+  out.assigneeAvatarVersion = assignee?.avatarUpdatedAt ? new Date(assignee.avatarUpdatedAt).getTime() : null;
   out.ownerId = task.ownerId ?? null;
   out.ownerName = userDisplayName(owner);
   if (task.dueDate) out.dueDate = new Date(task.dueDate).toISOString();
