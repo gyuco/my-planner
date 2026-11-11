@@ -132,6 +132,12 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
   const [board, setBoard] = useState<Board>(EMPTY_BOARD);
+  // Chiave (progetto o selezione aggregata) a cui appartiene `board`: finche'
+  // non coincide con quella richiesta la board e' "in caricamento" e mostra
+  // i placeholder, cosi' il cambio progetto e' visibile.
+  const [boardFor, setBoardFor] = useState<string | null>(null);
+  // Scarta le risposte arrivate dopo un cambio progetto piu' recente.
+  const boardRequestId = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -257,6 +263,7 @@ export function App() {
     setProjects([]);
     setProjectsLoaded(false);
     setBoard(EMPTY_BOARD);
+    setBoardFor(null);
     setShowUsers(false);
     setResolvedTask(null);
     setRouteNotice(null);
@@ -303,8 +310,16 @@ export function App() {
     if (loggedIn) loadProjects();
   }, [loggedIn, loadProjects]);
 
+  const boardKey = selectedProjectId
+    ? selectedProjectId === "all"
+      ? `all:${(aggregatedProjectIds ?? []).join(",")}`
+      : selectedProjectId
+    : null;
+  const boardLoading = boardKey !== null && boardKey !== boardFor;
+
   const loadBoard = useCallback(async () => {
-    if (!selectedProjectId) return;
+    if (!selectedProjectId || !boardKey) return;
+    const requestId = ++boardRequestId.current;
     try {
       // Priorità multi-chip e "solo bloccati" filtrati lato client (il
       // contratto REST supporta un solo `priority` alla volta); la ricerca
@@ -314,12 +329,18 @@ export function App() {
         selectedProjectId === "all"
           ? await getAggregatedBoard(aggregatedProjectIds ?? undefined, boardFilters)
           : await getProjectBoard(selectedProjectId, boardFilters);
+      if (requestId !== boardRequestId.current) return;
       setBoard(data);
+      setBoardFor(boardKey);
       setLoadError(null);
     } catch {
+      if (requestId !== boardRequestId.current) return;
+      // Anche in errore si esce dallo stato di caricamento: resta il messaggio.
+      setBoard(EMPTY_BOARD);
+      setBoardFor(boardKey);
       setLoadError(t.app.loadBoardError);
     }
-  }, [selectedProjectId, filters.search, filters.tag, aggregatedProjectIds, t]);
+  }, [selectedProjectId, boardKey, filters.search, filters.tag, aggregatedProjectIds, t]);
 
   useEffect(() => {
     loadBoard();
@@ -333,12 +354,17 @@ export function App() {
           search: filtersSearch(location.search, false),
         });
       }
+      const requestId = ++boardRequestId.current;
       try {
         const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
         const data = await getProjectBoard(projectId, boardFilters);
+        if (requestId !== boardRequestId.current) return;
         setBoard(data);
+        setBoardFor(projectId);
         setLoadError(null);
       } catch {
+        if (requestId !== boardRequestId.current) return;
+        setBoardFor(projectId);
         setLoadError(t.app.loadBoardError);
       }
     },
@@ -481,6 +507,9 @@ export function App() {
       />
       <div className="app-main">
         <header className="topbar">
+          {boardLoading && view === "board" && (
+            <div className="top-progress" role="progressbar" aria-label={t.board.loadingProject} />
+          )}
           <div className="topbar-title">
             <button
               type="button"
@@ -618,6 +647,7 @@ export function App() {
 
                 <KanbanBoard
                   board={filteredBoard}
+                  loading={boardLoading}
                   showProject={selectedProjectId === "all"}
                   onBoardChange={loadBoard}
                   onTaskClick={handleTaskClick}

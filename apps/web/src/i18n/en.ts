@@ -66,6 +66,7 @@ export const en = {
     showSubtasks: "Show subtasks",
   },
   board: {
+    loadingProject: "Loading project…",
     draft: "Draft",
     todo: "To do",
     inProgress: "In progress",
