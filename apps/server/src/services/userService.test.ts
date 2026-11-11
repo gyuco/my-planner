@@ -8,8 +8,10 @@ import {
   createUser,
   deleteUser,
   getAuthUser,
+  getOwnAvatar,
   listProjectsForUser,
   listUsers,
+  setOwnAvatar,
   updateOwnProfile,
   updateUser,
 } from "./userService.js";
@@ -231,5 +233,36 @@ describe("userService — ruoli e assegnazioni", () => {
         newPassword: "altra-password",
       }),
     ).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
+describe("userService — avatar", () => {
+  const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==";
+
+  it("salva, legge e rimuove l'avatar aggiornandone la versione", async () => {
+    const admin = await createAdmin();
+    expect((await getAuthUser(admin.id))?.avatarVersion).toBeNull();
+    expect(await getOwnAvatar(admin.id)).toEqual({ dataUrl: null });
+
+    const withAvatar = await setOwnAvatar(admin.id, PNG);
+    expect(typeof withAvatar.avatarVersion).toBe("number");
+    expect(await getOwnAvatar(admin.id)).toEqual({ dataUrl: PNG });
+
+    const removed = await setOwnAvatar(admin.id, null);
+    expect(removed.avatarVersion).toBeNull();
+    expect(await getOwnAvatar(admin.id)).toEqual({ dataUrl: null });
+  });
+
+  it("rifiuta formati non immagine e data URL troppo grandi", async () => {
+    const admin = await createAdmin();
+    await expect(setOwnAvatar(admin.id, "data:image/svg+xml;base64,PHN2Zz4=")).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    await expect(setOwnAvatar(admin.id, "https://example.com/a.png")).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    const huge = "data:image/png;base64," + "A".repeat(300_000);
+    await expect(setOwnAvatar(admin.id, huge)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+    expect((await getAuthUser(admin.id))?.avatarVersion).toBeNull();
   });
 });

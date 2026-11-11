@@ -33,6 +33,13 @@ model User {
   // progetti associati tramite UserProject. Default "admin" perche' il primo
   // utente creato al bootstrap e gli utenti pre-ruoli sono amministratori.
   role         String @default("admin")
+  // Avatar caricato dall'utente: data URL (immagine gia' ridimensionata lato
+  // client, max ~256px). Letto solo da GET /auth/me/avatar, mai insieme al
+  // contesto di autenticazione caricato a ogni richiesta.
+  avatar          String?
+  // Versione dell'avatar (istante dell'ultimo upload), esposta in AuthUser
+  // come `avatarVersion` per invalidare la cache del client.
+  avatarUpdatedAt DateTime?
   createdAt    DateTime @default(now())
 
   projects UserProject[]

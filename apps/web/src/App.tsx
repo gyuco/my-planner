@@ -27,9 +27,10 @@ import { ActivityPage } from "./pages/ActivityPage";
 
 // Recharts pesa: caricato solo quando si apre la tab Statistiche.
 const StatsPage = lazy(() => import("./pages/StatsPage"));
-import { displayName, userInitials } from "./lib/user";
+import { displayName } from "./lib/user";
 import { LogOutIcon, MenuIcon, PlusIcon, ShieldIcon } from "./components/Icons";
 import { clearToken, getStoredUser, hasValidToken, saveUser } from "./auth";
+import { OwnAvatarContent } from "./lib/avatar";
 import {
   getAggregatedBoard,
   getMe,
@@ -527,7 +528,7 @@ export function App() {
                     currentUser.role === "admin" ? t.users.roleAdmin : t.users.roleManager
                   }`}
                 >
-                  {userInitials(currentUser)}
+                  <OwnAvatarContent user={currentUser} />
                   {currentUser.role === "admin" && (
                     <span className="topbar-avatar-role">
                       <ShieldIcon />

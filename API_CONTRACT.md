@@ -102,7 +102,7 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 
 `GET /auth/me`
 - Auth: JWT
-- 200: `{ "id", "email", "firstName", "lastName", "role", "projectIds" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login.
+- 200: `{ "id", "email", "firstName", "lastName", "role", "projectIds", "avatarVersion" }` — usato dalla UI per aggiornare ruolo e permessi senza nuovo login. `avatarVersion` è il timestamp (ms) dell'ultimo upload dell'avatar, `null` se assente: la UI lo usa come chiave di cache.
 
 `PATCH /auth/me`
 - Auth: JWT
@@ -113,6 +113,19 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - Auth: JWT
 - Body: `{ "currentPassword": string, "newPassword": string (min 8) }` — cambio password self-service; la password attuale viene verificata e la nuova deve essere diversa.
 - 200: `{ "ok": true }`; 400 `VALIDATION_ERROR` se la password attuale non è corretta, se la nuova è troppo corta o coincide con quella attuale.
+
+`GET /auth/me/avatar`
+- Auth: JWT
+- 200: `{ "dataUrl": string | null }` — avatar dell'utente corrente. Endpoint separato da `GET /auth/me` per non caricare l'immagine a ogni richiesta autenticata.
+
+`PUT /auth/me/avatar`
+- Auth: JWT
+- Body: `{ "dataUrl": string }` — data URL base64 `image/png|jpeg|webp`, max 300.000 caratteri. La UI ritaglia e ridimensiona a 256×256 prima dell'invio. Salvato nella colonna `User.avatar` (Node/SQLite e D1), nessun uso dello storage allegati.
+- 200: utente nella forma di `GET /auth/me` con `avatarVersion` aggiornato; 400 `VALIDATION_ERROR` se formato non ammesso o troppo grande.
+
+`DELETE /auth/me/avatar`
+- Auth: JWT
+- 200: utente nella forma di `GET /auth/me` con `avatarVersion: null`.
 
 ### Gestione utenti (solo `admin`)
 `GET /users`

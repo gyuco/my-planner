@@ -40,6 +40,7 @@ export function getStoredUser(): AuthUser | null {
       lastName: typeof parsed.lastName === "string" ? parsed.lastName : "",
       role: parsed.role,
       projectIds: Array.isArray(parsed.projectIds) ? parsed.projectIds : [],
+      avatarVersion: typeof parsed.avatarVersion === "number" ? parsed.avatarVersion : null,
     };
   } catch {
     return null;

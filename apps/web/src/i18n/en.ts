@@ -334,6 +334,12 @@ export const en = {
     saving: "Saving...",
   },
   profile: {
+    avatarUpload: "Upload photo",
+    avatarChange: "Change photo",
+    avatarRemove: "Remove photo",
+    avatarUploading: "Uploading...",
+    avatarInvalid: "Choose a PNG, JPEG or WebP image",
+    avatarError: "Error updating the photo",
     title: "Profile",
     open: "Open profile",
     backToBoard: "Back to board",

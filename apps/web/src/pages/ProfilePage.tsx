@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AuthUser, Project } from "@my-planner/core";
-import { ApiRequestError, changeMyPassword, updateMyProfile } from "../api";
+import { ApiRequestError, changeMyPassword, deleteMyAvatar, updateMyProfile, uploadMyAvatar } from "../api";
+import { OwnAvatarContent, imageFileToAvatarDataUrl, primeAvatarCache } from "../lib/avatar";
 import { useI18n } from "../i18n";
-import { displayName, userInitials } from "../lib/user";
+import { displayName } from "../lib/user";
 
 interface ProfilePageProps {
   user: AuthUser;
@@ -30,6 +31,9 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSaved, setPasswordSaved] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
 
   // Se l'utente cambia (refresh sessione, modifica dal pannello admin) i campi
   // tornano a riflettere i valori persistiti.
@@ -72,6 +76,39 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
     }
   }
 
+  async function handleAvatarFile(file: File | undefined) {
+    if (!file) return;
+    setAvatarError(null);
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setAvatarError(t.profile.avatarInvalid);
+      return;
+    }
+    setAvatarBusy(true);
+    try {
+      const dataUrl = await imageFileToAvatarDataUrl(file);
+      const updated = await uploadMyAvatar(dataUrl);
+      primeAvatarCache(updated, dataUrl);
+      onUserUpdated(updated);
+    } catch (err) {
+      setAvatarError(err instanceof ApiRequestError ? err.message : t.profile.avatarError);
+    } finally {
+      setAvatarBusy(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarError(null);
+    setAvatarBusy(true);
+    try {
+      onUserUpdated(await deleteMyAvatar());
+    } catch (err) {
+      setAvatarError(err instanceof ApiRequestError ? err.message : t.profile.avatarError);
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPasswordError(null);
@@ -109,13 +146,31 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
       <div className="profile-card">
         <div className="profile-head">
           <div className="profile-avatar" aria-hidden="true">
-            {userInitials(user)}
+            <OwnAvatarContent user={user} />
           </div>
           <div className="profile-identity">
             <h2>{displayName(user)}</h2>
             {(!user.firstName.trim() || !user.lastName.trim()) && (
               <p className="profile-hint">{t.profile.missingName}</p>
             )}
+            <div className="profile-avatar-actions">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                hidden
+                onChange={(e) => handleAvatarFile(e.target.files?.[0])}
+              />
+              <button type="button" disabled={avatarBusy} onClick={() => avatarInputRef.current?.click()}>
+                {avatarBusy ? t.profile.avatarUploading : user.avatarVersion ? t.profile.avatarChange : t.profile.avatarUpload}
+              </button>
+              {user.avatarVersion ? (
+                <button type="button" className="link-button" disabled={avatarBusy} onClick={handleAvatarRemove}>
+                  {t.profile.avatarRemove}
+                </button>
+              ) : null}
+            </div>
+            {avatarError && <p className="login-error">{avatarError}</p>}
           </div>
         </div>
 
