@@ -11,7 +11,7 @@ test.describe("T4 - login e board base", () => {
     await page.getByLabel("Password").fill(E2E_BOOTSTRAP_PASSWORD);
     await page.getByRole("button", { name: "Sign in" }).click();
 
-    const newProjectButton = page.locator(".sidebar-header").getByRole("button", { name: "+", exact: true });
+    const newProjectButton = page.locator(".sidebar-header").getByRole("button", { name: "New project", exact: true });
     await expect(newProjectButton).toBeVisible();
 
     // Creazione progetto

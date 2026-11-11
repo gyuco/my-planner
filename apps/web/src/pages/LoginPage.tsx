@@ -10,15 +10,8 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 function BrandMark() {
   return (
     <svg className="brand-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-      <defs>
-        <linearGradient id="brand-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="55%" stopColor="#5b5bd6" />
-          <stop offset="100%" stopColor="#38bdf8" />
-        </linearGradient>
-      </defs>
-      <rect x="0" y="0" width="48" height="48" rx="14" fill="url(#brand-grad)" />
-      <g fill="#fff">
+      <rect x="0" y="0" width="48" height="48" rx="11" fill="#2f5d4a" />
+      <g fill="#f7f4ee">
         <rect x="10" y="26" width="7" height="12" rx="3.5" opacity="0.65" />
         <rect x="20.5" y="18" width="7" height="20" rx="3.5" opacity="0.85" />
         <rect x="31" y="10" width="7" height="28" rx="3.5" />

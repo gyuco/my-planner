@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copyText } from "../lib/clipboard";
+import { CheckIcon, LinkIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus, TaskType } from "@my-planner/core";
@@ -450,7 +451,15 @@ export function TaskDrawer({
           </div>
           <div className="drawer-header-actions">
             <button type="button" className="drawer-copy-link" onClick={handleCopyLink}>
-              {linkCopied ? `✓ ${t.taskDrawer.linkCopied}` : `🔗 ${t.taskDrawer.copyLink}`}
+              {linkCopied ? (
+                <>
+                  <CheckIcon /> {t.taskDrawer.linkCopied}
+                </>
+              ) : (
+                <>
+                  <LinkIcon /> {t.taskDrawer.copyLink}
+                </>
+              )}
             </button>
             {task && (
               <button
@@ -460,11 +469,17 @@ export function TaskDrawer({
                 disabled={deleting}
                 title={t.taskDrawer.deleteTask}
               >
-                {deleting ? t.taskDrawer.deleting : `🗑 ${t.taskDrawer.deleteTask}`}
+                {deleting ? (
+                  t.taskDrawer.deleting
+                ) : (
+                  <>
+                    <TrashIcon /> {t.taskDrawer.deleteTask}
+                  </>
+                )}
               </button>
             )}
-            <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle}>
-              &times;
+            <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle} aria-label={t.taskDrawer.closeTitle}>
+              <XIcon />
             </button>
           </div>
         </div>
