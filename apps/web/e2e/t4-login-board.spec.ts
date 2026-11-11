@@ -25,7 +25,7 @@ test.describe("T4 - login e board base", () => {
 
     await expect(page.locator(".topbar h1")).toHaveText(projectName);
     await expect(page.locator(".board")).toBeVisible();
-    await expect(page.locator(".column")).toHaveCount(5);
+    await expect(page.locator(".column")).toHaveCount(4);
 
     // Creazione task via modale
     const taskTitle = `Task E2E ${Date.now()}`;
@@ -66,25 +66,25 @@ test.describe("T4 - login e board base", () => {
     await loginViaUi(page);
     await selectProjectInSidebar(page, project.name);
 
-    // Di default sono visibili tutte e cinque le colonne.
-    await expect(page.locator(".column")).toHaveCount(5);
+    // Di default sono visibili tutte e quattro le colonne (Done non e' una colonna).
+    await expect(page.locator(".column")).toHaveCount(4);
     await expect(page.locator(".column", { hasText: "Testing" })).toBeVisible();
 
     // Il pulsante "Columns" permette di nascondere una colonna.
     await page.getByRole("button", { name: /Columns/ }).click();
     await page.getByRole("checkbox", { name: "Testing" }).uncheck();
-    await expect(page.locator(".column")).toHaveCount(4);
+    await expect(page.locator(".column")).toHaveCount(3);
     await expect(page.locator(".column", { hasText: "Testing" })).toHaveCount(0);
 
     // La preferenza è solo locale e sopravvive al reload.
     await page.reload();
     await selectProjectInSidebar(page, project.name);
-    await expect(page.locator(".column")).toHaveCount(4);
+    await expect(page.locator(".column")).toHaveCount(3);
 
     // "Mostra tutte" ripristina tutte le colonne.
     await page.getByRole("button", { name: /Columns/ }).click();
     await page.getByRole("button", { name: "Show all" }).click();
-    await expect(page.locator(".column")).toHaveCount(5);
+    await expect(page.locator(".column")).toHaveCount(4);
   });
 
   test("la sidebar sinistra è comprimibile e il titolo pagina segue il progetto", async ({ page }) => {

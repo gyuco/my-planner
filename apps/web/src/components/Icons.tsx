@@ -176,3 +176,22 @@ export function FilterIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function UndoIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+    </Icon>
+  );
+}
+
+export function ArchiveCheckIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect width="20" height="5" x="2" y="3" rx="1" />
+      <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" />
+      <path d="m9 14 2 2 4-4" />
+    </Icon>
+  );
+}

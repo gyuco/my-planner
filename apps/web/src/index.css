@@ -3551,3 +3551,119 @@ body.dnd-dragging * {
   .skeleton { animation-duration: 0s; animation-iteration-count: 1; }
   .top-progress::after { left: 0; width: 100%; opacity: 0.5; }
 }
+
+/* -------------------------------------------------------------------------
+   Revisione in Testing: Done / Rimetti in corso, uscita animata della card
+   ------------------------------------------------------------------------- */
+.task-card-review {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-top: 0.55rem;
+  margin-top: 0.1rem;
+  border-top: 1px solid var(--line-soft);
+  cursor: default;
+}
+.task-card-review button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.32rem 0.6rem;
+  font-size: 0.78rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.task-card-review svg { width: 0.95em; height: 0.95em; flex-shrink: 0; }
+.task-card-done {
+  flex: 1;
+  background: var(--accent-500);
+  border-color: var(--accent-500);
+  color: #fff;
+}
+.task-card-done:hover:not(:disabled) { background: var(--accent-600); border-color: var(--accent-600); }
+.task-card-send-back { flex: 1 1 auto; color: var(--ink-500); background: transparent; }
+.task-card-send-back:hover:not(:disabled) { color: var(--ink-900); }
+
+/* Uscita: la card si colora, scivola a destra e la colonna si richiude. */
+.task-card-leaving {
+  pointer-events: none;
+  animation: card-leave 0.42s var(--ease) forwards;
+}
+@keyframes card-leave {
+  0% { max-height: 320px; }
+  25% { border-color: var(--status-done); box-shadow: 0 0 0 3px rgba(78, 138, 95, 0.18); }
+  60% { opacity: 0; transform: translateX(40px) scale(0.96); max-height: 320px; }
+  100% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    border-width: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-card-leaving { animation-duration: 0.01s; }
+}
+
+/* Pulsante "Completati" nella toolbar della board. */
+.done-toggle { color: var(--ink-700); }
+.done-toggle svg { width: 15px; height: 15px; }
+.done-toggle-count {
+  min-width: 1.2rem;
+  padding: 0 0.35rem;
+  border-radius: var(--r-full);
+  background: var(--surface-sunken);
+  color: var(--ink-500);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Modale tabella completati. */
+.done-modal { max-width: 920px; }
+.done-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.done-modal-head h2 { margin: 0; display: flex; align-items: baseline; gap: 0.5rem; }
+.done-modal-count {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--ink-400);
+  font-variant-numeric: tabular-nums;
+}
+.modal .done-modal-search { width: 100%; min-width: 0; }
+.done-table-wrap {
+  overflow: auto;
+  max-height: 60vh;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.done-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.done-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.55rem 0.8rem;
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--ink-500);
+  background: var(--surface-sunken);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.done-table td {
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--ink-700);
+  vertical-align: middle;
+}
+.done-table tbody tr { cursor: pointer; }
+.done-table tbody tr:hover,
+.done-table tbody tr:focus-visible { background: var(--surface-sunken); outline: none; }
+.done-table tbody tr:last-child td { border-bottom: none; }
+.done-title { color: var(--ink-900); font-weight: 500; min-width: 14rem; }
+.done-date { white-space: nowrap; color: var(--ink-500); font-variant-numeric: tabular-nums; }
+.done-empty { margin: 1rem 0; text-align: center; color: var(--ink-400); font-size: 0.9rem; }
+.send-back-task { margin-top: -0.5rem; font-weight: 500; color: var(--ink-700); }

@@ -15,8 +15,21 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, type Board, type TaskStatus } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
-import { ApiRequestError, moveTask } from "../api";
+import { ApiRequestError, addComment, moveTask } from "../api";
+import { SendBackModal } from "./SendBackModal";
+import { DoneTasksModal } from "./DoneTasksModal";
+import { ArchiveCheckIcon } from "./Icons";
 import { useI18n } from "../i18n";
+
+/**
+ * Colonne della board: "done" non e' una colonna. Un task in Testing si chiude
+ * con il pulsante Done sulla card; i completati si consultano nella tabella
+ * aperta dal pulsante "Completati" della toolbar.
+ */
+const BOARD_STATUSES: TaskStatus[] = TASK_STATUSES.filter((s) => s !== "done");
+
+/** Durata dell'animazione di uscita della card chiusa (allineata al CSS). */
+const LEAVE_ANIMATION_MS = 420;
 
 /** Preferenza locale (per browser) delle colonne visibili: non tocca il server. */
 const VISIBLE_COLUMNS_STORAGE_KEY = "my-planner-visible-columns";
@@ -29,13 +42,13 @@ function columnDroppableId(status: TaskStatus): string {
 function getStoredVisibleStatuses(): TaskStatus[] {
   try {
     const raw = localStorage.getItem(VISIBLE_COLUMNS_STORAGE_KEY);
-    if (!raw) return [...TASK_STATUSES];
+    if (!raw) return [...BOARD_STATUSES];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [...TASK_STATUSES];
-    const valid = TASK_STATUSES.filter((status) => parsed.includes(status));
-    return valid.length > 0 ? valid : [...TASK_STATUSES];
+    if (!Array.isArray(parsed)) return [...BOARD_STATUSES];
+    const valid = BOARD_STATUSES.filter((status) => parsed.includes(status));
+    return valid.length > 0 ? valid : [...BOARD_STATUSES];
   } catch {
-    return [...TASK_STATUSES];
+    return [...BOARD_STATUSES];
   }
 }
 
@@ -54,9 +67,21 @@ interface SortableTaskCardProps {
   showProject?: boolean;
   onClick?: () => void;
   onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
+  onComplete?: (task: BoardTask) => void;
+  onSendBack?: (task: BoardTask) => void;
+  leaving?: boolean;
 }
 
-function SortableTaskCard({ task, status, showProject, onClick, onAlignStatus }: SortableTaskCardProps) {
+function SortableTaskCard({
+  task,
+  status,
+  showProject,
+  onClick,
+  onAlignStatus,
+  onComplete,
+  onSendBack,
+  leaving,
+}: SortableTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { status },
@@ -79,6 +104,9 @@ function SortableTaskCard({ task, status, showProject, onClick, onAlignStatus }:
       style={style}
       isDragging={isDragging}
       onAlignStatus={onAlignStatus ? (next) => onAlignStatus(task, next) : undefined}
+      onComplete={onComplete ? () => onComplete(task) : undefined}
+      onSendBack={onSendBack ? () => onSendBack(task) : undefined}
+      leaving={leaving}
     />
   );
 }
@@ -90,9 +118,22 @@ interface ColumnProps {
   showProject?: boolean;
   onTaskClick?: (task: BoardTask) => void;
   onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
+  onComplete?: (task: BoardTask) => void;
+  onSendBack?: (task: BoardTask) => void;
+  leavingIds?: ReadonlySet<string>;
 }
 
-function Column({ status, label, tasks, showProject, onTaskClick, onAlignStatus }: ColumnProps) {
+function Column({
+  status,
+  label,
+  tasks,
+  showProject,
+  onTaskClick,
+  onAlignStatus,
+  onComplete,
+  onSendBack,
+  leavingIds,
+}: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnDroppableId(status), data: { status } });
   const items = tasks.map((t) => t.id);
 
@@ -113,6 +154,9 @@ function Column({ status, label, tasks, showProject, onTaskClick, onAlignStatus 
             showProject={showProject}
             onClick={() => onTaskClick?.(task)}
             onAlignStatus={onAlignStatus}
+            onComplete={onComplete}
+            onSendBack={onSendBack}
+            leaving={leavingIds?.has(task.id)}
           />
         ))}
       </SortableContext>
@@ -186,13 +230,18 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
     { status: "todo", label: t.board.todo },
     { status: "in_progress", label: t.board.inProgress },
     { status: "testing", label: t.board.testing },
-    { status: "done", label: t.board.done },
   ];
   const [dragError, setDragError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null);
   const [visibleStatuses, setVisibleStatuses] = useState<TaskStatus[]>(getStoredVisibleStatuses);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  // Card in uscita dopo "Done" (animazione) e task da rimandare in In progress.
+  const [leavingIds, setLeavingIds] = useState<ReadonlySet<string>>(new Set());
+  const [sendBackTask, setSendBackTask] = useState<BoardTask | null>(null);
+  const [sendBackBusy, setSendBackBusy] = useState(false);
+  const [sendBackError, setSendBackError] = useState<string | null>(null);
+  const [showDone, setShowDone] = useState(false);
   // Copia locale per l'update ottimistico: senza questa, la card torna alla
   // posizione originale non appena dnd-kit rilascia (perché `board` non è
   // ancora cambiato) e poi salta in avanti quando arriva la risposta del
@@ -239,7 +288,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
       // Almeno una colonna deve restare visibile, altrimenti la board
       // diventerebbe uno spazio vuoto senza modo evidente di recuperarla.
       if (next.length === 0) return current;
-      return TASK_STATUSES.filter((s) => next.includes(s));
+      return BOARD_STATUSES.filter((s) => next.includes(s));
     });
   }
 
@@ -274,6 +323,49 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
       if (err instanceof ApiRequestError) {
         setDragError(err.message);
       }
+    }
+  }
+
+  // "Done" su una card in Testing: animazione di uscita in parallelo alla
+  // chiamata; la card sparisce solo se il server conferma.
+  async function handleComplete(task: BoardTask) {
+    setDragError(null);
+    setLeavingIds((ids) => new Set(ids).add(task.id));
+    const withoutLeaving = (ids: ReadonlySet<string>) => {
+      const next = new Set(ids);
+      next.delete(task.id);
+      return next;
+    };
+    try {
+      await Promise.all([
+        moveTask(task.id, "done"),
+        new Promise((resolve) => setTimeout(resolve, LEAVE_ANIMATION_MS)),
+      ]);
+      setLocalBoard((b) => reorderBoard(b, task.id, "done", (b.done as BoardTask[]).length));
+      setLeavingIds(withoutLeaving);
+      onBoardChange();
+    } catch (err) {
+      setLeavingIds(withoutLeaving);
+      setDragError(err instanceof ApiRequestError ? err.message : t.board.completeError);
+    }
+  }
+
+  // Rimanda in In progress e salva il motivo come commento. Prima lo
+  // spostamento (puo' essere bloccato da dipendenze), poi il commento: cosi'
+  // un rifiuto del server non lascia commenti orfani.
+  async function handleSendBackConfirm(message: string) {
+    if (!sendBackTask) return;
+    setSendBackBusy(true);
+    setSendBackError(null);
+    try {
+      await moveTask(sendBackTask.id, "in_progress");
+      await addComment(sendBackTask.id, message);
+      setSendBackTask(null);
+      onBoardChange();
+    } catch (err) {
+      setSendBackError(err instanceof ApiRequestError ? err.message : t.board.sendBackError);
+    } finally {
+      setSendBackBusy(false);
     }
   }
 
@@ -336,12 +428,41 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
         </div>
       )}
       <div className="board-toolbar">
+        {sendBackTask && (
+          <SendBackModal
+            task={sendBackTask}
+            busy={sendBackBusy}
+            error={sendBackError}
+            onCancel={() => {
+              setSendBackTask(null);
+              setSendBackError(null);
+            }}
+            onConfirm={handleSendBackConfirm}
+          />
+        )}
+        {showDone && (
+          <DoneTasksModal
+            tasks={localBoard.done as BoardTask[]}
+            showProject={showProject}
+            onClose={() => setShowDone(false)}
+            onTaskClick={onTaskClick}
+          />
+        )}
         {loading && (
           <span className="board-loading" role="status">
             <span className="spinner" aria-hidden="true" />
             {t.board.loadingProject}
           </span>
         )}
+        <button
+          type="button"
+          className="filter-chip done-toggle"
+          onClick={() => setShowDone(true)}
+          disabled={loading}
+        >
+          <ArchiveCheckIcon /> {t.board.doneButton}
+          <span className="done-toggle-count">{loading ? "–" : (localBoard.done as BoardTask[]).length}</span>
+        </button>
         <div className="column-picker" ref={pickerRef}>
           <button
             type="button"
@@ -351,7 +472,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
             aria-expanded={pickerOpen}
             title={t.board.columnsMenuTitle}
           >
-            {t.board.columns} · {visibleStatuses.length}/{TASK_STATUSES.length}
+            {t.board.columns} · {visibleStatuses.length}/{BOARD_STATUSES.length}
           </button>
           {pickerOpen && (
             <div className="column-picker-menu" role="group" aria-label={t.board.columnsMenuTitle}>
@@ -374,7 +495,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
               <button
                 type="button"
                 className="column-picker-reset"
-                onClick={() => setVisibleStatuses([...TASK_STATUSES])}
+                onClick={() => setVisibleStatuses([...BOARD_STATUSES])}
               >
                 {t.board.showAllColumns}
               </button>
@@ -403,6 +524,9 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
               showProject={showProject}
               onTaskClick={onTaskClick}
               onAlignStatus={handleAlignStatus}
+              onComplete={col.status === "testing" ? handleComplete : undefined}
+              onSendBack={col.status === "testing" ? (task) => setSendBackTask(task) : undefined}
+              leavingIds={leavingIds}
             />
               ))}
         </div>
