@@ -66,6 +66,7 @@ export const en = {
     showSubtasks: "Show subtasks",
   },
   board: {
+    moveTo: "Move to…",
     markDone: "Done",
     sendBack: "Back to in progress",
     sendBackTitle: "Send back to In progress",

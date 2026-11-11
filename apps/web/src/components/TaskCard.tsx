@@ -1,6 +1,6 @@
 import { suggestParentStatus, type Task, type TaskPriority, type TaskStatus } from "@my-planner/core";
 import { useI18n } from "../i18n";
-import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, SubtaskIcon, UndoIcon } from "./Icons";
+import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
@@ -62,6 +62,12 @@ interface TaskCardProps {
   onSendBack?: () => void;
   /** Card in uscita (animazione dopo "Done"). */
   leaving?: boolean;
+  /**
+   * Board senza drag (mobile/touch): colonne di destinazione proposte dal
+   * menu "Sposta in…" della card.
+   */
+  moveTargets?: { status: TaskStatus; label: string }[];
+  onMove?: (status: TaskStatus) => void;
 }
 
 export function TaskCard({
@@ -77,6 +83,8 @@ export function TaskCard({
   onComplete,
   onSendBack,
   leaving,
+  moveTargets,
+  onMove,
 }: TaskCardProps) {
   const { t, dateLocale } = useI18n();
   const PRIORITY_LABEL: Record<TaskPriority, string> = {
@@ -107,7 +115,9 @@ export function TaskCard({
 
   return (
     <div
-      className={`task-card${isDragging ? " task-card-dragging" : ""}${leaving ? " task-card-leaving" : ""}`}
+      className={`task-card${isDragging ? " task-card-dragging" : ""}${leaving ? " task-card-leaving" : ""}${
+        onMove ? " task-card-static" : ""
+      }`}
       ref={dragRef}
       style={style}
       onClick={onClick}
@@ -116,6 +126,36 @@ export function TaskCard({
       {...dragAttributes}
       {...dragListeners}
     >
+      {onMove && moveTargets && moveTargets.length > 0 && (
+        // Select nativo sopra l'icona "⋯": su mobile apre il picker del sistema.
+        <span
+          className="task-card-move"
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreIcon aria-hidden="true" />
+          <select
+            aria-label={t.board.moveTo}
+            value=""
+            disabled={leaving}
+            onChange={(e) => {
+              const next = e.target.value as TaskStatus;
+              if (next) onMove(next);
+            }}
+          >
+            <option value="" disabled>
+              {t.board.moveTo}
+            </option>
+            {moveTargets.map((target) => (
+              <option key={target.status} value={target.status}>
+                {target.label}
+              </option>
+            ))}
+          </select>
+        </span>
+      )}
+
       <div className="task-card-badges">
         <span className={`badge badge-type task-type-${task.type}`}>{t.taskType[task.type]}</span>
         <span className={`badge badge-priority badge-priority-${task.priority}`}>
