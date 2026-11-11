@@ -19,6 +19,7 @@ import { ApiRequestError, addComment, moveTask } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
 import { ArchiveCheckIcon } from "./Icons";
+import { useTouchBoard } from "../lib/useTouchBoard";
 import { useI18n } from "../i18n";
 
 /**
@@ -70,6 +71,9 @@ interface SortableTaskCardProps {
   onComplete?: (task: BoardTask) => void;
   onSendBack?: (task: BoardTask) => void;
   leaving?: boolean;
+  /** Mobile/touch: niente drag, spostamento dal menu della card. */
+  moveTargets?: { status: TaskStatus; label: string }[];
+  onMove?: (task: BoardTask, status: TaskStatus) => void;
 }
 
 function SortableTaskCard({
@@ -81,10 +85,14 @@ function SortableTaskCard({
   onComplete,
   onSendBack,
   leaving,
+  moveTargets,
+  onMove,
 }: SortableTaskCardProps) {
+  const dragDisabled = Boolean(onMove);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { status },
+    disabled: dragDisabled,
   });
 
   const style: React.CSSProperties = {
@@ -99,14 +107,16 @@ function SortableTaskCard({
       showProject={showProject}
       onClick={onClick}
       dragRef={setNodeRef}
-      dragAttributes={attributes}
-      dragListeners={listeners}
+      dragAttributes={dragDisabled ? undefined : attributes}
+      dragListeners={dragDisabled ? undefined : listeners}
       style={style}
       isDragging={isDragging}
       onAlignStatus={onAlignStatus ? (next) => onAlignStatus(task, next) : undefined}
       onComplete={onComplete ? () => onComplete(task) : undefined}
       onSendBack={onSendBack ? () => onSendBack(task) : undefined}
       leaving={leaving}
+      moveTargets={moveTargets}
+      onMove={onMove ? (next) => onMove(task, next) : undefined}
     />
   );
 }
@@ -121,6 +131,8 @@ interface ColumnProps {
   onComplete?: (task: BoardTask) => void;
   onSendBack?: (task: BoardTask) => void;
   leavingIds?: ReadonlySet<string>;
+  moveTargets?: { status: TaskStatus; label: string }[];
+  onMove?: (task: BoardTask, status: TaskStatus) => void;
 }
 
 function Column({
@@ -133,6 +145,8 @@ function Column({
   onComplete,
   onSendBack,
   leavingIds,
+  moveTargets,
+  onMove,
 }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnDroppableId(status), data: { status } });
   const items = tasks.map((t) => t.id);
@@ -157,6 +171,8 @@ function Column({
             onComplete={onComplete}
             onSendBack={onSendBack}
             leaving={leavingIds?.has(task.id)}
+            moveTargets={moveTargets}
+            onMove={onMove}
           />
         ))}
       </SortableContext>
@@ -242,6 +258,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
   const [sendBackBusy, setSendBackBusy] = useState(false);
   const [sendBackError, setSendBackError] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const touchBoard = useTouchBoard();
   // Copia locale per l'update ottimistico: senza questa, la card torna alla
   // posizione originale non appena dnd-kit rilascia (perché `board` non è
   // ancora cambiato) e poi salta in avanti quando arriva la risposta del
@@ -527,6 +544,8 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
               onComplete={col.status === "testing" ? handleComplete : undefined}
               onSendBack={col.status === "testing" ? (task) => setSendBackTask(task) : undefined}
               leavingIds={leavingIds}
+              moveTargets={touchBoard ? COLUMNS.filter((c) => c.status !== col.status) : undefined}
+              onMove={touchBoard ? handleAlignStatus : undefined}
             />
               ))}
         </div>

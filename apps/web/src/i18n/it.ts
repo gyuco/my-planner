@@ -68,6 +68,7 @@ export const it: Dictionary = {
     showSubtasks: "Mostra sotto-task",
   },
   board: {
+    moveTo: "Sposta in…",
     markDone: "Fatto",
     sendBack: "Rimetti in corso",
     sendBackTitle: "Rimetti in In progress",

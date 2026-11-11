@@ -68,6 +68,7 @@ export const es: Dictionary = {
     showSubtasks: "Mostrar subtareas",
   },
   board: {
+    moveTo: "Mover a…",
     markDone: "Hecho",
     sendBack: "Volver a en curso",
     sendBackTitle: "Devolver a En curso",
