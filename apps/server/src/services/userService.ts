@@ -429,6 +429,27 @@ export async function setOwnAvatar(userId: string, dataUrl: string | null): Prom
   return updated;
 }
 
+/**
+ * Avatar di un altro utente (es. assegnatario mostrato sulle card). Visibile
+ * a se stessi, agli admin e a chi condivide almeno un progetto con l'utente;
+ * gli admin hanno accesso a tutti i progetti, quindi il loro avatar e' visibile
+ * a chiunque possa vederli come assegnatari.
+ */
+export async function getUserAvatar(requester: AuthUser, userId: string): Promise<{ dataUrl: string | null }> {
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { avatar: true, role: true, projects: { select: { projectId: true } } },
+  });
+  if (!target) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+  const visible =
+    requester.id === userId ||
+    isAdmin(requester) ||
+    normalizeRole(target.role) === "admin" ||
+    target.projects.some((p) => requester.projectIds.includes(p.projectId));
+  if (!visible) throw new ApiErrorException("FORBIDDEN", "Utente non accessibile");
+  return { dataUrl: target.avatar ?? null };
+}
+
 /** Data URL dell'avatar dell'utente corrente, null se non caricato. */
 export async function getOwnAvatar(userId: string): Promise<{ dataUrl: string | null }> {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { avatar: true } });

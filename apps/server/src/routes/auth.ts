@@ -7,6 +7,7 @@ import {
   changeOwnPassword,
   getAuthUser,
   getOwnAvatar,
+  getUserAvatar,
   normalizeRole,
   setOwnAvatar,
   updateOwnProfile,
@@ -102,5 +103,11 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete("/auth/me/avatar", { onRequest: [app.authenticate] }, async (req) => {
     return setOwnAvatar((req as any).authUser.id, null);
+  });
+
+  // Avatar di un utente visibile (assegnatari sulle card).
+  app.get("/avatars/:userId", { onRequest: [app.authenticate] }, async (req) => {
+    const { userId } = req.params as { userId: string };
+    return getUserAvatar((req as any).authUser, userId);
   });
 }

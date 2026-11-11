@@ -336,6 +336,11 @@ export const it: Dictionary = {
     saving: "Salvataggio...",
   },
   profile: {
+    avatarCropTitle: "Ritaglia foto",
+    avatarCropHint: "Trascina per spostare, usa lo slider o la rotella per lo zoom.",
+    avatarZoom: "Zoom",
+    avatarCropApply: "Salva foto",
+    avatarCropCancel: "Annulla",
     avatarUpload: "Carica foto",
     avatarChange: "Cambia foto",
     avatarRemove: "Rimuovi foto",

@@ -16,6 +16,7 @@ import {
   deleteUser,
   getAuthUser,
   getOwnAvatar,
+  getUserAvatar,
   isAdmin,
   listProjectAssignees,
   listProjectsForUser,
@@ -155,6 +156,7 @@ export function buildRestApp() {
     "/admin/*",
     "/users",
     "/users/*",
+    "/avatars/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -203,6 +205,10 @@ export function buildRestApp() {
   });
 
   app.delete("/auth/me/avatar", async (c) => c.json(await setOwnAvatar(c.get("user").id, null)));
+
+  app.get("/avatars/:userId", async (c) =>
+    c.json(await getUserAvatar(c.get("user"), c.req.param("userId"))),
+  );
 
   // --- Gestione utenti (admin) ---------------------------------------------
   app.get("/users", async (c) => c.json(await listUsers()));

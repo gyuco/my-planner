@@ -121,6 +121,8 @@ export interface Task {
   // oppure email.
   assigneeId: string | null;
   assigneeName: string | null;
+  /** Versione dell'avatar dell'assegnatario (`GET /avatars/:userId`), null se assente. */
+  assigneeAvatarVersion?: number | null;
   // Owner: chi ha creato il task (null se creato via MCP o prima del campo).
   ownerId: string | null;
   ownerName: string | null;

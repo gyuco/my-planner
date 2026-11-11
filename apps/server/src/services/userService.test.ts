@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
-import { createProject } from "./taskService.js";
+import { createProject, createTask, getTask } from "./taskService.js";
 import {
   assertProjectAccess,
   changeOwnPassword,
@@ -9,6 +9,7 @@ import {
   deleteUser,
   getAuthUser,
   getOwnAvatar,
+  getUserAvatar,
   listProjectsForUser,
   listUsers,
   setOwnAvatar,
@@ -264,5 +265,35 @@ describe("userService — avatar", () => {
     const huge = "data:image/png;base64," + "A".repeat(300_000);
     await expect(setOwnAvatar(admin.id, huge)).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
     expect((await getAuthUser(admin.id))?.avatarVersion).toBeNull();
+  });
+});
+
+describe("userService — avatar di altri utenti", () => {
+  const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==";
+
+  it("e' visibile a chi condivide un progetto, non agli estranei", async () => {
+    await createAdmin();
+    const shared = await createProject("Condiviso");
+    const other = await createProject("Altro");
+    const mk = (email: string, projectIds: string[]) =>
+      createUser({ email, password: "password123", role: "manager", projectIds });
+    const owner = await mk("owner@example.com", [shared.id]);
+    const colleague = await mk("colleague@example.com", [shared.id]);
+    const stranger = await mk("stranger@example.com", [other.id]);
+    await setOwnAvatar(owner.id, PNG);
+
+    const colleagueAuth = (await getAuthUser(colleague.id))!;
+    const strangerAuth = (await getAuthUser(stranger.id))!;
+    expect(await getUserAvatar(colleagueAuth, owner.id)).toEqual({ dataUrl: PNG });
+    await expect(getUserAvatar(strangerAuth, owner.id)).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("espone la versione dell'avatar dell'assegnatario sul task", async () => {
+    const admin = await createAdmin();
+    const project = await createProject("P");
+    const task = await createTask(project.id, { title: "T", assigneeId: admin.id } as any);
+    expect((await getTask(task.id)).assigneeAvatarVersion).toBeNull();
+    const updated = await setOwnAvatar(admin.id, PNG);
+    expect((await getTask(task.id)).assigneeAvatarVersion).toBe(updated.avatarVersion);
   });
 });
