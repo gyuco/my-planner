@@ -41,6 +41,8 @@ function getStoredVisibleStatuses(): TaskStatus[] {
 
 interface KanbanBoardProps {
   board: Board;
+  /** Cambio progetto in corso: colonne con placeholder al posto delle card. */
+  loading?: boolean;
   showProject?: boolean;
   onBoardChange: () => void;
   onTaskClick?: (task: BoardTask) => void;
@@ -118,6 +120,36 @@ function Column({ status, label, tasks, showProject, onTaskClick, onAlignStatus 
   );
 }
 
+/** Numero di card fittizie per colonna: varia per non sembrare una griglia. */
+const SKELETON_CARDS = [2, 3, 1, 2, 1];
+
+function SkeletonCard({ wide }: { wide: boolean }) {
+  return (
+    <div className="skeleton-card" aria-hidden="true">
+      <div className="skeleton-row">
+        <span className="skeleton skeleton-pill" />
+        <span className="skeleton skeleton-pill skeleton-pill-short" />
+      </div>
+      <span className={`skeleton skeleton-line${wide ? "" : " skeleton-line-short"}`} />
+      {wide && <span className="skeleton skeleton-line skeleton-line-short" />}
+    </div>
+  );
+}
+
+function SkeletonColumn({ status, label, index }: { status: TaskStatus; label: string; index: number }) {
+  const count = SKELETON_CARDS[index % SKELETON_CARDS.length];
+  return (
+    <div className={`column column-status-${status} column-loading`}>
+      <h2>
+        {label} <span className="skeleton skeleton-count" />
+      </h2>
+      {Array.from({ length: count }, (_, i) => (
+        <SkeletonCard key={i} wide={(i + index) % 2 === 0} />
+      ))}
+    </div>
+  );
+}
+
 function findTaskById(board: Board, id: string): BoardTask | undefined {
   for (const status of TASK_STATUSES) {
     const found = (board[status] as BoardTask[]).find((t) => t.id === id);
@@ -147,7 +179,7 @@ function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, ta
   return next as Board;
 }
 
-export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
+export function KanbanBoard({ board, loading, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
   const { t } = useI18n();
   const COLUMNS: { status: TaskStatus; label: string }[] = [
     { status: "draft", label: t.board.draft },
@@ -304,6 +336,12 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
         </div>
       )}
       <div className="board-toolbar">
+        {loading && (
+          <span className="board-loading" role="status">
+            <span className="spinner" aria-hidden="true" />
+            {t.board.loadingProject}
+          </span>
+        )}
         <div className="column-picker" ref={pickerRef}>
           <button
             type="button"
@@ -351,8 +389,12 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
         onDragCancel={handleDragCancel}
         onDragEnd={handleDragEnd}
       >
-        <div className="board">
-          {visibleColumns.map((col) => (
+        <div className="board" aria-busy={loading || undefined}>
+          {loading
+            ? visibleColumns.map((col, index) => (
+                <SkeletonColumn key={col.status} status={col.status} label={col.label} index={index} />
+              ))
+            : visibleColumns.map((col) => (
             <Column
               key={col.status}
               status={col.status}
@@ -362,7 +404,7 @@ export function KanbanBoard({ board, showProject, onBoardChange, onTaskClick }: 
               onTaskClick={onTaskClick}
               onAlignStatus={handleAlignStatus}
             />
-          ))}
+              ))}
         </div>
         <DragOverlay>
           {activeTask && <TaskCard task={activeTask} showProject={showProject} isDragging />}

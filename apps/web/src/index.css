@@ -3471,3 +3471,83 @@ body.dnd-dragging * {
     border-radius: var(--r-lg);
   }
 }
+
+/* -------------------------------------------------------------------------
+   Caricamento board (cambio progetto): barra in topbar, spinner e skeleton
+   ------------------------------------------------------------------------- */
+.top-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  overflow: hidden;
+  background: rgba(var(--accent-rgb), 0.12);
+}
+.top-progress::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 35%;
+  background: var(--accent-500);
+  animation: top-progress 1.1s var(--ease) infinite;
+}
+@keyframes top-progress {
+  from { left: -35%; }
+  to { left: 100%; }
+}
+
+.board-toolbar { align-items: center; gap: 0.75rem; }
+.board-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+  font-size: 0.82rem;
+  color: var(--ink-500);
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--accent-rgb), 0.2);
+  border-top-color: var(--accent-500);
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.skeleton {
+  display: block;
+  border-radius: var(--r-sm);
+  background: linear-gradient(90deg, var(--line-soft) 25%, #f6f2ea 50%, var(--line-soft) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+.skeleton-row { display: flex; gap: 0.45rem; }
+.skeleton-pill { width: 3.6rem; height: 0.7rem; border-radius: var(--r-full); }
+.skeleton-pill-short { width: 2.4rem; }
+.skeleton-line { width: 88%; height: 0.8rem; }
+.skeleton-line-short { width: 55%; }
+.skeleton-count { width: 1rem; height: 0.75rem; margin-left: auto; }
+.skeleton-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.8rem 0.8rem 0.85rem;
+  margin-bottom: 0.45rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-progress::after,
+  .spinner,
+  .skeleton { animation-duration: 0s; animation-iteration-count: 1; }
+  .top-progress::after { left: 0; width: 100%; opacity: 0.5; }
+}

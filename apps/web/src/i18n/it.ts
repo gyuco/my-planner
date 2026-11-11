@@ -68,6 +68,7 @@ export const it: Dictionary = {
     showSubtasks: "Mostra sotto-task",
   },
   board: {
+    loadingProject: "Caricamento progetto…",
     draft: "Draft",
     todo: "To do",
     inProgress: "In progress",
