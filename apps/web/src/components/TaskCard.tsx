@@ -1,5 +1,6 @@
 import { suggestParentStatus, type Task, type TaskPriority, type TaskStatus } from "@my-planner/core";
 import { useI18n } from "../i18n";
+import { AlertIcon, ListChecksIcon, LockIcon, SubtaskIcon } from "./Icons";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
 export interface BoardTask extends Task {
@@ -14,14 +15,14 @@ export interface BoardTask extends Task {
 const SUBTASK_SEGMENT_ORDER: TaskStatus[] = ["done", "testing", "in_progress", "todo", "draft"];
 
 const PROJECT_COLOR_PALETTE = [
-  "#2563eb",
-  "#16a34a",
-  "#d97706",
-  "#dc2626",
-  "#7c3aed",
-  "#0891b2",
-  "#db2777",
-  "#65a30d",
+  "#2f5d4a",
+  "#5f7f99",
+  "#c2902f",
+  "#a35a3c",
+  "#8a6496",
+  "#4e8a5f",
+  "#9a6418",
+  "#3d6585",
 ];
 
 /** Colore stabile per progetto, derivato da un hash del suo id (F8). */
@@ -116,13 +117,13 @@ export function TaskCard({
             className="badge badge-parent"
             title={task.parentTitle ? t.taskCard.subtaskOf.replace("{title}", task.parentTitle) : t.taskCard.subtask}
           >
-            ↳ {task.parentTitle ?? t.taskCard.subtask}
+            <SubtaskIcon /> {task.parentTitle ?? t.taskCard.subtask}
           </span>
         )}
         {showProject && task.projectName && (
           <span
             className="badge badge-project"
-            style={{ background: colorForProject(task.projectId), color: "#fff" }}
+            style={{ ["--project-color" as string]: colorForProject(task.projectId) }}
           >
             {task.projectName}
           </span>
@@ -131,21 +132,11 @@ export function TaskCard({
 
       <div className="task-card-title">{task.title}</div>
 
-      {task.tags.length > 0 && (
-        <div className="task-card-tags">
-          {task.tags.map((tag) => (
-            <span key={tag} className="tag">
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
       {subtaskCount > 0 && (
         <div className="task-card-progress" title={subtaskSummary}>
           <div className="task-card-progress-head">
             <span className="task-card-progress-count">
-              ☑ {doneSubtasks}/{subtaskCount}
+              <ListChecksIcon /> {doneSubtasks}/{subtaskCount}
             </span>
             <span className="task-card-progress-pct">{subtaskProgress}%</span>
           </div>
@@ -199,14 +190,14 @@ export function TaskCard({
             onAlignStatus(suggestedStatus);
           }}
         >
-          ⚠ → {STATUS_LABEL[suggestedStatus]}
+          <AlertIcon /> {STATUS_LABEL[suggestedStatus]}
         </button>
       )}
 
       <div className="task-card-footer">
         {blocked && (
           <span className="task-card-blocked" title={t.taskCard.blockedTitle}>
-            🔒 {task.blockedByOpenCount}
+            <LockIcon /> {task.blockedByOpenCount}
           </span>
         )}
         {task.dueDate && (

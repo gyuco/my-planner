@@ -1,5 +1,7 @@
 import type { Project, TaskPriority } from "@my-planner/core";
+import { useState } from "react";
 import { useI18n } from "../i18n";
+import { FilterIcon, SubtaskIcon } from "./Icons";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -47,6 +49,16 @@ export function FilterBar({
   onSelectedProjectIdsChange,
 }: FilterBarProps) {
   const { t } = useI18n();
+  // Su mobile chip e select stanno in un pannello richiudibile (bottone "Filtri");
+  // su desktop il pannello e' `display: contents` e il toggle e' nascosto.
+  const [panelOpen, setPanelOpen] = useState(false);
+  const activeCount =
+    (filters.assignedToMe ? 1 : 0) +
+    filters.priorities.length +
+    (filters.blockedOnly ? 1 : 0) +
+    (filters.showSubtasks ? 1 : 0) +
+    (filters.tag !== null ? 1 : 0) +
+    (filters.assignee !== null ? 1 : 0);
   const PRIORITY_LABEL: Record<TaskPriority, string> = {
     low: t.filters.priorityLow,
     medium: t.filters.priorityMedium,
@@ -75,84 +87,98 @@ export function FilterBar({
 
   return (
     <div className="filter-bar">
-      <div className="filter-chips">
-        <button
-          type="button"
-          className={`filter-chip filter-chip-mine${filters.assignedToMe ? " active" : ""}`}
-          aria-pressed={filters.assignedToMe}
-          onClick={() => onChange({ ...filters, assignedToMe: !filters.assignedToMe })}
-        >
-          {t.filters.assignedToMe}
-        </button>
-        {PRIORITIES.map((p) => (
-          <button
-            key={p}
-            type="button"
-            className={`filter-chip filter-chip-${p}${filters.priorities.includes(p) ? " active" : ""}`}
-            onClick={() => togglePriority(p)}
-          >
-            {PRIORITY_LABEL[p]}
-          </button>
-        ))}
-        <button
-          type="button"
-          className={`filter-chip filter-chip-blocked${filters.blockedOnly ? " active" : ""}`}
-          onClick={() => onChange({ ...filters, blockedOnly: !filters.blockedOnly })}
-        >
-          {t.filters.blockedOnly}
-        </button>
-        <button
-          type="button"
-          className={`filter-chip${filters.showSubtasks ? " active" : ""}`}
-          aria-pressed={filters.showSubtasks}
-          onClick={() => onChange({ ...filters, showSubtasks: !filters.showSubtasks })}
-        >
-          ↳ {t.filters.showSubtasks}
-        </button>
-      </div>
+      <button
+        type="button"
+        className={`filter-toggle${panelOpen ? " is-open" : ""}`}
+        aria-expanded={panelOpen}
+        aria-controls="filter-panel"
+        onClick={() => setPanelOpen((o) => !o)}
+      >
+        <FilterIcon />
+        {t.filters.toggle}
+        {activeCount > 0 && <span className="filter-toggle-count">{activeCount}</span>}
+      </button>
 
-      {availableTags.length > 0 && (
-        <div className="filter-chips filter-chips-tags">
+      <div id="filter-panel" className={`filter-panel${panelOpen ? " is-open" : ""}`}>
+        <div className="filter-chips">
           <button
             type="button"
-            className={`filter-chip filter-chip-tag${filters.tag === null ? " active" : ""}`}
-            onClick={() => onChange({ ...filters, tag: null })}
+            className={`filter-chip filter-chip-mine${filters.assignedToMe ? " active" : ""}`}
+            aria-pressed={filters.assignedToMe}
+            onClick={() => onChange({ ...filters, assignedToMe: !filters.assignedToMe })}
           >
-            {t.filters.allTags}
+            {t.filters.assignedToMe}
           </button>
-          {availableTags.map((tag) => (
+          {PRIORITIES.map((p) => (
             <button
-              key={tag}
+              key={p}
               type="button"
-              className={`filter-chip filter-chip-tag${filters.tag === tag ? " active" : ""}`}
-              onClick={() => onChange({ ...filters, tag: filters.tag === tag ? null : tag })}
+              className={`filter-chip filter-chip-${p}${filters.priorities.includes(p) ? " active" : ""}`}
+              onClick={() => togglePriority(p)}
             >
-              #{tag}
+              {PRIORITY_LABEL[p]}
             </button>
           ))}
+          <button
+            type="button"
+            className={`filter-chip filter-chip-blocked${filters.blockedOnly ? " active" : ""}`}
+            onClick={() => onChange({ ...filters, blockedOnly: !filters.blockedOnly })}
+          >
+            {t.filters.blockedOnly}
+          </button>
+          <button
+            type="button"
+            className={`filter-chip${filters.showSubtasks ? " active" : ""}`}
+            aria-pressed={filters.showSubtasks}
+            onClick={() => onChange({ ...filters, showSubtasks: !filters.showSubtasks })}
+          >
+            <SubtaskIcon /> {t.filters.showSubtasks}
+          </button>
         </div>
-      )}
 
-      <select
-        className="filter-select"
-        aria-label={t.filters.assigneeLabel}
-        value={filters.assignee ?? ""}
-        onChange={(e) => onChange({ ...filters, assignee: e.target.value === "" ? null : e.target.value })}
-      >
-        <option value="">{t.filters.allAssignees}</option>
-        <option value={UNASSIGNED_FILTER}>{t.assignee.unassigned}</option>
-        {availableAssignees.map((a) => (
-          <option key={a.id} value={a.id}>
-            {a.name}
-          </option>
-        ))}
-        {/* L'assegnatario scelto resta selezionabile anche se non ha piu' task caricati. */}
-        {filters.assignee &&
-          filters.assignee !== UNASSIGNED_FILTER &&
-          !availableAssignees.some((a) => a.id === filters.assignee) && (
-            <option value={filters.assignee}>{t.filters.assigneeLabel}</option>
-          )}
-      </select>
+        {/* Tag come menu a tendina: con molti tag per progetto una riga di chip
+            occupava troppo spazio. */}
+        {(availableTags.length > 0 || filters.tag !== null) && (
+          <select
+            className="filter-select filter-select-tag"
+            aria-label={t.filters.allTags}
+            value={filters.tag ?? ""}
+            onChange={(e) => onChange({ ...filters, tag: e.target.value === "" ? null : e.target.value })}
+          >
+            <option value="">{t.filters.allTags}</option>
+            {availableTags.map((tag) => (
+              <option key={tag} value={tag}>
+                #{tag}
+              </option>
+            ))}
+            {filters.tag !== null && !availableTags.includes(filters.tag) && (
+              <option value={filters.tag}>#{filters.tag}</option>
+            )}
+          </select>
+        )}
+
+        <select
+          className="filter-select"
+          aria-label={t.filters.assigneeLabel}
+          value={filters.assignee ?? ""}
+          onChange={(e) => onChange({ ...filters, assignee: e.target.value === "" ? null : e.target.value })}
+        >
+          <option value="">{t.filters.allAssignees}</option>
+          <option value={UNASSIGNED_FILTER}>{t.assignee.unassigned}</option>
+          {availableAssignees.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+          {/* L'assegnatario scelto resta selezionabile anche se non ha piu' task caricati. */}
+          {filters.assignee &&
+            filters.assignee !== UNASSIGNED_FILTER &&
+            !availableAssignees.some((a) => a.id === filters.assignee) && (
+              <option value={filters.assignee}>{t.filters.assigneeLabel}</option>
+            )}
+        </select>
+
+      </div>
 
       <input
         type="search"

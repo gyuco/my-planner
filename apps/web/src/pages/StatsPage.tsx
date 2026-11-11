@@ -26,18 +26,18 @@ const UNASSIGNED = "none";
  * in un grafico impilato.
  */
 const STATUS_COLORS: Record<TaskStatus, string> = {
-  draft: "#2a78d6",
-  todo: "#eb6834",
-  in_progress: "#1baf7a",
-  testing: "#eda100",
-  done: "#e87ba4",
+  draft: "#aaa397",
+  todo: "#5f7f99",
+  in_progress: "#c2902f",
+  testing: "#8a6496",
+  done: "#4e8a5f",
 };
 /** Serie singola (task per stato) e scala sequenziale della matrice. */
-const SINGLE_SERIES = "#2a78d6";
-const SEQ_RGB = "42, 120, 214";
-const AXIS_COLOR = "#9a95ad";
-const GRID_COLOR = "#f0eef7";
-const TEXT_COLOR = "#55516b";
+const SINGLE_SERIES = "#2f5d4a";
+const SEQ_RGB = "47, 93, 74";
+const AXIS_COLOR = "#aaa397";
+const GRID_COLOR = "#ece7dd";
+const TEXT_COLOR = "#67615a";
 
 interface StatsFilters {
   type: TaskType | "";
@@ -341,7 +341,7 @@ export default function StatsPage({ projectId }: StatsPageProps) {
                       tickLine={false}
                     />
                     <Tooltip
-                      cursor={{ fill: "rgba(42, 120, 214, 0.06)" }}
+                      cursor={{ fill: "rgba(47, 93, 74, 0.06)" }}
                       formatter={(value) => [`${value} ${t.stats.tasks}`, ""]}
                       separator=""
                     />
@@ -476,7 +476,7 @@ export default function StatsPage({ projectId }: StatsPageProps) {
                         tick={{ fill: TEXT_COLOR, fontSize: 12 }}
                         tickLine={false}
                       />
-                      <Tooltip cursor={{ fill: "rgba(42, 120, 214, 0.06)" }} />
+                      <Tooltip cursor={{ fill: "rgba(47, 93, 74, 0.06)" }} />
                       <Legend
                         iconType="circle"
                         iconSize={8}
@@ -491,7 +491,7 @@ export default function StatsPage({ projectId }: StatsPageProps) {
                           name={STATUS_LABEL[s]}
                           stackId="status"
                           fill={STATUS_COLORS[s]}
-                          stroke="#ffffff"
+                          stroke="#fffdf9"
                           strokeWidth={2}
                           maxBarSize={24}
                         />

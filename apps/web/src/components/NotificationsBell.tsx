@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { NotificationItem, TaskStatus } from "@my-planner/core";
 import { getNotifications, markNotificationsRead } from "../api";
 import { useI18n } from "../i18n";
-import { BellIcon } from "./Icons";
+import { BellIcon, XIcon } from "./Icons";
 
 const POLL_INTERVAL_MS = 25_000;
 const MAX_ITEMS = 50;
@@ -198,7 +198,7 @@ export function NotificationsBell({ onOpenTask }: NotificationsBellProps) {
               aria-label={t.notifications.close}
               onClick={closePanel}
             >
-              ×
+              <XIcon />
             </button>
           </div>
 

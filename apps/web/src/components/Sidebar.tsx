@@ -1,5 +1,6 @@
 import type { Project } from "@my-planner/core";
 import { useI18n } from "../i18n";
+import { LinkIcon, PlusIcon, RefreshIcon, SettingsIcon } from "./Icons";
 import { copyText } from "../lib/clipboard";
 import { absoluteUrl, projectPath } from "../lib/routes";
 
@@ -41,8 +42,8 @@ export function Sidebar({
       <div className="sidebar-header">
         <span>{t.sidebar.projects}</span>
         {isAdmin && (
-          <button className="icon-button" onClick={onCreateProject} title={t.sidebar.newProjectTitle}>
-            +
+          <button className="icon-button" onClick={onCreateProject} title={t.sidebar.newProjectTitle} aria-label={t.sidebar.newProjectTitle}>
+            <PlusIcon />
           </button>
         )}
       </div>
@@ -70,7 +71,7 @@ export function Sidebar({
               title={t.sidebar.refreshProjectTitle}
               aria-label={`${t.sidebar.refreshProjectTitle} ${p.name}`}
             >
-              ↻
+              <RefreshIcon />
             </button>
             <button
               className="icon-button sidebar-project-link"
@@ -78,7 +79,7 @@ export function Sidebar({
               title={t.sidebar.copyProjectLinkTitle}
               aria-label={`${t.sidebar.copyProjectLinkTitle} ${p.name}`}
             >
-              🔗
+              <LinkIcon />
             </button>
             <button
               className="icon-button sidebar-project-settings"
@@ -86,7 +87,7 @@ export function Sidebar({
               title={t.sidebar.projectSettingsTitle}
               aria-label={`${t.sidebar.projectSettingsTitle} ${p.name}`}
             >
-              ⚙
+              <SettingsIcon />
             </button>
           </div>
         ))}

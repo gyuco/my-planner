@@ -53,6 +53,7 @@ export const es: Dictionary = {
     activityLog: "Registro de actividad",
   },
   filters: {
+    toggle: "Filtros",
     priorityLow: "Baja",
     priorityMedium: "Media",
     priorityHigh: "Alta",

@@ -51,6 +51,7 @@ export const en = {
     activityLog: "Activity log",
   },
   filters: {
+    toggle: "Filters",
     priorityLow: "Low",
     priorityMedium: "Medium",
     priorityHigh: "High",
