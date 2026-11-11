@@ -2,11 +2,13 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { apiError } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
-import { changePasswordInputSchema, updateProfileInputSchema } from "../lib/validation.js";
+import { avatarInputSchema, changePasswordInputSchema, updateProfileInputSchema } from "../lib/validation.js";
 import {
   changeOwnPassword,
   getAuthUser,
+  getOwnAvatar,
   normalizeRole,
+  setOwnAvatar,
   updateOwnProfile,
 } from "../services/userService.js";
 
@@ -62,6 +64,7 @@ export async function authRoutes(app: FastifyInstance) {
           lastName: user.lastName ?? "",
           role: normalizeRole(user.role),
           projectIds: [],
+          avatarVersion: null,
         },
     };
   });
@@ -84,5 +87,20 @@ export async function authRoutes(app: FastifyInstance) {
     const input = changePasswordInputSchema.parse(req.body ?? {});
     await changeOwnPassword((req as any).authUser.id, input);
     return { ok: true };
+  });
+
+  // Avatar self-service: data URL gia' ridimensionato dal client. Lettura su
+  // endpoint dedicato (autenticato) per non appesantire /auth/me.
+  app.get("/auth/me/avatar", { onRequest: [app.authenticate] }, async (req) => {
+    return getOwnAvatar((req as any).authUser.id);
+  });
+
+  app.put("/auth/me/avatar", { onRequest: [app.authenticate] }, async (req) => {
+    const input = avatarInputSchema.parse(req.body ?? {});
+    return setOwnAvatar((req as any).authUser.id, input.dataUrl);
+  });
+
+  app.delete("/auth/me/avatar", { onRequest: [app.authenticate] }, async (req) => {
+    return setOwnAvatar((req as any).authUser.id, null);
   });
 }

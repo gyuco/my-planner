@@ -39,6 +39,11 @@ export interface AuthUser {
   lastName: string;
   role: UserRole;
   projectIds: string[];
+  /**
+   * Versione dell'avatar caricato (ms epoch dell'ultimo upload), null se
+   * l'utente non ne ha uno. L'immagine si legge da `GET /auth/me/avatar`.
+   */
+  avatarVersion: number | null;
 }
 
 /** Utente completo per la gestione admin (nessun hash password esposto). */

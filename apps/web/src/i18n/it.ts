@@ -336,6 +336,12 @@ export const it: Dictionary = {
     saving: "Salvataggio...",
   },
   profile: {
+    avatarUpload: "Carica foto",
+    avatarChange: "Cambia foto",
+    avatarRemove: "Rimuovi foto",
+    avatarUploading: "Caricamento...",
+    avatarInvalid: "Scegli un'immagine PNG, JPEG o WebP",
+    avatarError: "Errore durante l'aggiornamento della foto",
     title: "Profilo",
     open: "Apri profilo",
     backToBoard: "Torna alla board",

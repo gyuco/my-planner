@@ -121,6 +121,21 @@ export async function changeMyPassword(input: ChangePasswordInput): Promise<void
   await apiFetch("/auth/me/password", { method: "PATCH", body: JSON.stringify(input) });
 }
 
+/** Avatar dell'utente corrente come data URL (null se non caricato). */
+export function getMyAvatar(): Promise<{ dataUrl: string | null }> {
+  return apiFetch("/auth/me/avatar");
+}
+
+/** Carica un avatar gia' ridimensionato (data URL PNG/JPEG/WebP). */
+export function uploadMyAvatar(dataUrl: string): Promise<AuthUser> {
+  return apiFetch("/auth/me/avatar", { method: "PUT", body: JSON.stringify({ dataUrl }) });
+}
+
+/** Rimuove l'avatar: il profilo torna alle iniziali. */
+export function deleteMyAvatar(): Promise<AuthUser> {
+  return apiFetch("/auth/me/avatar", { method: "DELETE" });
+}
+
 // --- Gestione utenti (solo admin) -------------------------------------------
 
 export interface CreateUserInput {

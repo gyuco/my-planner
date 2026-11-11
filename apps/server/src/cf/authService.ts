@@ -61,6 +61,7 @@ export async function loginUser(env: CfEnv, body: unknown) {
         lastName: user.lastName ?? "",
         role: normalizeRole(user.role),
         projectIds: [],
+        avatarVersion: null,
       },
   };
 }

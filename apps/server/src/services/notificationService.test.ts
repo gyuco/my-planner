@@ -41,6 +41,7 @@ function authUserOf(account: UserAccount): AuthUser {
     firstName: account.firstName,
     lastName: account.lastName,
     role: account.role,
+    avatarVersion: null,
     projectIds: account.projectIds,
   };
 }

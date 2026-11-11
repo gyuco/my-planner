@@ -174,6 +174,11 @@ export const updateProfileInputSchema = z.object({
   lastName: z.string().max(100).optional(),
 });
 
+/** Upload avatar: data URL base64 (formato e dimensione verificati nel service). */
+export const avatarInputSchema = z.object({
+  dataUrl: z.string().min(1).max(300_000),
+});
+
 /** Cambio password self-service: la password attuale serve come conferma. */
 export const changePasswordInputSchema = z.object({
   currentPassword: z.string().min(1).max(200),

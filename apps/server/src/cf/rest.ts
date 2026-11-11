@@ -15,11 +15,13 @@ import {
   createUser,
   deleteUser,
   getAuthUser,
+  getOwnAvatar,
   isAdmin,
   listProjectAssignees,
   listProjectsForUser,
   listUsers,
   restrictProjectIds,
+  setOwnAvatar,
   updateOwnProfile,
   updateUser,
 } from "../services/userService.js";
@@ -73,6 +75,7 @@ import {
   updateUserInputSchema,
   updateProfileInputSchema,
   changePasswordInputSchema,
+  avatarInputSchema,
   notificationsQuerySchema,
   markNotificationsReadInputSchema,
   activityQuerySchema,
@@ -190,6 +193,16 @@ export function buildRestApp() {
     await changeOwnPassword(c.get("user").id, input);
     return c.json({ ok: true });
   });
+
+  // Avatar self-service (stesse regole del runtime Node, vedi userService).
+  app.get("/auth/me/avatar", async (c) => c.json(await getOwnAvatar(c.get("user").id)));
+
+  app.put("/auth/me/avatar", async (c) => {
+    const input = avatarInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await setOwnAvatar(c.get("user").id, input.dataUrl));
+  });
+
+  app.delete("/auth/me/avatar", async (c) => c.json(await setOwnAvatar(c.get("user").id, null)));
 
   // --- Gestione utenti (admin) ---------------------------------------------
   app.get("/users", async (c) => c.json(await listUsers()));

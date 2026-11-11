@@ -40,9 +40,19 @@ export function isAdmin(user: AuthUser): boolean {
 
 /** Carica il contesto di autorizzazione dell'utente; null se non esiste piu'. */
 export async function getAuthUser(userId: string): Promise<AuthUser | null> {
+  // Select esplicito: questa funzione gira a ogni richiesta autenticata e non
+  // deve trascinarsi dietro il data URL dell'avatar (decine di KB).
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { projects: { select: { projectId: true } } },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      role: true,
+      avatarUpdatedAt: true,
+      projects: { select: { projectId: true } },
+    },
   });
   if (!user) return null;
   const role = normalizeRole(user.role);
@@ -53,6 +63,7 @@ export async function getAuthUser(userId: string): Promise<AuthUser | null> {
     lastName: user.lastName ?? "",
     role,
     projectIds: role === "admin" ? [] : user.projects.map((p) => p.projectId),
+    avatarVersion: user.avatarUpdatedAt ? user.avatarUpdatedAt.getTime() : null,
   };
 }
 
@@ -384,6 +395,45 @@ export async function updateOwnProfile(
   const updated = await getAuthUser(userId);
   if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
   return updated;
+}
+
+/**
+ * Avatar: il client invia un'immagine gia' ridimensionata (data URL base64).
+ * Il limite sul data URL (~300 KB) tiene la riga ben sotto i limiti di D1.
+ */
+const MAX_AVATAR_DATA_URL_LENGTH = 300_000;
+const AVATAR_DATA_URL_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function validateAvatarDataUrl(value: unknown): string {
+  if (typeof value !== "string" || !AVATAR_DATA_URL_RE.test(value)) {
+    throw new ApiErrorException(
+      "VALIDATION_ERROR",
+      "L'avatar deve essere un'immagine PNG, JPEG o WebP (data URL base64)",
+    );
+  }
+  if (value.length > MAX_AVATAR_DATA_URL_LENGTH) {
+    throw new ApiErrorException("VALIDATION_ERROR", "Immagine avatar troppo grande");
+  }
+  return value;
+}
+
+/** Imposta (data URL) o rimuove (null) l'avatar dell'utente corrente. */
+export async function setOwnAvatar(userId: string, dataUrl: string | null): Promise<AuthUser> {
+  const avatar = dataUrl === null ? null : validateAvatarDataUrl(dataUrl);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { avatar, avatarUpdatedAt: avatar === null ? null : new Date() },
+  });
+  const updated = await getAuthUser(userId);
+  if (!updated) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+  return updated;
+}
+
+/** Data URL dell'avatar dell'utente corrente, null se non caricato. */
+export async function getOwnAvatar(userId: string): Promise<{ dataUrl: string | null }> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { avatar: true } });
+  if (!user) throw new ApiErrorException("NOT_FOUND", "Utente non trovato");
+  return { dataUrl: user.avatar ?? null };
 }
 
 export interface ChangePasswordInput {
