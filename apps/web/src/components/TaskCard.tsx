@@ -1,6 +1,6 @@
 import { suggestParentStatus, type Task, type TaskPriority, type TaskStatus } from "@my-planner/core";
 import { useI18n } from "../i18n";
-import { AlertIcon, ListChecksIcon, LockIcon, SubtaskIcon } from "./Icons";
+import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
@@ -56,6 +56,12 @@ interface TaskCardProps {
   isDragging?: boolean;
   /** Se presente, mostra l'azione per allineare lo stato del parent a quello suggerito dalle sotto-task. */
   onAlignStatus?: (status: TaskStatus) => void;
+  /** Solo in Testing: chiude il task (Done). */
+  onComplete?: () => void;
+  /** Solo in Testing: lo rimanda in In progress con un messaggio. */
+  onSendBack?: () => void;
+  /** Card in uscita (animazione dopo "Done"). */
+  leaving?: boolean;
 }
 
 export function TaskCard({
@@ -68,6 +74,9 @@ export function TaskCard({
   style,
   isDragging,
   onAlignStatus,
+  onComplete,
+  onSendBack,
+  leaving,
 }: TaskCardProps) {
   const { t, dateLocale } = useI18n();
   const PRIORITY_LABEL: Record<TaskPriority, string> = {
@@ -98,7 +107,7 @@ export function TaskCard({
 
   return (
     <div
-      className={`task-card${isDragging ? " task-card-dragging" : ""}`}
+      className={`task-card${isDragging ? " task-card-dragging" : ""}${leaving ? " task-card-leaving" : ""}`}
       ref={dragRef}
       style={style}
       onClick={onClick}
@@ -193,6 +202,33 @@ export function TaskCard({
         >
           <AlertIcon /> {STATUS_LABEL[suggestedStatus]}
         </button>
+      )}
+
+      {(onComplete || onSendBack) && (
+        <div
+          className="task-card-review"
+          // Click/tastiera sui bottoni non devono avviare il drag ne' aprire il drawer.
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {onComplete && (
+            <button type="button" className="task-card-done" onClick={onComplete} disabled={leaving}>
+              <CheckIcon /> {t.board.markDone}
+            </button>
+          )}
+          {onSendBack && (
+            <button
+              type="button"
+              className="task-card-send-back"
+              onClick={onSendBack}
+              disabled={leaving}
+              title={t.board.sendBack}
+            >
+              <UndoIcon /> {t.board.sendBack}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="task-card-footer">
