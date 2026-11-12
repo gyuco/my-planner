@@ -64,14 +64,20 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
-function html(body: string, status = 200): Response {
+/**
+ * `formActionOrigin`: origine del redirect_uri (gia' validato). Chrome applica
+ * `form-action` anche ai redirect dopo il submit: con solo 'self' il 302 verso
+ * claude.ai viene bloccato e il pulsante "Autorizza" sembra non fare nulla.
+ */
+function html(body: string, status = 200, formActionOrigin?: string): Response {
+  const formAction = formActionOrigin ? `'self' ${formActionOrigin}` : "'self'";
   return new Response(body, {
     status,
     headers: {
       "Content-Type": "text/html; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'",
+      "Content-Security-Policy": `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}; frame-ancestors 'none'`,
       "Referrer-Policy": "no-referrer",
     },
   });
@@ -131,7 +137,7 @@ button{margin-top:16px;width:100%;padding:10px;border:0;border-radius:8px;backgr
 <input id="token" name="token" type="password" autocomplete="off" required autofocus aria-required="true"${error ? ' aria-invalid="true" aria-describedby="err"' : ""}>
 ${error ? `<p class="err" id="err" role="alert">${escapeHtml(error)}</p>` : ""}
 <button type="submit">Autorizza</button>
-</form></main></body></html>`, error ? 400 : 200);
+</form></main></body></html>`, error ? 400 : 200, new URL(p.redirect_uri).origin);
 }
 
 interface CodePayload {

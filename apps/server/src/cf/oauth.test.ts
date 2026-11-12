@@ -97,6 +97,8 @@ describe("cf oauth", () => {
     const page = (await handleOAuthRequest(new Request(`${BASE}/authorize?${q}`)))!;
     expect(page.status).toBe(200);
     expect(await page.text()).toContain('name="token"');
+    // Chrome applica form-action anche al redirect post-submit verso Claude.
+    expect(page.headers.get("Content-Security-Policy")).toContain("form-action 'self' https://claude.ai;");
 
     const bad = (await handleOAuthRequest(authorizeForm(challenge, "wrong")))!;
     expect(bad.status).toBe(400);
