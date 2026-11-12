@@ -7,6 +7,7 @@ import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { getAttachmentOrThrow } from "../services/attachmentService.js";
 import { prisma } from "../lib/prisma.js";
 import { ApiErrorException } from "@my-planner/core";
+import { protectedResourceMetadataUrl } from "./oauth.js";
 
 /**
  * MCP HTTP su Workers (CF9/CF10): sostituisce Fastify +
@@ -18,21 +19,27 @@ import { ApiErrorException } from "@my-planner/core";
  * risolto contro D1 (mcp/auth.ts); il server è scoped al progetto del token.
  */
 
-function tokenError(message: string): Response {
+function tokenError(request: Request, message: string): Response {
+  // WWW-Authenticate punta ai metadata OAuth (RFC 9728): e' cosi' che i
+  // custom connector di Claude scoprono il flusso di login (src/cf/oauth.ts).
+  const metadata = protectedResourceMetadataUrl(new URL(request.url).origin);
   return new Response(JSON.stringify(apiError("MCP_TOKEN_INVALID", message)), {
     status: 401,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "WWW-Authenticate": `Bearer resource_metadata="${metadata}"`,
+    },
   });
 }
 
 async function resolveTokenOrReject(request: Request): Promise<string | Response> {
   const auth = request.headers.get("authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
-  if (!token) return tokenError("Token MCP mancante");
+  if (!token) return tokenError(request, "Token MCP mancante");
   try {
     return await resolveProjectFromToken(token);
   } catch {
-    return tokenError("Token MCP non valido o revocato");
+    return tokenError(request, "Token MCP non valido o revocato");
   }
 }
 

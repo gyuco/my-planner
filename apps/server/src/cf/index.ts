@@ -5,6 +5,7 @@ import { withRequestPrisma } from "./db.js";
 import { setAttachmentStorageFactory } from "../lib/attachmentStorage/provider.js";
 import { createR2AttachmentStorage } from "./storage/r2.js";
 import { handleMcpRequest, handleMcpAttachmentDownload } from "./mcp.js";
+import { handleOAuthRequest } from "./oauth.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
 import { cfSmtpSocketFactory } from "./smtpSocket.js";
@@ -17,6 +18,7 @@ import type { CfEnv } from "./env.js";
  * Routing:
  *   GET  /mcp/attachments/:id/download -> stream R2 autenticato col token MCP
  *   *    /mcp                         -> MCP Streamable HTTP (CF9/CF10)
+ *   *    /.well-known/oauth-*, /authorize, /token, /register -> OAuth connector Claude
  *   *    tutto il resto               -> REST API Hono (CF5/CF6/CF8)
  *
  * Ogni invocazione (fetch e scheduled) gira dentro `withRequestPrisma`, che le
@@ -68,6 +70,10 @@ export default {
   async fetch(request: Request, env: CfEnv, ctx: ExecutionContext): Promise<Response> {
     return invocation.run({ env, ctx }, () => withRequestPrisma(env, async () => {
       await prepareRequest(env);
+
+      // OAuth per i custom connector di Claude (src/cf/oauth.ts).
+      const oauth = await handleOAuthRequest(request);
+      if (oauth) return oauth;
 
       const url = new URL(request.url);
       if (request.method === "GET" && url.pathname.startsWith("/mcp/attachments/")) {
