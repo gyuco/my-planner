@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { TASK_STATUSES, type Board, type TaskStatus } from "@my-planner/core";
+import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
 import { ApiRequestError, addComment, moveTask } from "../api";
@@ -21,40 +21,60 @@ import { DoneTasksModal } from "./DoneTasksModal";
 import { ArchiveCheckIcon } from "./Icons";
 import { useTouchBoard } from "../lib/useTouchBoard";
 import { useI18n } from "../i18n";
+import { boardStatusKeys, statusLabel } from "../lib/statuses";
 
 /**
  * Colonne della board: "done" non e' una colonna. Un task in Testing si chiude
  * con il pulsante Done sulla card; i completati si consultano nella tabella
- * aperta dal pulsante "Completati" della toolbar.
+ * aperta dal pulsante "Completati" della toolbar. Gli stati personalizzati del
+ * progetto arrivano come chiavi aggiuntive della board (tra in_progress e testing).
  */
-const BOARD_STATUSES: TaskStatus[] = TASK_STATUSES.filter((s) => s !== "done");
+function boardColumnKeys(board: Board): TaskStatusKey[] {
+  return boardStatusKeys(board).filter((s) => s !== "done");
+}
+
+/** Classe CSS del colore: gli stati personalizzati condividono un colore. */
+function statusClass(status: TaskStatusKey): string {
+  return isBaseStatus(status) ? status : "custom";
+}
 
 /** Durata dell'animazione di uscita della card chiusa (allineata al CSS). */
 const LEAVE_ANIMATION_MS = 420;
 
-/** Preferenza locale (per browser) delle colonne visibili: non tocca il server. */
-const VISIBLE_COLUMNS_STORAGE_KEY = "my-planner-visible-columns";
+/**
+ * Preferenza locale (per browser) delle colonne nascoste: non tocca il server.
+ * Si salvano le nascoste (non le visibili) cosi' un nuovo stato personalizzato
+ * compare subito. La vecchia chiave con le visibili viene convertita.
+ */
+const HIDDEN_COLUMNS_STORAGE_KEY = "my-planner-hidden-columns";
+const LEGACY_VISIBLE_COLUMNS_STORAGE_KEY = "my-planner-visible-columns";
 
-function columnDroppableId(status: TaskStatus): string {
+function columnDroppableId(status: TaskStatusKey): string {
   return `column-${status}`;
 }
 
-/** Legge le colonne salvate localmente, scartando valori sconosciuti o vuoti. */
-function getStoredVisibleStatuses(): TaskStatus[] {
+/** Legge le colonne nascoste salvate localmente (lista vuota se assente o non valida). */
+function getStoredHiddenStatuses(): TaskStatusKey[] {
   try {
-    const raw = localStorage.getItem(VISIBLE_COLUMNS_STORAGE_KEY);
-    if (!raw) return [...BOARD_STATUSES];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [...BOARD_STATUSES];
-    const valid = BOARD_STATUSES.filter((status) => parsed.includes(status));
-    return valid.length > 0 ? valid : [...BOARD_STATUSES];
+    const raw = localStorage.getItem(HIDDEN_COLUMNS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === "string") : [];
+    }
+    const legacy = localStorage.getItem(LEGACY_VISIBLE_COLUMNS_STORAGE_KEY);
+    if (!legacy) return [];
+    const visible = JSON.parse(legacy);
+    if (!Array.isArray(visible) || visible.length === 0) return [];
+    return TASK_STATUSES.filter((s) => s !== "done" && !visible.includes(s));
   } catch {
-    return [...BOARD_STATUSES];
+    return [];
   }
 }
 
 interface KanbanBoardProps {
   board: Board;
+  /** Nomi degli stati personalizzati (chiave -> nome); senza nome si mostra la chiave. */
+  statusLabels?: Record<string, string>;
   /** Cambio progetto in corso: colonne con placeholder al posto delle card. */
   loading?: boolean;
   showProject?: boolean;
@@ -64,16 +84,16 @@ interface KanbanBoardProps {
 
 interface SortableTaskCardProps {
   task: BoardTask;
-  status: TaskStatus;
+  status: TaskStatusKey;
   showProject?: boolean;
   onClick?: () => void;
-  onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
+  onAlignStatus?: (task: BoardTask, status: TaskStatusKey) => void;
   onComplete?: (task: BoardTask) => void;
   onSendBack?: (task: BoardTask) => void;
   leaving?: boolean;
   /** Mobile/touch: niente drag, spostamento dal menu della card. */
-  moveTargets?: { status: TaskStatus; label: string }[];
-  onMove?: (task: BoardTask, status: TaskStatus) => void;
+  moveTargets?: { status: TaskStatusKey; label: string }[];
+  onMove?: (task: BoardTask, status: TaskStatusKey) => void;
 }
 
 function SortableTaskCard({
@@ -122,17 +142,17 @@ function SortableTaskCard({
 }
 
 interface ColumnProps {
-  status: TaskStatus;
+  status: TaskStatusKey;
   label: string;
   tasks: BoardTask[];
   showProject?: boolean;
   onTaskClick?: (task: BoardTask) => void;
-  onAlignStatus?: (task: BoardTask, status: TaskStatus) => void;
+  onAlignStatus?: (task: BoardTask, status: TaskStatusKey) => void;
   onComplete?: (task: BoardTask) => void;
   onSendBack?: (task: BoardTask) => void;
   leavingIds?: ReadonlySet<string>;
-  moveTargets?: { status: TaskStatus; label: string }[];
-  onMove?: (task: BoardTask, status: TaskStatus) => void;
+  moveTargets?: { status: TaskStatusKey; label: string }[];
+  onMove?: (task: BoardTask, status: TaskStatusKey) => void;
 }
 
 function Column({
@@ -153,7 +173,7 @@ function Column({
 
   return (
     <div
-      className={`column column-status-${status}${isOver ? " column-drag-over" : ""}`}
+      className={`column column-status-${statusClass(status)}${isOver ? " column-drag-over" : ""}`}
       ref={setNodeRef}
     >
       <h2>
@@ -196,10 +216,10 @@ function SkeletonCard({ wide }: { wide: boolean }) {
   );
 }
 
-function SkeletonColumn({ status, label, index }: { status: TaskStatus; label: string; index: number }) {
+function SkeletonColumn({ status, label, index }: { status: TaskStatusKey; label: string; index: number }) {
   const count = SKELETON_CARDS[index % SKELETON_CARDS.length];
   return (
-    <div className={`column column-status-${status} column-loading`}>
+    <div className={`column column-status-${statusClass(status)} column-loading`}>
       <h2>
         {label} <span className="skeleton skeleton-count" />
       </h2>
@@ -211,21 +231,22 @@ function SkeletonColumn({ status, label, index }: { status: TaskStatus; label: s
 }
 
 function findTaskById(board: Board, id: string): BoardTask | undefined {
-  for (const status of TASK_STATUSES) {
-    const found = (board[status] as BoardTask[]).find((t) => t.id === id);
+  for (const status of boardStatusKeys(board)) {
+    const found = ((board[status] ?? []) as BoardTask[]).find((t) => t.id === id);
     if (found) return found;
   }
   return undefined;
 }
 
 /** Sposta `taskId` in `targetStatus`/`targetIndex` in una copia del board, per l'update ottimistico. */
-function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, targetIndex: number): Board {
-  const next = {} as Record<TaskStatus, BoardTask[]>;
-  for (const status of TASK_STATUSES) {
-    next[status] = [...(board[status] as BoardTask[])];
+function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatusKey, targetIndex: number): Board {
+  const next = {} as Record<TaskStatusKey, BoardTask[]>;
+  const keys = boardStatusKeys(board);
+  for (const status of keys) {
+    next[status] = [...((board[status] ?? []) as BoardTask[])];
   }
   let moved: BoardTask | undefined;
-  for (const status of TASK_STATUSES) {
+  for (const status of keys) {
     const list = next[status];
     const idx = list.findIndex((t) => t.id === taskId);
     if (idx !== -1) {
@@ -235,21 +256,31 @@ function reorderBoard(board: Board, taskId: string, targetStatus: TaskStatus, ta
     }
   }
   if (!moved) return board;
-  next[targetStatus].splice(targetIndex, 0, moved);
+  (next[targetStatus] ??= []).splice(targetIndex, 0, moved);
   return next as Board;
 }
 
-export function KanbanBoard({ board, loading, showProject, onBoardChange, onTaskClick }: KanbanBoardProps) {
+export function KanbanBoard({
+  board,
+  statusLabels,
+  loading,
+  showProject,
+  onBoardChange,
+  onTaskClick,
+}: KanbanBoardProps) {
   const { t } = useI18n();
-  const COLUMNS: { status: TaskStatus; label: string }[] = [
-    { status: "draft", label: t.board.draft },
-    { status: "todo", label: t.board.todo },
-    { status: "in_progress", label: t.board.inProgress },
-    { status: "testing", label: t.board.testing },
-  ];
+  const boardStatuses = boardColumnKeys(board);
+  const COLUMNS: { status: TaskStatusKey; label: string }[] = boardStatuses.map((status) => ({
+    status,
+    label: statusLabel(t, status, statusLabels),
+  }));
   const [dragError, setDragError] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<BoardTask | null>(null);
-  const [visibleStatuses, setVisibleStatuses] = useState<TaskStatus[]>(getStoredVisibleStatuses);
+  const [hiddenStatuses, setHiddenStatuses] = useState<TaskStatusKey[]>(getStoredHiddenStatuses);
+  // Almeno una colonna resta visibile anche se le preferenze salvate le
+  // nascondono tutte (es. stati cancellati).
+  const shown = boardStatuses.filter((s) => !hiddenStatuses.includes(s));
+  const visibleStatuses = shown.length > 0 ? shown : boardStatuses;
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
   // Card in uscita dopo "Done" (animazione) e task da rimandare in In progress.
@@ -273,11 +304,11 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
   // al server, così ogni utente può avere la propria vista.
   useEffect(() => {
     try {
-      localStorage.setItem(VISIBLE_COLUMNS_STORAGE_KEY, JSON.stringify(visibleStatuses));
+      localStorage.setItem(HIDDEN_COLUMNS_STORAGE_KEY, JSON.stringify(hiddenStatuses));
     } catch {
       /* ignore (storage non disponibile) */
     }
-  }, [visibleStatuses]);
+  }, [hiddenStatuses]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -297,15 +328,13 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
     };
   }, [pickerOpen]);
 
-  function toggleColumn(status: TaskStatus) {
-    setVisibleStatuses((current) => {
-      const next = current.includes(status)
-        ? current.filter((s) => s !== status)
-        : [...current, status];
+  function toggleColumn(status: TaskStatusKey) {
+    setHiddenStatuses((current) => {
+      if (current.includes(status)) return current.filter((s) => s !== status);
       // Almeno una colonna deve restare visibile, altrimenti la board
       // diventerebbe uno spazio vuoto senza modo evidente di recuperarla.
-      if (next.length === 0) return current;
-      return BOARD_STATUSES.filter((s) => next.includes(s));
+      if (visibleStatuses.length <= 1) return current;
+      return [...current, status];
     });
   }
 
@@ -327,9 +356,9 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
 
   // Allinea lo stato di un parent a quello suggerito dalle sue sotto-task
   // (badge ⚠ sulla card): stesso endpoint del drag, in coda alla colonna.
-  async function handleAlignStatus(task: BoardTask, targetStatus: TaskStatus) {
+  async function handleAlignStatus(task: BoardTask, targetStatus: TaskStatusKey) {
     const previousBoard = localBoard;
-    const targetIndex = (localBoard[targetStatus] as BoardTask[]).length;
+    const targetIndex = ((localBoard[targetStatus] ?? []) as BoardTask[]).length;
     setLocalBoard(reorderBoard(localBoard, task.id, targetStatus, targetIndex));
     setDragError(null);
     try {
@@ -393,26 +422,26 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
     if (!over) return;
 
     const activeId = String(active.id);
-    const activeStatus = (active.data.current?.status as TaskStatus | undefined) ?? null;
+    const activeStatus = (active.data.current?.status as TaskStatusKey | undefined) ?? null;
     if (!activeStatus) return;
 
     const overIdStr = String(over.id);
-    let targetStatus: TaskStatus;
+    let targetStatus: TaskStatusKey;
     let targetIndex: number;
 
     if (overIdStr.startsWith("column-")) {
-      targetStatus = overIdStr.slice("column-".length) as TaskStatus;
-      targetIndex = (localBoard[targetStatus] as BoardTask[]).length;
+      targetStatus = overIdStr.slice("column-".length) as TaskStatusKey;
+      targetIndex = ((localBoard[targetStatus] ?? []) as BoardTask[]).length;
     } else {
-      targetStatus = (over.data.current?.status as TaskStatus | undefined) ?? activeStatus;
-      const targetTasks = localBoard[targetStatus] as BoardTask[];
+      targetStatus = (over.data.current?.status as TaskStatusKey | undefined) ?? activeStatus;
+      const targetTasks = (localBoard[targetStatus] ?? []) as BoardTask[];
       const idx = targetTasks.findIndex((t) => t.id === overIdStr);
       targetIndex = idx === -1 ? targetTasks.length : idx;
     }
 
     const previousBoard = localBoard;
     if (activeStatus === targetStatus) {
-      const tasks = localBoard[targetStatus] as BoardTask[];
+      const tasks = (localBoard[targetStatus] ?? []) as BoardTask[];
       const activeIndex = tasks.findIndex((t) => t.id === activeId);
       if (activeIndex !== -1 && activeIndex < targetIndex) {
         targetIndex -= 1;
@@ -489,7 +518,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
             aria-expanded={pickerOpen}
             title={t.board.columnsMenuTitle}
           >
-            {t.board.columns} · {visibleStatuses.length}/{BOARD_STATUSES.length}
+            {t.board.columns} · {visibleStatuses.length}/{boardStatuses.length}
           </button>
           {pickerOpen && (
             <div className="column-picker-menu" role="group" aria-label={t.board.columnsMenuTitle}>
@@ -504,7 +533,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
                       disabled={checked && visibleStatuses.length === 1}
                       onChange={() => toggleColumn(col.status)}
                     />
-                    <span className={`column-picker-dot column-picker-dot-${col.status}`} />
+                    <span className={`column-picker-dot column-picker-dot-${statusClass(col.status)}`} />
                     <span>{col.label}</span>
                   </label>
                 );
@@ -512,7 +541,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
               <button
                 type="button"
                 className="column-picker-reset"
-                onClick={() => setVisibleStatuses([...BOARD_STATUSES])}
+                onClick={() => setHiddenStatuses([])}
               >
                 {t.board.showAllColumns}
               </button>
@@ -537,7 +566,7 @@ export function KanbanBoard({ board, loading, showProject, onBoardChange, onTask
               key={col.status}
               status={col.status}
               label={col.label}
-              tasks={localBoard[col.status] as BoardTask[]}
+              tasks={(localBoard[col.status] ?? []) as BoardTask[]}
               showProject={showProject}
               onTaskClick={onTaskClick}
               onAlignStatus={handleAlignStatus}

@@ -4,7 +4,7 @@ import {
   type ProjectStats,
   type ProjectStatsAssignee,
   type TaskPriority,
-  type TaskStatus,
+  type TaskStatusKey,
   type TaskType,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
@@ -35,14 +35,18 @@ export interface ProjectStatsFilters {
   from?: Date;
 }
 
-function countByStatus(): Record<TaskStatus, number> {
-  return Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<TaskStatus, number>;
+// Stati di base sempre presenti (a 0); gli stati personalizzati compaiono
+// solo quando almeno un task li usa (vedi `ensureStatus`).
+function countByStatus(): Record<TaskStatusKey, number> {
+  return Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<TaskStatusKey, number>;
 }
 
-function countByStatusAnd<K extends string>(keys: readonly K[]): Record<TaskStatus, Record<K, number>> {
-  return Object.fromEntries(
-    TASK_STATUSES.map((s) => [s, Object.fromEntries(keys.map((k) => [k, 0]))]),
-  ) as Record<TaskStatus, Record<K, number>>;
+function zeroes<K extends string>(keys: readonly K[]): Record<K, number> {
+  return Object.fromEntries(keys.map((k) => [k, 0])) as Record<K, number>;
+}
+
+function countByStatusAnd<K extends string>(keys: readonly K[]): Record<TaskStatusKey, Record<K, number>> {
+  return Object.fromEntries(TASK_STATUSES.map((s) => [s, zeroes(keys)])) as Record<TaskStatusKey, Record<K, number>>;
 }
 
 /**
@@ -120,8 +124,11 @@ export async function getProjectStats(projectId: string, filters: ProjectStatsFi
   let complexityDone = 0;
 
   for (const t of tasks) {
-    const status = t.status as TaskStatus;
+    const status = t.status as TaskStatusKey;
     const isDone = status === "done";
+    byStatus[status] ??= 0;
+    byStatusPriority[status] ??= zeroes(PRIORITIES);
+    byStatusType[status] ??= zeroes(TASK_TYPES);
     byStatus[status]++;
     byStatusPriority[status][t.priority as TaskPriority]++;
     byStatusType[status][t.type as TaskType]++;
@@ -141,7 +148,7 @@ export async function getProjectStats(projectId: string, filters: ProjectStatsFi
       };
       byAssigneeMap.set(t.assigneeId, row);
     }
-    row.byStatus[status]++;
+    row.byStatus[status] = (row.byStatus[status] ?? 0) + 1;
     if (!isDone) row.open++;
   }
 

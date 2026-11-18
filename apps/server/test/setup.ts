@@ -32,6 +32,7 @@ export async function cleanDatabase() {
   await prisma.attachment.deleteMany();
   await prisma.task.deleteMany();
   await prisma.projectToken.deleteMany();
+  await prisma.projectStatus.deleteMany();
   await prisma.project.deleteMany();
   await prisma.user.deleteMany();
 }

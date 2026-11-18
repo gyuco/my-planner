@@ -56,6 +56,12 @@ import { getEmailSettings, sendTestEmail, updateEmailSettings } from "../service
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { activityFiltersFromQuery, listActivity, listActivityActors } from "../services/activityService.js";
 import { getProjectStats } from "../services/statsService.js";
+import {
+  createProjectStatus,
+  deleteProjectStatus,
+  listProjectStatuses,
+  renameProjectStatus,
+} from "../services/statusService.js";
 import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
 import { sendStandupEmail } from "./email.js";
 import {
@@ -67,6 +73,7 @@ import {
   commentInputSchema,
   projectNameInputSchema,
   projectTokenInputSchema,
+  projectStatusInputSchema,
   boardFiltersQuerySchema,
   aggregatedBoardQuerySchema,
   storageSettingsInputSchema,
@@ -269,6 +276,33 @@ export function buildRestApp() {
   app.post("/projects/:projectId/unarchive", async (c) => {
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
     return c.json(await unarchiveProject(c.req.param("projectId")));
+  });
+
+  // --- Stati personalizzati ------------------------------------------------
+  app.get("/projects/:projectId/statuses", async (c) => {
+    const { projectId } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    return c.json(await listProjectStatuses(projectId));
+  });
+
+  app.post("/projects/:projectId/statuses", async (c) => {
+    const { projectId } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    const { label } = projectStatusInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await createProjectStatus(projectId, label), 201);
+  });
+
+  app.patch("/projects/:projectId/statuses/:key", async (c) => {
+    const { projectId, key } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    const { label } = projectStatusInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await renameProjectStatus(projectId, key, label));
+  });
+
+  app.delete("/projects/:projectId/statuses/:key", async (c) => {
+    const { projectId, key } = c.req.param();
+    await assertProjectAccess(c.get("user"), projectId);
+    return c.json(await deleteProjectStatus(projectId, key));
   });
 
   // --- Token MCP -----------------------------------------------------------

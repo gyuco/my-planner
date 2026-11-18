@@ -7,7 +7,12 @@ import { TASK_EVENT_TYPES } from "@my-planner/core";
  * restituiscano lo stesso VALIDATION_ERROR sugli stessi input malformati.
  */
 
-export const taskStatusSchema = z.enum(["draft", "todo", "in_progress", "testing", "done"]);
+/**
+ * Stato di un task: uno dei 5 stati di base o uno stato personalizzato del
+ * progetto (chiave o etichetta). La validita' rispetto al progetto e' decisa
+ * dal service (statusService.resolveStatus), uguale per REST e MCP.
+ */
+export const taskStatusSchema = z.string().trim().min(1).max(60);
 export const taskPrioritySchema = z.enum(["low", "medium", "high", "urgent"]);
 export const taskTypeSchema = z.enum(["bug", "feature", "analysis"]);
 
@@ -94,6 +99,11 @@ export const createSubtasksInputSchema = z.object({
 export const moveTaskInputSchema = z.object({
   status: taskStatusSchema,
   position: z.number().int().nonnegative().optional(),
+});
+
+/** Creazione / rinomina di uno stato personalizzato di progetto. */
+export const projectStatusInputSchema = z.object({
+  label: z.string().trim().min(1).max(50),
 });
 
 export const dependencyInputSchema = z.object({

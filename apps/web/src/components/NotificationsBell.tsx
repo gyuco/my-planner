@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { NotificationItem, TaskStatus } from "@my-planner/core";
+import type { NotificationItem } from "@my-planner/core";
 import { getNotifications, markNotificationsRead } from "../api";
 import { useI18n } from "../i18n";
 import { BellIcon, XIcon } from "./Icons";
@@ -77,7 +77,7 @@ export function NotificationsBell({ onOpenTask }: NotificationsBellProps) {
     };
   }, [open]);
 
-  const statusLabel: Record<TaskStatus, string> = {
+  const statusLabel: Record<string, string> = {
     draft: t.board.draft,
     todo: t.board.todo,
     in_progress: t.board.inProgress,
