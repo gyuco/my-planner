@@ -19,6 +19,7 @@ import {
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
 import { listProjectAssignees } from "../services/userService.js";
+import { listProjectStatuses, resolveStatus } from "../services/statusService.js";
 import { buildTaskUrl, getAppUrl } from "../services/emailSettingsService.js";
 import type { Actor } from "../services/notificationService.js";
 
@@ -82,7 +83,7 @@ export function createProjectMcpServer(projectId: string) {
     "list_tasks",
     "Elenca i task del progetto associato al token",
     {
-      status: z.enum(["draft", "todo", "in_progress", "testing", "done"]).optional(),
+      status: z.string().min(1).describe("Stato: draft | todo | in_progress | testing | done oppure uno stato personalizzato del progetto (chiave o nome, vedi list_statuses)").optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
@@ -164,7 +165,8 @@ export function createProjectMcpServer(projectId: string) {
   server.tool(
     "update_task",
     "Aggiorna un task del progetto associato al token. parentId puo' essere impostato per riassegnare la task " +
-      "come sotto-task di un'altra (null per staccarla e renderla di nuovo un task di primo livello).",
+      "come sotto-task di un'altra (null per staccarla e renderla di nuovo un task di primo livello). " +
+      "status (opzionale) sposta il task come move_task, anche in uno stato personalizzato.",
     {
       taskId: z.string(),
       title: z.string().min(1).max(300).optional(),
@@ -176,11 +178,17 @@ export function createProjectMcpServer(projectId: string) {
       dueDate: z.string().datetime().nullable().optional(),
       parentId: z.string().nullable().optional(),
       assigneeId: z.string().nullable().optional(),
+      status: z.string().min(1).describe("Stato: draft | todo | in_progress | testing | done oppure uno stato personalizzato del progetto (chiave o nome, vedi list_statuses)").optional(),
     },
-    async ({ taskId, ...rest }) =>
+    async ({ taskId, status, ...rest }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
-        return updateTask(taskId, rest, MCP_ACTOR);
+        // Valida lo stato prima di salvare gli altri campi: niente update a meta'.
+        if (status !== undefined) await resolveStatus(projectId, status);
+        const hasFields = Object.values(rest).some((v) => v !== undefined);
+        const updated = hasFields ? await updateTask(taskId, rest, MCP_ACTOR) : undefined;
+        if (status === undefined) return updated ?? getTask(taskId);
+        return moveTask(taskId, status, undefined, MCP_ACTOR);
       })
   );
 
@@ -193,8 +201,13 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "move_task",
-    "Sposta un task del progetto in un nuovo stato (draft | todo | in_progress | testing | done)",
-    { taskId: z.string(), status: z.enum(["draft", "todo", "in_progress", "testing", "done"]), position: z.number().int().nonnegative().optional() },
+    "Sposta un task del progetto in un nuovo stato: uno di base (draft | todo | in_progress | testing | done) " +
+      "oppure uno stato personalizzato del progetto, indicato per chiave o per nome (vedi list_statuses)",
+    {
+      taskId: z.string(),
+      status: z.string().min(1).describe("Stato: draft | todo | in_progress | testing | done oppure uno stato personalizzato del progetto (chiave o nome, vedi list_statuses)"),
+      position: z.number().int().nonnegative().optional(),
+    },
     async ({ taskId, status, position }) =>
       withErrors(async () => {
         await assertTaskInProject(taskId);
@@ -298,13 +311,22 @@ export function createProjectMcpServer(projectId: string) {
   server.tool(
     "get_board",
     "Restituisce la board Kanban del progetto associato al token. Ogni task include subtaskCount/openSubtaskCount/subtaskStatusCounts " +
-      "(0 se non ha sotto-task) cosi' da distinguere a colpo d'occhio i task singoli da quelli con un gruppo di sotto-task.",
+      "(0 se non ha sotto-task) cosi' da distinguere a colpo d'occhio i task singoli da quelli con un gruppo di sotto-task. " +
+      "Oltre agli stati di base ha una colonna per ogni stato personalizzato del progetto (chiave dello stato).",
     {
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
     },
     async (filters) => withErrors(() => getBoard(projectId, filters))
+  );
+
+  server.tool(
+    "list_statuses",
+    "Elenca gli stati del progetto nell'ordine delle colonne: i 5 di base (builtIn true) e quelli personalizzati " +
+      "(es. bloqueante). Usa `key` (o il nome) come status in move_task, update_task e list_tasks.",
+    {},
+    async () => withErrors(() => listProjectStatuses(projectId))
   );
 
   return server;

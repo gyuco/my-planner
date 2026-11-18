@@ -212,6 +212,17 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - 404 `NOT_FOUND`
 - **Decisione confermata:** l'archiviazione è reversibile in v1, per evitare che un errore diventi irreversibile senza intervenire sul DB.
 
+### Stati personalizzati — sotto `/projects/:projectId/statuses`
+
+Ogni progetto ha i 5 stati di base (`draft`, `todo`, `in_progress`, `testing`, `done`: fissi, non rinominabili né cancellabili) più eventuali stati personalizzati (es. `bloqueante`, `pendiente-email`). Uno stato personalizzato ha una `key` stabile, generata dal nome alla creazione (minuscole, senza accenti, spazi → `-`), e un `label` modificabile: `Task.status` salva la `key`, quindi rinominare non tocca i task. Sulla board le colonne personalizzate stanno tra `in_progress` e `testing`.
+
+- `GET /projects/:projectId/statuses` → `ProjectStatus[]` (`{ key, label, builtIn }`) nell'ordine delle colonne; per gli stati di base `label === key`.
+- `POST /projects/:projectId/statuses` body `{ "label": string (1-50) }` → 201 `ProjectStatus`. 409 `CONFLICT` se il nome esiste già (o è uno stato di base), 400 `VALIDATION_ERROR` se non contiene lettere/numeri.
+- `PATCH /projects/:projectId/statuses/:key` body `{ "label": string }` → `ProjectStatus` (cambia solo `label`). 400 `VALIDATION_ERROR` per uno stato di base.
+- `DELETE /projects/:projectId/statuses/:key` → `{ key, deleted: true }`. 409 `CONFLICT` se un task del progetto lo usa; 400 `VALIDATION_ERROR` per uno stato di base.
+
+Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta uno stato di base, la `key` di uno stato personalizzato del progetto o il suo `label` (senza distinzione maiuscole/minuscole); altro → 400 `VALIDATION_ERROR` con l'elenco degli stati validi.
+
 ### Token MCP (B12) — sotto `/projects/:projectId/tokens`
 
 `POST /projects/:projectId/tokens`
@@ -278,7 +289,7 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - 400 `VALIDATION_ERROR` se `parentId` creerebbe un annidamento a più livelli, un self-parenting, o se il task ha già proprie sotto-task (non può diventare a sua volta una sotto-task)
 
 ### `POST /tasks/:taskId/move`
-- Body: `{ "status": "draft"|"todo"|"in_progress"|"testing"|"done", "position"?: number }`
+- Body: `{ "status": "draft"|"todo"|"in_progress"|"testing"|"done"|<stato personalizzato>, "position"?: number }` (vedi §3 Stati personalizzati)
 - `position` opzionale: indice manuale nella colonna target (drag&drop); se omesso, il task va in coda alla colonna.
 - 200: `Task` aggiornato
 - 409 `DEPENDENCY_BLOCKED` se `status === "in_progress"` e ci sono dipendenze non `done`:
@@ -495,7 +506,7 @@ Convenzione di output: ogni tool ritorna `{ content: [{ type: "text", text: JSON
 ### Task
 
 **`list_tasks`**
-- Input: `{ status: z.enum(["draft","todo","in_progress","testing","done"]).optional(), priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional(), assigneeId: z.string().optional(), ownerId: z.string().optional() }`
+- Input: `{ status: z.string().optional() /* base o personalizzato */, priority: z.enum(["low","medium","high","urgent"]).optional(), tag: z.string().optional(), search: z.string().optional(), assigneeId: z.string().optional(), ownerId: z.string().optional() }`
 - Output: `Task[]`
 
 **`list_assignees`**
@@ -545,9 +556,15 @@ z.object({
 - Errori: `NOT_FOUND`, `FORBIDDEN`, `VALIDATION_ERROR` (ha ancora sotto-task: eliminale o riassegnale prima)
 
 **`move_task`**
-- Input: `{ taskId: z.string(), status: z.enum(["draft","todo","in_progress","testing","done"]), position: z.number().int().nonnegative().optional() }`
+- Input: `{ taskId: z.string(), status: z.string() /* base, key o nome di uno stato personalizzato */, position: z.number().int().nonnegative().optional() }`
 - Output: `Task`
-- Errori: `DEPENDENCY_BLOCKED` (con `message` che elenca i blocker non risolti, identico a REST), `NOT_FOUND`, `FORBIDDEN`
+- Errori: `DEPENDENCY_BLOCKED` (con `message` che elenca i blocker non risolti, identico a REST), `VALIDATION_ERROR` (stato sconosciuto nel progetto), `NOT_FOUND`, `FORBIDDEN`
+
+`update_task` accetta anche `status` opzionale (stesso significato di `move_task`, validato prima di salvare gli altri campi).
+
+**`list_statuses`**
+- Input: `{}`
+- Output: `ProjectStatus[]` — stati del progetto del token nell'ordine delle colonne (base + personalizzati).
 
 ### Dipendenze
 
@@ -596,7 +613,7 @@ z.object({
 
 **`get_board`**
 - Input: `{ priority: z.enum([...]).optional(), tag: z.string().optional(), search: z.string().optional() }`
-- Output: `{ draft: Task[], todo: Task[], in_progress: Task[], testing: Task[], done: Task[] }` — scoped al progetto del token. Ogni `Task` include `subtaskCount`/`openSubtaskCount`/`subtaskStatusCounts` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
+- Output: `{ draft: Task[], todo: Task[], in_progress: Task[], <stati personalizzati>: Task[], testing: Task[], done: Task[] }` (chiavi nell'ordine delle colonne) — scoped al progetto del token. `subtaskStatusCounts` ha anche `custom` (sotto-task in stati personalizzati). Ogni `Task` include `subtaskCount`/`openSubtaskCount`/`subtaskStatusCounts` (0 se non ha sotto-task); la board resta piatta (non filtra le sotto-task fuori dalle colonne, quello e' un accorpamento lato frontend, vedi BACKLOG.md).
 - **Nessun `get_aggregated_board` via MCP** (per costruzione: il token è scoped a un progetto).
 
 ---

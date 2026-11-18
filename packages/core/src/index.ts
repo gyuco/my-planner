@@ -1,10 +1,60 @@
 /**
- * Stati di un task, nell'ordine in cui compaiono come colonne sulla board:
- * draft -> todo -> in_progress -> testing -> done.
+ * Stati di base di un task, nell'ordine in cui compaiono come colonne sulla
+ * board: draft -> todo -> in_progress -> testing -> done. Esistono in ogni
+ * progetto e non si possono rinominare ne' cancellare.
  */
 export const TASK_STATUSES = ["draft", "todo", "in_progress", "testing", "done"] as const;
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+/**
+ * Valore di `Task.status`: uno stato di base oppure la chiave di uno stato
+ * personalizzato del progetto (vedi `ProjectStatus`).
+ */
+export type TaskStatusKey = TaskStatus | (string & {});
+
+export function isBaseStatus(status: string): status is TaskStatus {
+  return (TASK_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Stato di un progetto (GET /projects/:projectId/statuses). Gli stati di base
+ * hanno `builtIn: true` e `label` uguale alla chiave (la UI li traduce); quelli
+ * personalizzati hanno una chiave stabile generata alla creazione (rinominare
+ * cambia solo `label`, quindi i task e i client MCP non si rompono).
+ */
+export interface ProjectStatus {
+  key: TaskStatusKey;
+  label: string;
+  builtIn: boolean;
+}
+
+/** Formato della chiave di uno stato personalizzato. */
+export const CUSTOM_STATUS_KEY_PATTERN = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+
+/**
+ * Chiave derivata dall'etichetta di uno stato personalizzato:
+ * "Pendiente email" -> "pendiente-email". Stringa vuota se non resta nulla.
+ */
+export function statusKeyFromLabel(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "")
+    .slice(0, 40)
+    .replace(/[-_]+$/g, "");
+}
+
+/**
+ * Ordine delle colonne: gli stati personalizzati stanno tra in_progress e
+ * testing (sono stati "aperti" in attesa di qualcosa, es. bloqueante).
+ */
+export function orderedStatusKeys(customKeys: readonly string[]): TaskStatusKey[] {
+  return ["draft", "todo", "in_progress", ...customKeys, "testing", "done"];
+}
 
 export type TaskPriority = "low" | "medium" | "high" | "urgent";
 
@@ -77,13 +127,14 @@ export interface Project {
 export interface SubtaskSummary {
   id: string;
   title: string;
-  status: TaskStatus;
+  status: TaskStatusKey;
 }
 
-export type SubtaskStatusCounts = Record<TaskStatus, number>;
+/** Sotto-task per stato di base; `custom` conta quelle in stati personalizzati. */
+export type SubtaskStatusCounts = Record<TaskStatus, number> & { custom: number };
 
 export function emptySubtaskStatusCounts(): SubtaskStatusCounts {
-  return { draft: 0, todo: 0, in_progress: 0, testing: 0, done: 0 };
+  return { draft: 0, todo: 0, in_progress: 0, testing: 0, done: 0, custom: 0 };
 }
 
 /**
@@ -92,16 +143,17 @@ export function emptySubtaskStatusCounts(): SubtaskStatusCounts {
  * disallineamento). null se non ci sono sotto-task.
  * - tutte done -> done
  * - tutte in testing/done -> testing
- * - almeno una avviata (in_progress/testing/done) -> in_progress
+ * - almeno una avviata (in_progress/testing/done o stato personalizzato) -> in_progress
  * - tutte draft -> draft
  * - altrimenti -> todo
  */
 export function suggestParentStatus(counts: SubtaskStatusCounts): TaskStatus | null {
-  const total = TASK_STATUSES.reduce((sum, s) => sum + counts[s], 0);
+  const custom = counts.custom ?? 0;
+  const total = TASK_STATUSES.reduce((sum, s) => sum + counts[s], 0) + custom;
   if (total === 0) return null;
   if (counts.done === total) return "done";
   if (counts.testing + counts.done === total) return "testing";
-  if (counts.in_progress + counts.testing + counts.done > 0) return "in_progress";
+  if (counts.in_progress + counts.testing + counts.done + custom > 0) return "in_progress";
   if (counts.draft === total) return "draft";
   return "todo";
 }
@@ -111,7 +163,7 @@ export interface Task {
   projectId: string;
   title: string;
   description: string;
-  status: TaskStatus;
+  status: TaskStatusKey;
   type: TaskType;
   priority: TaskPriority;
   complexity: TaskComplexity | null;
@@ -289,8 +341,8 @@ export interface NotificationItem {
   actorId: string | null;
   actorName: string | null;
   actorType: "user" | "mcp" | "system";
-  from: TaskStatus | null;
-  to: TaskStatus | null;
+  from: TaskStatusKey | null;
+  to: TaskStatusKey | null;
   excerpt: string | null;
   createdAt: string;
 }
@@ -394,19 +446,26 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   INTERNAL_ERROR: 500,
 };
 
+/**
+ * Board Kanban: una lista per stato. Oltre ai 5 stati di base contiene una
+ * chiave per ogni stato personalizzato del progetto; le chiavi sono gia'
+ * nell'ordine delle colonne (vedi `orderedStatusKeys`).
+ */
 export interface Board {
   draft: Task[];
   todo: Task[];
   in_progress: Task[];
   testing: Task[];
   done: Task[];
+  [status: string]: Task[];
 }
 
 /** Riga del carico per assegnatario in `ProjectStats` (assigneeId null = non assegnati). */
 export interface ProjectStatsAssignee {
   assigneeId: string | null;
   name: string | null;
-  byStatus: Record<TaskStatus, number>;
+  /** Stati di base sempre presenti; gli stati personalizzati solo se usati. */
+  byStatus: Record<TaskStatusKey, number>;
   open: number;
 }
 
@@ -429,9 +488,10 @@ export interface ProjectStats {
   /** Task attualmente done chiusi (ultimo passaggio a done) dopo `periodFrom`. */
   closedInPeriod: number;
   periodFrom: string;
-  byStatus: Record<TaskStatus, number>;
-  byStatusPriority: Record<TaskStatus, Record<TaskPriority, number>>;
-  byStatusType: Record<TaskStatus, Record<TaskType, number>>;
+  /** Stati di base sempre presenti; gli stati personalizzati solo se usati. */
+  byStatus: Record<TaskStatusKey, number>;
+  byStatusPriority: Record<TaskStatusKey, Record<TaskPriority, number>>;
+  byStatusType: Record<TaskStatusKey, Record<TaskType, number>>;
   byAssignee: ProjectStatsAssignee[];
   /** Valori disponibili per i filtri, calcolati su tutti i task del progetto. */
   availableTags: string[];

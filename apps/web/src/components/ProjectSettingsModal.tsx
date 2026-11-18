@@ -9,14 +9,17 @@ import {
   revokeProjectToken,
 } from "../api";
 import { useI18n } from "../i18n";
+import { ProjectStatusesSection } from "./ProjectStatusesSection";
 
 interface ProjectSettingsModalProps {
   project: Project;
   onClose: () => void;
   onChanged: () => void;
+  /** Stati personalizzati creati/rinominati/cancellati. */
+  onStatusesChanged?: () => void;
 }
 
-export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesChanged }: ProjectSettingsModalProps) {
   const { t, formatDate } = useI18n();
   const [name, setName] = useState(project.name);
   const [renaming, setRenaming] = useState(false);
@@ -172,6 +175,8 @@ export function ProjectSettingsModal({ project, onClose, onChanged }: ProjectSet
           </form>
           {renameError && <p className="login-error">{renameError}</p>}
         </section>
+
+        <ProjectStatusesSection projectId={project.id} onChanged={() => onStatusesChanged?.()} />
 
         <section className="drawer-section">
           <h3>{t.projectSettings.mcpTokens}</h3>

@@ -3,7 +3,8 @@ import { copyText } from "../lib/clipboard";
 import { CheckIcon, LinkIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
-import type { Attachment, Comment, Task, TaskComplexity, TaskPriority, TaskStatus, TaskType } from "@my-planner/core";
+import { statusLabel } from "../lib/statuses";
+import type { Attachment, Comment, ProjectStatus, Task, TaskComplexity, TaskPriority, TaskStatusKey, TaskType } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
 import {
   ApiRequestError,
@@ -21,6 +22,7 @@ import {
   removeDependency,
   updateTask,
   uploadAttachment,
+  listProjectStatuses,
 } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
@@ -96,13 +98,28 @@ export function TaskDrawer({
 }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
-  const STATUS_LABEL: Record<TaskStatus, string> = {
-    draft: t.board.draft,
-    todo: t.board.todo,
-    in_progress: t.board.inProgress,
-    testing: t.board.testing,
-    done: t.board.done,
-  };
+  // Stati del progetto (base + personalizzati); finche' non arrivano si
+  // mostrano quelli di base.
+  const [projectStatuses, setProjectStatuses] = useState<ProjectStatus[]>(() =>
+    TASK_STATUSES.map((key) => ({ key, label: key, builtIn: true })),
+  );
+  useEffect(() => {
+    let cancelled = false;
+    listProjectStatuses(projectId)
+      .then((list) => {
+        if (!cancelled) setProjectStatuses(list);
+      })
+      .catch(() => {
+        /* restano gli stati di base */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+  const customLabels = useMemo(
+    () => Object.fromEntries(projectStatuses.filter((s) => !s.builtIn).map((s) => [s.key, s.label])),
+    [projectStatuses],
+  );
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -277,7 +294,7 @@ export function TaskDrawer({
     }
   }
 
-  async function handleChangeStatus(status: TaskStatus) {
+  async function handleChangeStatus(status: TaskStatusKey) {
     if (!task || status === task.status) return;
     setStatusError(null);
     setChangingStatus(true);
@@ -508,14 +525,17 @@ export function TaskDrawer({
                 <select
                   value={task.status}
                   disabled={changingStatus}
-                  onChange={(e) => handleChangeStatus(e.target.value as TaskStatus)}
+                  onChange={(e) => handleChangeStatus(e.target.value)}
                   aria-label={t.taskDrawer.changeStatusAria}
                 >
-                  {TASK_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {STATUS_LABEL[s]}
+                  {projectStatuses.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {statusLabel(t, s.key, customLabels)}
                     </option>
                   ))}
+                  {!projectStatuses.some((s) => s.key === task.status) && (
+                    <option value={task.status}>{statusLabel(t, task.status, customLabels)}</option>
+                  )}
                 </select>
               </label>
               {statusError && (

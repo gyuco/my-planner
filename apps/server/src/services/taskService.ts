@@ -2,17 +2,19 @@ import {
   ApiErrorException,
   emptySubtaskStatusCounts,
   FIBONACCI_COMPLEXITY,
-  TASK_STATUSES,
+  isBaseStatus,
+  orderedStatusKeys,
   type SubtaskStatusCounts,
   type TaskComplexity,
   type TaskFieldChange,
-  type TaskStatus,
+  type TaskStatusKey,
   type TaskType,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 import { emitEvent } from "./activityService.js";
+import { listCustomStatusKeys, resolveStatus } from "./statusService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -24,9 +26,12 @@ import { emitEvent } from "./activityService.js";
 
 type TaskPriority = "low" | "medium" | "high" | "urgent";
 
-/** Board vuota con tutte le colonne previste, nell'ordine di `TASK_STATUSES`. */
-function emptyBoard(): Record<TaskStatus, any[]> {
-  return Object.fromEntries(TASK_STATUSES.map((status) => [status, []])) as unknown as Record<TaskStatus, any[]>;
+/**
+ * Board vuota con tutte le colonne previste (stati di base + personalizzati),
+ * nell'ordine di `orderedStatusKeys`: il client usa l'ordine delle chiavi.
+ */
+function emptyBoard(customKeys: string[]): Record<string, any[]> {
+  return Object.fromEntries(orderedStatusKeys(customKeys).map((status) => [status, []]));
 }
 
 export function tagsToArray(tags: string): string[] {
@@ -97,7 +102,8 @@ function countSubtasks(subtasks: { status: string }[]): SubtaskCounts {
   for (const s of subtasks) {
     counts.total += 1;
     if (s.status !== "done") counts.open += 1;
-    if (s.status in counts.byStatus) counts.byStatus[s.status as TaskStatus] += 1;
+    if (isBaseStatus(s.status)) counts.byStatus[s.status] += 1;
+    else counts.byStatus.custom += 1;
   }
   return counts;
 }
@@ -316,11 +322,11 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
 
 export async function listTasks(
   projectId: string,
-  filters: { status?: TaskStatus; priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters
+  filters: { status?: string; priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters
 ) {
   await getProjectOrThrow(projectId);
   const where: any = { projectId };
-  if (filters.status) where.status = filters.status;
+  if (filters.status) where.status = await resolveStatus(projectId, filters.status);
   if (filters.priority) where.priority = filters.priority;
   applyPeopleFilters(where, filters);
   if (filters.search) {
@@ -513,11 +519,13 @@ export async function deleteTask(taskId: string, actor: Actor = SYSTEM_ACTOR) {
 
 export async function moveTask(
   taskId: string,
-  status: TaskStatus,
+  requestedStatus: string,
   position?: number,
   actor: Actor = SYSTEM_ACTOR,
 ) {
   const existing = await getTaskOrThrow(taskId);
+  // Stato di base, chiave o etichetta di uno stato personalizzato del progetto.
+  const status = await resolveStatus(existing.projectId, requestedStatus);
 
   if (status === "in_progress") {
     const blockers = await prisma.taskDependency.findMany({
@@ -561,7 +569,7 @@ export async function moveTask(
       recipientId: notifyAssignee(updated.assigneeId, actor),
       data: {
         title: updated.title,
-        from: existing.status as TaskStatus,
+        from: existing.status as TaskStatusKey,
         to: status,
       },
     });
@@ -575,6 +583,7 @@ export async function getBoard(
   filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
 ) {
   await getProjectOrThrow(projectId);
+  const customKeys = await listCustomStatusKeys([projectId]);
   const where: any = { projectId };
   if (filters.priority) where.priority = filters.priority;
   applyPeopleFilters(where, filters);
@@ -597,12 +606,12 @@ export async function getBoard(
     computeSubtaskCounts(tasks.map((t) => t.id)),
   ]);
 
-  const board = emptyBoard();
+  const board = emptyBoard(customKeys);
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     applySubtaskCounts(serialized, subtaskMap.get(t.id));
-    board[t.status as TaskStatus]?.push(serialized);
+    board[t.status]?.push(serialized);
   }
   return board;
 }
@@ -611,6 +620,7 @@ export async function getAggregatedBoard(
   projectIds: string[] | undefined,
   filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
 ) {
+  const customKeys = await listCustomStatusKeys(projectIds);
   const where: any = {
     project: projectIds ? { id: { in: projectIds } } : { archived: false },
   };
@@ -635,12 +645,12 @@ export async function getAggregatedBoard(
     computeSubtaskCounts(tasks.map((t) => t.id)),
   ]);
 
-  const board = emptyBoard();
+  const board = emptyBoard(customKeys);
   for (const t of tasks) {
     const serialized = serializeTask(t);
     serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
     applySubtaskCounts(serialized, subtaskMap.get(t.id));
-    board[t.status as TaskStatus]?.push(serialized);
+    board[t.status]?.push(serialized);
   }
   return board;
 }

@@ -36,10 +36,12 @@ import {
   getMe,
   getProjectBoard,
   getTask,
+  listProjectStatuses,
   listProjects,
   setUnauthorizedHandler,
 } from "./api";
 import { useI18n } from "./i18n";
+import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
 import { parseRoute, projectPath } from "./lib/routes";
 import {
   filtersSearch,
@@ -68,7 +70,8 @@ function getStoredSidebarCollapsed(): boolean {
 
 function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: string | null): Board {
   const titles = new Map<string, string>();
-  for (const status of TASK_STATUSES) {
+  const statusKeys = boardStatusKeys(board);
+  for (const status of statusKeys) {
     for (const t of board[status] as BoardTask[]) titles.set(t.id, t.title);
   }
   function applyFilters(tasks: BoardTask[]): BoardTask[] {
@@ -96,19 +99,16 @@ function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: st
     if (filters.tag && !t.tags.includes(filters.tag)) return false;
     return true;
   }
-  return {
-    draft: applyFilters(board.draft as BoardTask[]),
-    todo: applyFilters(board.todo as BoardTask[]),
-    in_progress: applyFilters(board.in_progress as BoardTask[]),
-    testing: applyFilters(board.testing as BoardTask[]),
-    done: applyFilters(board.done as BoardTask[]),
-  };
+  // Stessa sequenza di chiavi del server: l'ordine delle colonne resta quello.
+  return Object.fromEntries(
+    statusKeys.map((status) => [status, applyFilters((board[status] ?? []) as BoardTask[])]),
+  ) as Board;
 }
 
 /** Assegnatari presenti nei task caricati, per il filtro della FilterBar. */
 function collectAssignees(board: Board): AssigneeOption[] {
   const map = new Map<string, string>();
-  for (const status of TASK_STATUSES) {
+  for (const status of boardStatusKeys(board)) {
     for (const t of board[status] as BoardTask[]) {
       if (t.assigneeId) map.set(t.assigneeId, t.assigneeName ?? t.assigneeId);
     }
@@ -118,7 +118,7 @@ function collectAssignees(board: Board): AssigneeOption[] {
 
 function collectTags(board: Board): string[] {
   const set = new Set<string>();
-  for (const status of TASK_STATUSES) {
+  for (const status of boardStatusKeys(board)) {
     for (const t of board[status] as BoardTask[]) {
       for (const tag of t.tags) set.add(tag);
     }
@@ -139,6 +139,9 @@ export function App() {
   // Scarta le risposte arrivate dopo un cambio progetto piu' recente.
   const boardRequestId = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Nomi degli stati personalizzati del progetto selezionato (chiave -> nome).
+  const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
+  const [statusesVersion, setStatusesVersion] = useState(0);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
@@ -316,6 +319,26 @@ export function App() {
       : selectedProjectId
     : null;
   const boardLoading = boardKey !== null && boardKey !== boardFor;
+
+  // Sulla board aggregata gli stati personalizzati dipendono dal progetto:
+  // le colonne mostrano la chiave.
+  useEffect(() => {
+    if (!selectedProjectId || selectedProjectId === "all") {
+      setStatusLabels({});
+      return;
+    }
+    let cancelled = false;
+    listProjectStatuses(selectedProjectId)
+      .then((list) => {
+        if (!cancelled) setStatusLabels(customStatusLabels(list));
+      })
+      .catch(() => {
+        if (!cancelled) setStatusLabels({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedProjectId, statusesVersion]);
 
   const loadBoard = useCallback(async () => {
     if (!selectedProjectId || !boardKey) return;
@@ -649,6 +672,7 @@ export function App() {
                   board={filteredBoard}
                   loading={boardLoading}
                   showProject={selectedProjectId === "all"}
+                  statusLabels={statusLabels}
                   onBoardChange={loadBoard}
                   onTaskClick={handleTaskClick}
                 />
@@ -688,6 +712,10 @@ export function App() {
           project={settingsProject}
           onClose={() => setSettingsProjectId(null)}
           onChanged={loadProjects}
+          onStatusesChanged={() => {
+            setStatusesVersion((v) => v + 1);
+            loadBoard();
+          }}
         />
       )}
 

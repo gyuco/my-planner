@@ -5,7 +5,13 @@ import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
 import { createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
 import { assertProjectAccess, listProjectsForUser } from "../services/userService.js";
-import { projectNameInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import { projectNameInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import {
+  createProjectStatus,
+  deleteProjectStatus,
+  listProjectStatuses,
+  renameProjectStatus,
+} from "../services/statusService.js";
 
 export async function projectRoutes(app: FastifyInstance) {
   app.get("/projects", { onRequest: [app.authenticate] }, async (req) => {
@@ -38,6 +44,34 @@ export async function projectRoutes(app: FastifyInstance) {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
     return unarchiveProject(projectId);
+  });
+
+  // --- Stati personalizzati ----------------------------------------------
+
+  app.get("/projects/:projectId/statuses", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    return listProjectStatuses(projectId);
+  });
+
+  app.post("/projects/:projectId/statuses", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { projectId } = req.params as { projectId: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    const { label } = projectStatusInputSchema.parse(req.body ?? {});
+    return reply.code(201).send(await createProjectStatus(projectId, label));
+  });
+
+  app.patch("/projects/:projectId/statuses/:key", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId, key } = req.params as { projectId: string; key: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    const { label } = projectStatusInputSchema.parse(req.body ?? {});
+    return renameProjectStatus(projectId, key, label);
+  });
+
+  app.delete("/projects/:projectId/statuses/:key", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId, key } = req.params as { projectId: string; key: string };
+    await assertProjectAccess((req as any).authUser, projectId);
+    return deleteProjectStatus(projectId, key);
   });
 
   // --- Token MCP ---------------------------------------------------------

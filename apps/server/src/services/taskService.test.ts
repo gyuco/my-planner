@@ -256,7 +256,7 @@ describe("taskService — sotto-task", () => {
     await moveTask(a.id, "done");
     await moveTask(b.id, "in_progress");
 
-    const expected = { draft: 1, todo: 0, in_progress: 1, testing: 0, done: 1 };
+    const expected = { draft: 1, todo: 0, in_progress: 1, testing: 0, done: 1, custom: 0 };
     const board = await getBoard(project.id, {});
     const parentOnBoard = board.draft.find((t: any) => t.id === parent.id);
     expect(parentOnBoard.subtaskStatusCounts).toEqual(expected);

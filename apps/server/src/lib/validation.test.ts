@@ -72,8 +72,10 @@ describe("validation — moveTaskInputSchema", () => {
     }
   });
 
-  it("rifiuta status fuori enum", () => {
-    expect(moveTaskInputSchema.safeParse({ status: "archiviato" }).success).toBe(false);
+  it("accetta stati personalizzati (validati dal service sul progetto) e rifiuta status vuoto", () => {
+    expect(moveTaskInputSchema.safeParse({ status: "bloqueante" }).success).toBe(true);
+    expect(moveTaskInputSchema.safeParse({ status: "" }).success).toBe(false);
+    expect(moveTaskInputSchema.safeParse({}).success).toBe(false);
   });
 
   it("rifiuta position negativa o non intera", () => {

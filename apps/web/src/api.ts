@@ -5,7 +5,8 @@ import type {
   ProjectToken,
   Task,
   TaskPriority,
-  TaskStatus,
+  TaskStatusKey,
+  ProjectStatus,
   TaskComplexity,
   TaskType,
   TaskDependency,
@@ -205,6 +206,28 @@ export interface ProjectTokenWithSecret extends ProjectToken {
   token: string;
 }
 
+// --- Stati personalizzati -------------------------------------------------
+
+/** Stati del progetto (base + personalizzati) nell'ordine delle colonne. */
+export function listProjectStatuses(projectId: string): Promise<ProjectStatus[]> {
+  return apiFetch(`/projects/${projectId}/statuses`);
+}
+
+export function createProjectStatus(projectId: string, label: string): Promise<ProjectStatus> {
+  return apiFetch(`/projects/${projectId}/statuses`, { method: "POST", body: JSON.stringify({ label }) });
+}
+
+export function renameProjectStatus(projectId: string, key: string, label: string): Promise<ProjectStatus> {
+  return apiFetch(`/projects/${projectId}/statuses/${encodeURIComponent(key)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ label }),
+  });
+}
+
+export function deleteProjectStatus(projectId: string, key: string): Promise<{ key: string; deleted: true }> {
+  return apiFetch(`/projects/${projectId}/statuses/${encodeURIComponent(key)}`, { method: "DELETE" });
+}
+
 export function listProjectTokens(projectId: string): Promise<ProjectToken[]> {
   return apiFetch(`/projects/${projectId}/tokens`);
 }
@@ -331,7 +354,7 @@ export function createSubtasks(parentId: string, subtasks: CreateSubtaskInput[])
 
 export function moveTask(
   taskId: string,
-  status: TaskStatus,
+  status: TaskStatusKey,
   position?: number,
 ): Promise<Task> {
   return apiFetch(`/tasks/${taskId}/move`, {

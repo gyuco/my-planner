@@ -1,7 +1,8 @@
-import { suggestParentStatus, type Task, type TaskPriority, type TaskStatus } from "@my-planner/core";
+import { isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
+import { baseStatusLabels } from "../lib/statuses";
 
 /** Task come restituito dalla board: include i campi calcolati dal service layer. */
 export interface BoardTask extends Task {
@@ -12,8 +13,11 @@ export interface BoardTask extends Task {
   parentTitle?: string;
 }
 
-/** Ordine dei segmenti nella barra delle sotto-task: dal piu' avanzato al meno. */
-const SUBTASK_SEGMENT_ORDER: TaskStatus[] = ["done", "testing", "in_progress", "todo", "draft"];
+/**
+ * Ordine dei segmenti nella barra delle sotto-task: dal piu' avanzato al meno.
+ * "custom" raggruppa le sotto-task in stati personalizzati del progetto.
+ */
+const SUBTASK_SEGMENT_ORDER = ["done", "testing", "custom", "in_progress", "todo", "draft"] as const;
 
 const PROJECT_COLOR_PALETTE = [
   "#2f5d4a",
@@ -55,7 +59,7 @@ interface TaskCardProps {
   style?: React.CSSProperties;
   isDragging?: boolean;
   /** Se presente, mostra l'azione per allineare lo stato del parent a quello suggerito dalle sotto-task. */
-  onAlignStatus?: (status: TaskStatus) => void;
+  onAlignStatus?: (status: TaskStatusKey) => void;
   /** Solo in Testing: chiude il task (Done). */
   onComplete?: () => void;
   /** Solo in Testing: lo rimanda in In progress con un messaggio. */
@@ -66,8 +70,8 @@ interface TaskCardProps {
    * Board senza drag (mobile/touch): colonne di destinazione proposte dal
    * menu "Sposta in…" della card.
    */
-  moveTargets?: { status: TaskStatus; label: string }[];
-  onMove?: (status: TaskStatus) => void;
+  moveTargets?: { status: TaskStatusKey; label: string }[];
+  onMove?: (status: TaskStatusKey) => void;
 }
 
 export function TaskCard({
@@ -98,20 +102,19 @@ export function TaskCard({
   const doneSubtasks = subtaskCount - (task.openSubtaskCount ?? 0);
   const subtaskProgress = subtaskCount > 0 ? Math.round((doneSubtasks / subtaskCount) * 100) : 0;
   const statusCounts = task.subtaskStatusCounts;
-  const STATUS_LABEL: Record<TaskStatus, string> = {
-    draft: t.board.draft,
-    todo: t.board.todo,
-    in_progress: t.board.inProgress,
-    testing: t.board.testing,
-    done: t.board.done,
+  const STATUS_LABEL: Record<(typeof SUBTASK_SEGMENT_ORDER)[number], string> = {
+    ...baseStatusLabels(t),
+    custom: t.board.otherStatuses,
   };
   const subtaskSummary = statusCounts
-    ? SUBTASK_SEGMENT_ORDER.filter((s) => statusCounts[s] > 0)
+    ? SUBTASK_SEGMENT_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0)
         .map((s) => `${statusCounts[s]} ${STATUS_LABEL[s]}`)
         .join(" · ")
     : t.taskCard.subtasksTitle;
   const suggestedStatus = statusCounts ? suggestParentStatus(statusCounts) : null;
-  const statusMismatch = suggestedStatus !== null && suggestedStatus !== task.status;
+  // Un parent in uno stato personalizzato (es. bloqueante) e' una scelta
+  // esplicita: nessun suggerimento di allineamento.
+  const statusMismatch = suggestedStatus !== null && isBaseStatus(task.status) && suggestedStatus !== task.status;
 
   return (
     <div
@@ -140,7 +143,7 @@ export function TaskCard({
             value=""
             disabled={leaving}
             onChange={(e) => {
-              const next = e.target.value as TaskStatus;
+              const next = e.target.value;
               if (next) onMove(next);
             }}
           >
@@ -200,7 +203,7 @@ export function TaskCard({
             aria-valuetext={subtaskSummary}
           >
             {statusCounts ? (
-              SUBTASK_SEGMENT_ORDER.filter((s) => statusCounts[s] > 0).map((s) => (
+              SUBTASK_SEGMENT_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0).map((s) => (
                 <div
                   key={s}
                   className={`task-card-progress-seg task-card-progress-seg-${s}`}
@@ -216,7 +219,7 @@ export function TaskCard({
           </div>
           {statusCounts && (
             <div className="task-card-progress-legend">
-              {SUBTASK_SEGMENT_ORDER.filter((s) => s !== "done" && statusCounts[s] > 0).map((s) => (
+              {SUBTASK_SEGMENT_ORDER.filter((s) => s !== "done" && (statusCounts[s] ?? 0) > 0).map((s) => (
                 <span key={s} className="task-card-progress-legend-item" title={STATUS_LABEL[s]}>
                   <span className={`task-card-progress-dot task-card-progress-seg-${s}`} />
                   {statusCounts[s]} {STATUS_LABEL[s]}
