@@ -1,4 +1,4 @@
-import type { TaskStatus } from "@my-planner/core";
+import type { TaskStatus, TaskStatusKey } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { sendMail, type MailMessage } from "../lib/email/smtp.js";
 import { getSmtpSocketFactory, runInBackground } from "../lib/email/provider.js";
@@ -28,8 +28,9 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   done: "Fatto",
 };
 
-function statusLabel(status: TaskStatus | undefined): string {
-  return status ? (STATUS_LABELS[status] ?? status) : "?";
+function statusLabel(status: TaskStatusKey | undefined): string {
+  // Stati personalizzati: la chiave (es. "bloqueante") e' gia' leggibile.
+  return status ? (STATUS_LABELS[status as TaskStatus] ?? status) : "?";
 }
 
 function escapeHtml(value: string): string {

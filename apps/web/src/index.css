@@ -42,6 +42,8 @@
   --status-in_progress: var(--ochre-400);
   --status-testing: var(--plum-500);
   --status-done: #4e8a5f;
+  /* Stati personalizzati del progetto (es. bloqueante): un solo colore */
+  --status-custom: #a35a3c;
 
   /* Semantici */
   --success: #3f7a52;
@@ -950,6 +952,7 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 .column-picker-dot-in_progress { background: var(--status-in_progress); }
 .column-picker-dot-testing { background: var(--status-testing); }
 .column-picker-dot-done { background: var(--status-done); }
+.column-picker-dot-custom { background: var(--status-custom); }
 
 .column-picker-reset {
   width: 100%;
@@ -1014,6 +1017,7 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 .board .column-status-in_progress h2::before { background: var(--status-in_progress); }
 .board .column-status-testing h2::before { background: var(--status-testing); }
 .board .column-status-done h2::before { background: var(--status-done); }
+.board .column-status-custom h2::before { background: var(--status-custom); }
 
 .column-count {
   margin-left: auto;
@@ -1287,6 +1291,7 @@ body.dnd-dragging * {
 .task-card-progress-seg-in_progress { background: var(--status-in_progress); }
 .task-card-progress-seg-testing { background: var(--status-testing); }
 .task-card-progress-seg-done { background: var(--status-done); }
+.task-card-progress-seg-custom { background: var(--status-custom); }
 
 .task-card-progress-legend {
   display: flex;
@@ -2371,6 +2376,10 @@ body.dnd-dragging * {
 }
 
 .drawer-empty { color: var(--ink-300); font-size: 0.85rem; font-style: italic; }
+.drawer-hint { color: var(--ink-300); font-size: 0.8rem; margin: 0 0 0.5rem; }
+.status-list .column-picker-dot { display: inline-block; vertical-align: middle; }
+.status-key { font-size: 0.75rem; margin-left: 0.35rem; color: var(--ink-300); }
+.status-edit-form { flex: 1; }
 
 .drawer-inline-form { display: flex; gap: 0.5rem; }
 

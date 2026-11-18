@@ -1,5 +1,5 @@
 import { TASK_TYPES } from "@my-planner/core";
-import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskStatus, TaskType } from "@my-planner/core";
+import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskType } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n/en";
 
@@ -44,7 +44,7 @@ interface ActivityListProps {
 
 export function ActivityList({ items, showProject = false, onOpenTask, onFilterTask }: ActivityListProps) {
   const { t, formatDate, formatDateTime } = useI18n();
-  const statusLabel: Record<TaskStatus, string> = {
+  const statusLabel: Record<string, string> = {
     draft: t.board.draft,
     todo: t.board.todo,
     in_progress: t.board.inProgress,

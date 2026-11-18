@@ -5,7 +5,7 @@ import type {
   NotificationsResponse,
   TaskEventType,
   TaskFieldChange,
-  TaskStatus,
+  TaskStatusKey,
 } from "@my-planner/core";
 import { NOTIFICATION_EVENT_TYPES } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
@@ -45,8 +45,8 @@ export interface TaskEventData {
   /** Denormalizzato: la notifica resta leggibile dopo la delete del task. */
   title: string;
   parentId?: string | null;
-  from?: TaskStatus;
-  to?: TaskStatus;
+  from?: TaskStatusKey;
+  to?: TaskStatusKey;
   /** Estratto del commento (markdown troncato). */
   excerpt?: string;
   /** Campi modificati (`task.updated`). */
