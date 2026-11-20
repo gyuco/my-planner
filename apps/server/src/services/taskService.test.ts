@@ -19,9 +19,10 @@ import {
   listComments,
   createSubtasks,
   getBoard,
+  sendBackTask,
 } from "./taskService.js";
 import { createAttachment } from "./attachmentService.js";
-import { createUser, deleteUser, listProjectAssignees } from "./userService.js";
+import { createUser, deleteUser, listProjectAssignees, updateUser } from "./userService.js";
 
 async function setupProject(name = "Progetto Test") {
   return createProject(name);
@@ -402,6 +403,149 @@ describe("taskService — move/transizioni di stato", () => {
 
   it("moveTask lancia NOT_FOUND su task inesistente", async () => {
     await expect(moveTask("inesistente", "draft")).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("taskService — sendBackTask (Testing -> In corso)", () => {
+  async function setupSendBack() {
+    const project = await createProject("Progetto SB");
+    const other = await createProject("Altro SB");
+    const admin = await createUser({ email: "sb-admin@test.it", password: "password123", role: "admin" });
+    const a = await createUser({
+      email: "sb-a@test.it",
+      password: "password123",
+      role: "manager",
+      projectIds: [project.id],
+    });
+    const b = await createUser({
+      email: "sb-b@test.it",
+      password: "password123",
+      role: "manager",
+      projectIds: [project.id],
+    });
+    const c = await createUser({
+      email: "sb-c@test.it",
+      password: "password123",
+      role: "manager",
+      projectIds: [project.id],
+    });
+    return { project, other, admin, a, b, c };
+  }
+
+  it("riassegna a chi ha spostato il task in Testing, sposta in in_progress e salva il commento", async () => {
+    const { project, a, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Fix" });
+    await moveTask(task.id, "in_progress", undefined, { type: "user", id: a.id });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    await updateTask(task.id, { assigneeId: b.id }, { type: "user", id: a.id });
+
+    const result = await sendBackTask(task.id, "Non funziona", { type: "user", id: c.id });
+    expect(result.status).toBe("in_progress");
+    expect(result.assigneeId).toBe(a.id);
+
+    const stored = await prisma.task.findUnique({ where: { id: task.id } });
+    expect(stored?.status).toBe("in_progress");
+    expect(stored?.assigneeId).toBe(a.id);
+    const comments = await listComments(task.id);
+    expect(comments.map((x) => x.body)).toEqual(["Non funziona"]);
+  });
+
+  it("se solo un attore MCP lo ha spostato in Testing, l'assegnatario non cambia", async () => {
+    const { project, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Fix MCP", assigneeId: b.id });
+    await moveTask(task.id, "testing", undefined, { type: "mcp" });
+
+    const result = await sendBackTask(task.id, "Da rivedere", { type: "user", id: c.id });
+    expect(result.status).toBe("in_progress");
+    expect(result.assigneeId).toBe(b.id);
+    expect((await listComments(task.id)).map((x) => x.body)).toEqual(["Da rivedere"]);
+  });
+
+  it("vince l'ultimo spostamento in Testing fatto da un utente", async () => {
+    const { project, a, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Fix due volte" });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    await moveTask(task.id, "in_progress", undefined, { type: "user", id: c.id });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: b.id });
+    // Uno spostamento successivo verso un altro stato non conta.
+    await moveTask(task.id, "done", undefined, { type: "user", id: a.id });
+    await moveTask(task.id, "testing", undefined, { type: "mcp" });
+
+    const result = await sendBackTask(task.id, "Ancora rotto", { type: "user", id: c.id });
+    expect(result.assigneeId).toBe(b.id);
+  });
+
+  it("messaggio vuoto -> VALIDATION_ERROR e stato invariato", async () => {
+    const { project, a } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Vuoto" });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+
+    await expect(sendBackTask(task.id, "   ", { type: "user", id: a.id })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+    const stored = await prisma.task.findUnique({ where: { id: task.id } });
+    expect(stored?.status).toBe("testing");
+    expect(stored?.assigneeId).toBeNull();
+    expect(await listComments(task.id)).toEqual([]);
+  });
+
+  it("chi l'ha spostato non e' piu' membro del progetto -> assegnatario invariato, nessun errore", async () => {
+    const { project, other, admin, a, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Ex membro", assigneeId: b.id });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    await updateUser(a.id, { projectIds: [other.id] }, admin.id);
+
+    const result = await sendBackTask(task.id, "Torna indietro", { type: "user", id: c.id });
+    expect(result.status).toBe("in_progress");
+    expect(result.assigneeId).toBe(b.id);
+    expect((await listComments(task.id)).map((x) => x.body)).toEqual(["Torna indietro"]);
+  });
+
+  it("chi l'ha spostato e' stato cancellato -> assegnatario invariato, nessun errore", async () => {
+    const { project, admin, a, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Ex utente", assigneeId: b.id });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    await deleteUser(a.id, admin.id);
+
+    const result = await sendBackTask(task.id, "Torna indietro", { type: "user", id: c.id });
+    expect(result.status).toBe("in_progress");
+    expect(result.assigneeId).toBe(b.id);
+  });
+
+  it("se chi l'ha spostato e' gia' l'assegnatario non emette task.assigned", async () => {
+    const { project, a, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Gia' suo", assigneeId: a.id });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    const before = await prisma.taskEvent.findMany({ where: { taskId: task.id }, select: { id: true } });
+    const lastId = Math.max(...before.map((e) => e.id));
+
+    const result = await sendBackTask(task.id, "Rivedi", { type: "user", id: c.id });
+    expect(result.assigneeId).toBe(a.id);
+    const after = await prisma.taskEvent.findMany({
+      where: { taskId: task.id, id: { gt: lastId } },
+      orderBy: { id: "asc" },
+    });
+    expect(after.map((e) => e.type)).toEqual(["task.status_changed", "comment.created"]);
+  });
+
+  it("propaga DEPENDENCY_BLOCKED senza scrivere commenti ne' riassegnare", async () => {
+    const { project, a, b, c } = await setupSendBack();
+    const task = await createTask(project.id, { title: "Bloccato", assigneeId: b.id });
+    const blocker = await createTask(project.id, { title: "Blocker" });
+    await moveTask(task.id, "testing", undefined, { type: "user", id: a.id });
+    await addDependency(task.id, blocker.id);
+
+    await expect(sendBackTask(task.id, "Rivedi", { type: "user", id: c.id })).rejects.toMatchObject({
+      code: "DEPENDENCY_BLOCKED",
+    });
+    const stored = await prisma.task.findUnique({ where: { id: task.id } });
+    expect(stored?.status).toBe("testing");
+    expect(stored?.assigneeId).toBe(b.id);
+    expect(await listComments(task.id)).toEqual([]);
+  });
+
+  it("sendBackTask lancia NOT_FOUND su task inesistente", async () => {
+    await expect(sendBackTask("inesistente", "ciao", { type: "mcp" })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
 

@@ -300,6 +300,16 @@ Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta un
 
 Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato/esteso a `POST /tasks/:taskId/move` per includere `position` e restituire l'envelope errore standard (attualmente restituisce `{ error: string }` grezzo — da allineare).
 
+### `POST /tasks/:taskId/send-back`
+"Devolver a En curso": in una sola chiamata sposta il task in `in_progress`, lo riassegna a chi lo aveva spostato in Testing e salva il motivo come commento. Solo REST (nessun tool MCP; `move_task` resta invariato).
+- Body: `{ "message": "string markdown" }` (stessa regola del body dei commenti: non vuoto)
+- Ordine: validazione di `message` → move a `in_progress` (come `POST /tasks/:taskId/move`) → riassegnazione → commento. Se la move fallisce non viene scritto nient'altro.
+- Riassegnazione: il nuovo assegnatario è l'utente dell'ultimo evento `task.status_changed` con `to = "testing"` fatto da un utente (`actorType = "user"`). Se non esiste (es. spostato in Testing solo via MCP), se l'utente è stato cancellato o non è più admin/membro del progetto, resta l'assegnatario attuale. Se è già l'assegnatario non viene emesso `task.assigned`; altrimenti sì (con notifica al nuovo assegnatario).
+- 200: `Task` aggiornato (stessa forma di `move`, con il nuovo assegnatario)
+- 400 `VALIDATION_ERROR` se `message` è vuoto
+- 409 `DEPENDENCY_BLOCKED` se ci sono dipendenze non `done` (come `move`)
+- 404 `NOT_FOUND`
+
 ### `DELETE /tasks/:taskId`
 - 200: `{ "id": "...", "deleted": true }`
 - Cascade: elimina commenti, allegati (incl. file fisico/oggetto S3 tramite `AttachmentStorage.delete`), e tutte le `TaskDependency` che coinvolgono il task (come `taskId` o `blockedByTaskId`).

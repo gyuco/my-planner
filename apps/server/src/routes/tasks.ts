@@ -6,6 +6,7 @@ import {
   updateTask,
   deleteTask,
   moveTask,
+  sendBackTask,
   addDependency,
   removeDependency,
   listBlockers,
@@ -21,6 +22,7 @@ import {
   taskInputSchema,
   taskUpdateInputSchema,
   moveTaskInputSchema,
+  sendBackTaskInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   createSubtasksInputSchema,
@@ -80,6 +82,14 @@ export async function taskRoutes(app: FastifyInstance) {
     await assertTaskAccess((req as any).authUser, taskId);
     const { status, position } = moveTaskInputSchema.parse(req.body ?? {});
     return moveTask(taskId, status, position, userActor((req as any).authUser));
+  });
+
+  // Testing -> in_progress + riassegnazione a chi lo aveva messo in Testing + commento.
+  app.post("/tasks/:taskId/send-back", { onRequest: [app.authenticate] }, async (req) => {
+    const { taskId } = req.params as { taskId: string };
+    await assertTaskAccess((req as any).authUser, taskId);
+    const { message } = sendBackTaskInputSchema.parse(req.body ?? {});
+    return sendBackTask(taskId, message, userActor((req as any).authUser));
   });
 
   // --- Dipendenze ------------------------------------------------------------
