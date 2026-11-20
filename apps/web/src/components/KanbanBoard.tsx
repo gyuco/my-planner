@@ -15,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
-import { ApiRequestError, addComment, moveTask } from "../api";
+import { ApiRequestError, moveTask, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
 import { ArchiveCheckIcon } from "./Icons";
@@ -396,16 +396,15 @@ export function KanbanBoard({
     }
   }
 
-  // Rimanda in In progress e salva il motivo come commento. Prima lo
-  // spostamento (puo' essere bloccato da dipendenze), poi il commento: cosi'
-  // un rifiuto del server non lascia commenti orfani.
+  // Rimanda in In progress, riassegna a chi l'aveva messo in Testing e salva
+  // il motivo come commento: un'unica chiamata, il server fa tutto in ordine
+  // (se la move e' bloccata da dipendenze non scrive nient'altro).
   async function handleSendBackConfirm(message: string) {
     if (!sendBackTask) return;
     setSendBackBusy(true);
     setSendBackError(null);
     try {
-      await moveTask(sendBackTask.id, "in_progress");
-      await addComment(sendBackTask.id, message);
+      await sendBackTaskRequest(sendBackTask.id, message);
       setSendBackTask(null);
       onBoardChange();
     } catch (err) {

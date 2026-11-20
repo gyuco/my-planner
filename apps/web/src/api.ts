@@ -410,6 +410,14 @@ export function listBlockers(taskId: string): Promise<{ blockers: Task[]; allRes
 
 // --- Commenti ----------------------------------------------------------------
 
+/**
+ * "Devolver a En curso": sposta in in_progress, riassegna a chi lo aveva
+ * messo in Testing e salva `message` come commento, in una sola chiamata.
+ */
+export function sendBackTask(taskId: string, message: string): Promise<Task> {
+  return apiFetch(`/tasks/${taskId}/send-back`, { method: "POST", body: JSON.stringify({ message }) });
+}
+
 export function addComment(taskId: string, body: string): Promise<Comment> {
   return apiFetch(`/tasks/${taskId}/comments`, { method: "POST", body: JSON.stringify({ body }) });
 }

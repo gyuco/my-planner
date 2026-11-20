@@ -12,7 +12,7 @@ import {
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
-import { SYSTEM_ACTOR, type Actor } from "./notificationService.js";
+import { parseEventData, SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 import { emitEvent } from "./activityService.js";
 import { listCustomStatusKeys, resolveStatus } from "./statusService.js";
 
@@ -576,6 +576,57 @@ export async function moveTask(
   }
 
   return serializeTask(updated);
+}
+
+/**
+ * Utente che ha spostato per ultimo il task in Testing (dal log TaskEvent).
+ * Contano solo gli spostamenti fatti da un utente REST: quelli via MCP o di
+ * sistema non identificano una persona; se l'utente e' stato cancellato
+ * `actorId` e' null (onDelete: SetNull) e l'evento viene ignorato.
+ */
+async function findLastTestingMover(taskId: string): Promise<string | null> {
+  const events = await prisma.taskEvent.findMany({
+    where: { taskId, type: "task.status_changed", actorType: "user", actorId: { not: null } },
+    orderBy: { id: "desc" },
+    select: { actorId: true, data: true },
+  });
+  for (const event of events) {
+    if (parseEventData(event.data).to === "testing") return event.actorId;
+  }
+  return null;
+}
+
+/**
+ * "Devolver a En curso": riporta un task da Testing a in_progress, lo
+ * riassegna a chi lo aveva spostato in Testing (cosi' la correzione torna a
+ * chi ha fatto il lavoro) e salva il motivo come commento.
+ *
+ * Se nessun utente lo ha spostato in Testing (es. solo MCP) o quell'utente
+ * non e' piu' un assegnatario valido del progetto, l'assegnatario resta
+ * quello attuale. Gli errori della move (es. DEPENDENCY_BLOCKED) si
+ * propagano prima di qualsiasi altra scrittura.
+ */
+export async function sendBackTask(taskId: string, message: string, actor: Actor = SYSTEM_ACTOR) {
+  if (!message || message.trim().length === 0) {
+    throw new ApiErrorException("VALIDATION_ERROR", "body del commento non può essere vuoto");
+  }
+  await getTaskOrThrow(taskId);
+
+  const target = await findLastTestingMover(taskId);
+  const moved = await moveTask(taskId, "in_progress", undefined, actor);
+
+  let result = moved;
+  if (target && target !== (moved.assigneeId ?? null)) {
+    try {
+      result = await updateTask(taskId, { assigneeId: target }, actor);
+    } catch (err) {
+      // L'utente non e' piu' admin/membro del progetto: resta l'assegnatario attuale.
+      if (!(err instanceof ApiErrorException && err.code === "VALIDATION_ERROR")) throw err;
+    }
+  }
+
+  await addComment(taskId, message, actor);
+  return result;
 }
 
 export async function getBoard(

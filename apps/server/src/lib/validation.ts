@@ -114,6 +114,11 @@ export const commentInputSchema = z.object({
   body: z.string().min(1),
 });
 
+/** "Devolver a En curso": il motivo diventa un commento (stessa regola). */
+export const sendBackTaskInputSchema = z.object({
+  message: z.string().min(1),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
