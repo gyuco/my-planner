@@ -1,0 +1,52 @@
+# dev-workflow configuration. Reference: dev-workflow skill, references/config.md
+store:
+  type: my-planner
+  servers:
+    - my-planner-My-planner
+    - claude_ai_My_Planner_My_planner
+
+git:
+  base_branch: develop
+  branch_pattern: "feat/{id}-{slug}"
+
+parallel:
+  max_coders: 3
+
+models:
+  coder: opus
+  reviewer: opus
+
+review:
+  max_rounds: 2
+  merge_method: merge
+  large_diff_lines: 1000
+
+setup: ["npm install"]
+
+services:
+  local: []
+  cloud: []
+
+areas:
+  core:
+    paths: ["packages/core/**"]
+    test: "npm run test --workspace packages/core"
+    checks: ["npm run typecheck --workspace packages/core"]
+  backend:
+    paths: ["apps/server/**"]
+    test: "npm run test --workspace apps/server"
+    checks: ["npm run typecheck --workspace apps/server"]
+  frontend:
+    paths: ["apps/web/**"]
+    test: ""
+    checks: ["npm run typecheck --workspace apps/web"]
+    visual: true
+    visual_hint:
+      local: "http://localhost:5173 (start with `npm run dev`)"
+      cloud: "check out the PR branch locally and run `npm run dev`"
+
+risk:
+  high: ["**/prisma/**", "**/migrations/**", "package-lock.json", "**/package.json", "apps/server/src/routes/auth.ts", "apps/server/src/mcp/**", ".github/**", "docker-compose.yml"]
+  low: ["**/*.md", "docs/**"]
+
+full_suite: []

@@ -103,6 +103,8 @@ export const en = {
     unassigned: "Unassigned",
     assignedTo: "Assigned to {name}",
     loadError: "Cannot load assignees",
+    searchPlaceholder: "Search people...",
+    noResults: "No results",
   },
   taskType: {
     label: "Type",
