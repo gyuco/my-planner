@@ -105,6 +105,8 @@ export const it: Dictionary = {
     unassigned: "Non assegnato",
     assignedTo: "Assegnato a {name}",
     loadError: "Impossibile caricare gli assegnatari",
+    searchPlaceholder: "Cerca una persona...",
+    noResults: "Nessun risultato",
   },
   taskType: {
     label: "Tipo",

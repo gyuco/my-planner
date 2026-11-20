@@ -4,7 +4,7 @@ import { CheckIcon, LinkIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import { statusLabel } from "../lib/statuses";
-import type { Attachment, Comment, ProjectStatus, Task, TaskComplexity, TaskPriority, TaskStatusKey, TaskType } from "@my-planner/core";
+import type { Attachment, Comment, ProjectStatus, Task, TaskAssignee, TaskComplexity, TaskPriority, TaskStatusKey, TaskType } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
 import {
   ApiRequestError,
@@ -152,6 +152,8 @@ export function TaskDrawer({
   // la si ripete a fine salvataggio con lo stato piu' recente del form.
   const savingRef = useRef(false);
   const saveQueuedRef = useRef(false);
+  // Ultima modifica dell'assegnatario in corso: le risposte superate vengono ignorate.
+  const assigneeRequestRef = useRef(0);
   const saveFieldsRef = useRef<(overrides?: { type?: TaskType; explicit?: boolean }) => Promise<void>>();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
@@ -282,14 +284,22 @@ export function TaskDrawer({
   }
   saveFieldsRef.current = saveFields;
 
-  async function handleChangeAssignee(assigneeId: string | null) {
+  async function handleChangeAssignee(assigneeId: string | null, assignee: TaskAssignee | null) {
     if (!task || assigneeId === task.assigneeId) return;
+    // Aggiornamento ottimistico: il picker mostra subito il nuovo nome, la
+    // PATCH conferma (o fa rollback) in seguito.
+    const previous = { assigneeId: task.assigneeId, assigneeName: task.assigneeName };
+    const requestId = ++assigneeRequestRef.current;
+    setTask((prev) => (prev ? { ...prev, assigneeId, assigneeName: assignee?.name ?? null } : prev));
     try {
       const updated = await updateTask(taskId, { assigneeId });
+      if (requestId !== assigneeRequestRef.current) return;
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
       onChanged();
       toast.success(t.taskDrawer.saved);
     } catch (err) {
+      if (requestId !== assigneeRequestRef.current) return;
+      setTask((prev) => (prev ? { ...prev, ...previous } : prev));
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
     }
   }
@@ -595,7 +605,12 @@ export function TaskDrawer({
                 )}
               </div>
               <div className="modal-row">
-                <AssigneeSelect projectId={projectId} value={task.assigneeId} onChange={handleChangeAssignee} />
+                <AssigneeSelect
+                  projectId={projectId}
+                  value={task.assigneeId}
+                  valueName={task.assigneeName}
+                  onChange={handleChangeAssignee}
+                />
                 <label>
                   {t.taskDrawer.ownerLabel}
                   <input value={task.ownerName ?? t.taskDrawer.ownerUnknown} readOnly disabled />

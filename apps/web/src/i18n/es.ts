@@ -105,6 +105,8 @@ export const es: Dictionary = {
     unassigned: "Sin asignar",
     assignedTo: "Asignado a {name}",
     loadError: "No se pueden cargar los responsables",
+    searchPlaceholder: "Buscar una persona...",
+    noResults: "Sin resultados",
   },
   taskType: {
     label: "Tipo",
