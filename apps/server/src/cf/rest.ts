@@ -37,6 +37,7 @@ import {
   updateTask,
   deleteTask,
   moveTask,
+  sendBackTask,
   addDependency,
   removeDependency,
   listBlockers,
@@ -69,6 +70,7 @@ import {
   taskInputSchema,
   taskUpdateInputSchema,
   moveTaskInputSchema,
+  sendBackTaskInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -393,6 +395,13 @@ export function buildRestApp() {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const { status, position } = moveTaskInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await moveTask(c.req.param("taskId"), status, position, userActor(c.get("user"))));
+  });
+
+  // Testing -> in_progress + riassegnazione a chi lo aveva messo in Testing + commento.
+  app.post("/tasks/:taskId/send-back", async (c) => {
+    await assertTaskAccess(c.get("user"), c.req.param("taskId"));
+    const { message } = sendBackTaskInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await sendBackTask(c.req.param("taskId"), message, userActor(c.get("user"))));
   });
 
   // --- Dipendenze ----------------------------------------------------------
