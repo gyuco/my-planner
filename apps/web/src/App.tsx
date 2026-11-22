@@ -719,6 +719,7 @@ export function App() {
       {settingsProject && (
         <ProjectSettingsModal
           project={settingsProject}
+          isAdmin={isAdmin}
           onClose={() => setSettingsProjectId(null)}
           onChanged={loadProjects}
           onStatusesChanged={() => {

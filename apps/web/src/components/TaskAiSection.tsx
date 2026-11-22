@@ -18,7 +18,7 @@ interface TaskAiSectionProps {
  * e solo se la gestione AI e' attiva.
  */
 export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
-  const { t } = useI18n();
+  const { t, formatDateTime } = useI18n();
   const toast = useToast();
   const ai = task.ai;
   const [enabled, setEnabled] = useState(ai?.enabled ?? false);
@@ -174,6 +174,14 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
         </p>
       )}
       {ai?.enabled && runState}
+      {ai?.enabled && ai.dispatch?.sessionUrl && (
+        <p className="ai-hint">
+          🤖 {t.taskAi.session}:{" "}
+          <a href={ai.dispatch.sessionUrl} target="_blank" rel="noreferrer">
+            {t.taskAi.sessionAt.replace("{date}", formatDateTime(ai.dispatch.at))}
+          </a>
+        </p>
+      )}
       {failure && (
         <button type="button" onClick={handleResume} disabled={saving}>
           {t.taskAi.resume}

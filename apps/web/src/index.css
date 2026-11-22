@@ -3938,3 +3938,8 @@ body.dnd-dragging * {
 }
 .notifications-dot-ai-failed { background: var(--danger); }
 .repo-label { display: block; margin-top: 0.75rem; }
+
+/* Impostazioni progetto: avvio automatico AI (routine Claude Code) */
+.ai-routine-steps { margin: 0; padding-left: 1.2rem; font-size: 0.84rem; color: var(--ink-700); display: flex; flex-direction: column; gap: 0.25rem; }
+.ai-routine-form { display: flex; flex-direction: column; gap: 0.6rem; }
+.ai-routine-section .mcp-config-json { max-height: 14rem; overflow: auto; white-space: pre-wrap; }

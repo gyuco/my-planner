@@ -16,6 +16,7 @@ import {
   type TaskType,
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { serializeProject } from "./projectSerializer.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { parseEventData, SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 import { emitEvent } from "./activityService.js";
@@ -92,6 +93,9 @@ function serializeAi(task: any): TaskAi {
         : null,
     rejectCount: task.aiRejectCount ?? 0,
     failure: task.aiFailedAt ? { at: new Date(task.aiFailedAt).toISOString(), reason: task.aiFailReason ?? "" } : null,
+    dispatch: task.aiDispatchedAt
+      ? { step: task.aiDispatchedStep, at: new Date(task.aiDispatchedAt).toISOString(), sessionUrl: task.aiSessionUrl ?? null }
+      : null,
   };
 }
 
@@ -100,9 +104,11 @@ function serializeTask(task: any): any {
     tags, assignee, owner,
     aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher,
     aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason,
+    aiDispatchedStep, aiDispatchedAt, aiSessionUrl,
     ...rest
   } = task;
   void [aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason];
+  void [aiDispatchedStep, aiDispatchedAt, aiSessionUrl];
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
   out.ai = serializeAi(task);
   out.assigneeId = task.assigneeId ?? null;
@@ -182,17 +188,18 @@ export async function computeBlockedByOpenCount(taskIds: string[]) {
 // ---------------------------------------------------------------------------
 
 export async function listProjects(includeArchived = false) {
-  return prisma.project.findMany({
+  const rows = await prisma.project.findMany({
     where: includeArchived ? {} : { archived: false },
     orderBy: { createdAt: "asc" },
   });
+  return rows.map(serializeProject);
 }
 
 export async function createProject(name: string) {
   if (!name || name.trim().length === 0 || name.length > 200) {
     throw new ApiErrorException("VALIDATION_ERROR", "Il nome del progetto deve avere tra 1 e 200 caratteri");
   }
-  return prisma.project.create({ data: { name } });
+  return serializeProject(await prisma.project.create({ data: { name } }));
 }
 
 export async function getProjectOrThrow(projectId: string) {
@@ -206,7 +213,7 @@ export async function renameProject(projectId: string, name: string) {
   if (!name || name.trim().length === 0 || name.length > 200) {
     throw new ApiErrorException("VALIDATION_ERROR", "Il nome del progetto deve avere tra 1 e 200 caratteri");
   }
-  return prisma.project.update({ where: { id: projectId }, data: { name } });
+  return serializeProject(await prisma.project.update({ where: { id: projectId }, data: { name } }));
 }
 
 /**
@@ -234,17 +241,17 @@ export async function updateProject(projectId: string, input: { name?: string; r
     data.name = input.name;
   }
   if (input.repoUrl !== undefined) data.repoUrl = normalizeRepoUrl(input.repoUrl);
-  return prisma.project.update({ where: { id: projectId }, data });
+  return serializeProject(await prisma.project.update({ where: { id: projectId }, data }));
 }
 
 export async function archiveProject(projectId: string) {
   await getProjectOrThrow(projectId);
-  return prisma.project.update({ where: { id: projectId }, data: { archived: true } });
+  return serializeProject(await prisma.project.update({ where: { id: projectId }, data: { archived: true } }));
 }
 
 export async function unarchiveProject(projectId: string) {
   await getProjectOrThrow(projectId);
-  return prisma.project.update({ where: { id: projectId }, data: { archived: false } });
+  return serializeProject(await prisma.project.update({ where: { id: projectId }, data: { archived: false } }));
 }
 
 // ---------------------------------------------------------------------------

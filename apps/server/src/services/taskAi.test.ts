@@ -26,6 +26,7 @@ describe("gestione AI del task", () => {
       running: null,
       rejectCount: 0,
       failure: null,
+      dispatch: null,
     });
   });
 

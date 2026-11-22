@@ -142,6 +142,12 @@ export const pushSubscriptionInputSchema = z.object({
   label: z.string().max(100).nullable().optional(),
 });
 
+/** Routine Claude Code del progetto per l'avvio automatico dei passi AI (solo admin). */
+export const aiRoutineInputSchema = z.object({
+  routineId: z.string().min(1).max(100),
+  token: z.string().max(500).nullable().optional(),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
