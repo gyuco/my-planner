@@ -14,6 +14,7 @@ import {
   type RecordTaskEventInput,
 } from "./notificationService.js";
 import { queueTaskEventEmail } from "./emailNotificationService.js";
+import { queueTaskEventPush } from "./pushService.js";
 
 /**
  * Log attivita': ogni mutazione rilevante di un task scrive una riga in
@@ -47,6 +48,12 @@ export async function emitEvent(input: RecordTaskEventInput): Promise<void> {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[my-planner] impossibile accodare l'email di notifica", err);
+  }
+  try {
+    await queueTaskEventPush(input);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[my-planner] impossibile accodare le notifiche push", err);
   }
 }
 

@@ -3902,3 +3902,15 @@ body.dnd-dragging * {
   box-shadow: none;
 }
 .ai-section .ai-option > span { color: var(--ink-800); font-size: 0.86rem; min-width: 0; }
+
+/* Notifiche push nel profilo */
+.push-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; justify-content: flex-start; }
+.push-status { color: var(--success); font-weight: 600; font-size: 0.86rem; margin-right: 0.25rem; }
+.push-notice {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--r-md);
+  background: var(--info-bg);
+  color: var(--info);
+  font-size: 0.84rem;
+}
