@@ -24,6 +24,7 @@ import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ActivityPage } from "./pages/ActivityPage";
+import { GuidePage } from "./pages/GuidePage";
 
 // Recharts pesa: caricato solo quando si apre la tab Statistiche.
 const StatsPage = lazy(() => import("./pages/StatsPage"));
@@ -253,6 +254,10 @@ export function App() {
       document.title = `${t.activity.title} · My Planner`;
       return;
     }
+    if (view === "guide") {
+      document.title = `${t.guide.sidebar} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (view === "stats" && currentProject) {
       document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
@@ -414,7 +419,7 @@ export function App() {
   // (primo progetto, altrimenti vista aggregata) mantenendo l'eventuale ?task=.
   useEffect(() => {
     if (!loggedIn || !projectsLoaded) return;
-    if (view === "profile" || view === "activity") return;
+    if (view === "profile" || view === "activity" || view === "guide") return;
     if (selectedProjectId) return;
     const target = projects[0]?.id ?? "all";
     const unknownProject = route.projectId !== null && route.projectId !== "all";
@@ -511,8 +516,13 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={view === "activity" ? null : selectedProjectId}
+        selectedProjectId={view === "activity" || view === "guide" ? null : selectedProjectId}
         activityActive={view === "activity"}
+        guideActive={view === "guide"}
+        onOpenGuide={() => {
+          navigate("/guide");
+          setSidebarOpen(false);
+        }}
         isAdmin={isAdmin}
         onSelect={(id) => {
           // Cambiando progetto si resta sulle statistiche (non esistono per la vista aggregata).
@@ -551,7 +561,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -609,7 +619,9 @@ export function App() {
           </div>
         </header>
 
-        {view === "activity" ? (
+        {view === "guide" ? (
+          <GuidePage />
+        ) : view === "activity" ? (
           <ActivityPage
             projects={projects}
             onOpenTask={(taskId, projectId) => {

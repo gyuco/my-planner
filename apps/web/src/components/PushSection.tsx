@@ -4,6 +4,7 @@ import { ApiRequestError, listPushDevices, removePushDevice, sendTestPush } from
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { currentSubscription, disablePushOnThisDevice, enablePush, pushSupport } from "../lib/push";
+import { Link } from "react-router-dom";
 
 // Id del dispositivo registrato da questo browser, per riconoscerlo nell'elenco.
 const DEVICE_ID_KEY = "my-planner:push-device-id";
@@ -101,7 +102,12 @@ export function PushSection() {
   return (
     <div className="profile-section push-section">
       <span className="field-label">{t.push.title}</span>
-      <p className="profile-hint">{t.push.hint}</p>
+      <p className="profile-hint">
+        {t.push.hint}{" "}
+        <Link className="guide-link" to="/guide#guide-planner">
+          {t.guide.readGuide}
+        </Link>
+      </p>
 
       {support === "ios-needs-install" && <p className="push-notice">{t.push.iosInstall}</p>}
       {support === "unsupported" && <p className="push-notice">{t.push.unsupported}</p>}
