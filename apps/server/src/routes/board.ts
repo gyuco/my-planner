@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { getBoard, getAggregatedBoard } from "../services/taskService.js";
+import { getBoard, getAggregatedBoard, listDoneTasks } from "../services/taskService.js";
 import { getProjectStats } from "../services/statsService.js";
 import {
   assertProjectAccess,
+  doneProjectScope,
   isAdmin,
   listProjectsForUser,
   restrictProjectIds,
@@ -10,6 +11,7 @@ import {
 import {
   boardFiltersQuerySchema,
   aggregatedBoardQuerySchema,
+  doneTasksQuerySchema,
   projectStatsQuerySchema,
 } from "../lib/validation.js";
 
@@ -40,4 +42,11 @@ export async function boardRoutes(app: FastifyInstance) {
 
     return getAggregatedBoard(allowed, filters);
   });
+
+  app.get("/tasks/done", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectIds, ...query } = doneTasksQuerySchema.parse(req.query ?? {});
+    const allowed = await doneProjectScope((req as any).authUser, projectIds);
+    return listDoneTasks({ ...query, projectIds: allowed });
+  });
 }
+

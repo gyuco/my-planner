@@ -15,10 +15,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
-import { ApiRequestError, moveTask, sendBackTask as sendBackTaskRequest } from "../api";
+import { ApiRequestError, moveTask, runAiRoutine, type DoneTasksQuery, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
-import { ArchiveCheckIcon } from "./Icons";
+import { ArchiveCheckIcon, RefreshIcon } from "./Icons";
+import { useToast } from "../lib/toast";
 import { useTouchBoard } from "../lib/useTouchBoard";
 import { useI18n } from "../i18n";
 import { boardStatusKeys, statusLabel } from "../lib/statuses";
@@ -80,6 +81,14 @@ interface KanbanBoardProps {
   showProject?: boolean;
   onBoardChange: () => void;
   onTaskClick?: (task: BoardTask) => void;
+  /** Ricarica la board (pulsante Aggiorna della toolbar). */
+  onRefresh?: () => Promise<void> | void;
+  /** Task completati che rispettano i filtri (null = in caricamento). */
+  doneCount?: number | null;
+  /** Filtri per l'archivio dei completati (pulsante Done). */
+  doneQuery: DoneTasksQuery;
+  /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
+  aiQueueProjectId?: string | null;
 }
 
 interface SortableTaskCardProps {
@@ -267,8 +276,40 @@ export function KanbanBoard({
   showProject,
   onBoardChange,
   onTaskClick,
+  onRefresh,
+  aiQueueProjectId,
+  doneCount = null,
+  doneQuery,
 }: KanbanBoardProps) {
   const { t } = useI18n();
+  const toast = useToast();
+  const [refreshing, setRefreshing] = useState(false);
+  const [aiQueueBusy, setAiQueueBusy] = useState(false);
+
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function handleRunAiQueue() {
+    if (!aiQueueProjectId || aiQueueBusy) return;
+    setAiQueueBusy(true);
+    try {
+      const res = await runAiRoutine(aiQueueProjectId);
+      if (res.fired) toast.success(t.aiRoutine.fired.replace("{count}", String(res.taskIds.length)));
+      else toast.error(t.aiRoutine.notFired.replace("{reason}", res.reason ?? "?"));
+      if (res.fired) onBoardChange();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : t.aiRoutine.notFired.replace("{reason}", "?"));
+    } finally {
+      setAiQueueBusy(false);
+    }
+  }
   const boardStatuses = boardColumnKeys(board);
   const COLUMNS: { status: TaskStatusKey; label: string }[] = boardStatuses.map((status) => ({
     status,
@@ -295,6 +336,11 @@ export function KanbanBoard({
   // ancora cambiato) e poi salta in avanti quando arriva la risposta del
   // server — l'effetto "va e torna indietro" segnalato.
   const [localBoard, setLocalBoard] = useState<Board>(board);
+  // Completati da questa board in attesa del nuovo conteggio dal server.
+  const [pendingDone, setPendingDone] = useState(0);
+  useEffect(() => {
+    setPendingDone(0);
+  }, [doneCount]);
 
   useEffect(() => {
     setLocalBoard(board);
@@ -388,6 +434,7 @@ export function KanbanBoard({
         new Promise((resolve) => setTimeout(resolve, LEAVE_ANIMATION_MS)),
       ]);
       setLocalBoard((b) => reorderBoard(b, task.id, "done", (b.done as BoardTask[]).length));
+      setPendingDone((n) => n + 1);
       setLeavingIds(withoutLeaving);
       onBoardChange();
     } catch (err) {
@@ -487,7 +534,7 @@ export function KanbanBoard({
         )}
         {showDone && (
           <DoneTasksModal
-            tasks={localBoard.done as BoardTask[]}
+            query={doneQuery}
             showProject={showProject}
             onClose={() => setShowDone(false)}
             onTaskClick={onTaskClick}
@@ -499,6 +546,28 @@ export function KanbanBoard({
             {t.board.loadingProject}
           </span>
         )}
+        {aiQueueProjectId && (
+          <button
+            type="button"
+            className="filter-chip ai-queue-button"
+            onClick={handleRunAiQueue}
+            disabled={aiQueueBusy || loading}
+            title={t.board.runAiQueueTitle}
+          >
+            {aiQueueBusy ? t.aiRoutine.running : t.board.runAiQueue}
+          </button>
+        )}
+        {onRefresh && (
+          <button
+            type="button"
+            className={`filter-chip board-refresh${refreshing ? " refreshing" : ""}`}
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            title={t.board.refreshTitle}
+          >
+            <RefreshIcon /> {t.board.refresh}
+          </button>
+        )}
         <button
           type="button"
           className="filter-chip done-toggle"
@@ -506,7 +575,9 @@ export function KanbanBoard({
           disabled={loading}
         >
           <ArchiveCheckIcon /> {t.board.doneButton}
-          <span className="done-toggle-count">{loading ? "–" : (localBoard.done as BoardTask[]).length}</span>
+          <span className="done-toggle-count">
+            {loading || doneCount === null ? "–" : doneCount + pendingDone}
+          </span>
         </button>
         <div className="column-picker" ref={pickerRef}>
           <button

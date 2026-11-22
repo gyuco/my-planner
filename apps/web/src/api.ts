@@ -340,8 +340,48 @@ function buildQuery(filters?: BoardFilters): string {
   return qs ? `?${qs}` : "";
 }
 
+/**
+ * Board del progetto senza i task completati (crescono senza limite): il
+ * conteggio e l'archivio arrivano da listDoneTasks.
+ */
 export function getProjectBoard(projectId: string, filters?: BoardFilters): Promise<Board> {
-  return apiFetch(`/projects/${projectId}/board${buildQuery(filters)}`);
+  const qs = buildQuery(filters);
+  return apiFetch(`/projects/${projectId}/board${qs ? `${qs}&` : "?"}includeDone=false`);
+}
+
+/** Filtri dell'archivio dei completati (GET /tasks/done). `assigneeId: "none"` = non assegnati. */
+export interface DoneTasksQuery {
+  projectIds?: string[];
+  /** Ricerca della board (titolo o descrizione). */
+  search?: string;
+  /** Ricerca dell'archivio (titolo o progetto). */
+  q?: string;
+  tag?: string;
+  assigneeId?: string;
+  priorities?: TaskPriority[];
+  includeSubtasks?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface DoneTasksPage {
+  total: number;
+  tasks: Task[];
+}
+
+export function listDoneTasks(query: DoneTasksQuery): Promise<DoneTasksPage> {
+  const params = new URLSearchParams();
+  if (query.projectIds && query.projectIds.length > 0) params.set("projectIds", query.projectIds.join(","));
+  if (query.search) params.set("search", query.search);
+  if (query.q) params.set("q", query.q);
+  if (query.tag) params.set("tag", query.tag);
+  if (query.assigneeId) params.set("assigneeId", query.assigneeId);
+  if (query.priorities && query.priorities.length > 0) params.set("priorities", query.priorities.join(","));
+  if (query.includeSubtasks) params.set("includeSubtasks", "true");
+  if (query.limit !== undefined) params.set("limit", String(query.limit));
+  if (query.offset) params.set("offset", String(query.offset));
+  const qs = params.toString();
+  return apiFetch(`/tasks/done${qs ? `?${qs}` : ""}`);
 }
 
 /** Filtri di GET /projects/:projectId/stats. `assigneeId: "none"` = non assegnati. */
@@ -376,8 +416,8 @@ export function getAggregatedBoard(
   if (filters?.priority) params.set("priority", filters.priority);
   if (filters?.tag) params.set("tag", filters.tag);
   if (filters?.search) params.set("search", filters.search);
-  const qs = params.toString();
-  return apiFetch(`/board${qs ? `?${qs}` : ""}`);
+  params.set("includeDone", "false");
+  return apiFetch(`/board?${params.toString()}`);
 }
 
 // --- Task ----------------------------------------------------------------

@@ -37,9 +37,11 @@ import {
   getMe,
   getProjectBoard,
   getTask,
+  listDoneTasks,
   listProjectStatuses,
   listProjects,
   setUnauthorizedHandler,
+  type DoneTasksQuery,
 } from "./api";
 import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
@@ -382,32 +384,50 @@ export function App() {
     loadBoard();
   }, [loadBoard]);
 
-  const refreshProject = useCallback(
-    async (projectId: string) => {
-      if (projectId !== selectedProjectId) {
-        navigate({
-          pathname: projectPath(projectId, view === "stats" ? "stats" : "board"),
-          search: filtersSearch(location.search, false),
-        });
-      }
-      const requestId = ++boardRequestId.current;
-      try {
-        const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
-        const data = await getProjectBoard(projectId, boardFilters);
-        if (requestId !== boardRequestId.current) return;
-        setBoard(data);
-        setBoardFor(projectId);
-        setLoadError(null);
-      } catch {
-        if (requestId !== boardRequestId.current) return;
-        setBoardFor(projectId);
-        setLoadError(t.app.loadBoardError);
-      }
-    },
-    [filters.search, filters.tag, t, navigate, selectedProjectId, view],
-  );
-
   const currentUserId = currentUser?.id ?? null;
+
+  // Archivio dei completati: la board non li carica, qui si chiedono solo il
+  // conteggio (badge Done) e, nella modale, le pagine con gli stessi filtri.
+  const doneQuery = useMemo<DoneTasksQuery>(() => {
+    const byPerson = filters.assignedToMe || filters.assignee !== null;
+    return {
+      projectIds:
+        selectedProjectId === "all"
+          ? aggregatedProjectIds && aggregatedProjectIds.length > 0
+            ? aggregatedProjectIds
+            : undefined
+          : selectedProjectId
+            ? [selectedProjectId]
+            : undefined,
+      search: filters.search || undefined,
+      tag: filters.tag ?? undefined,
+      priorities: filters.priorities.length > 0 ? filters.priorities : undefined,
+      assigneeId: filters.assignedToMe
+        ? (currentUserId ?? undefined)
+        : filters.assignee === UNASSIGNED_FILTER
+          ? "none"
+          : (filters.assignee ?? undefined),
+      includeSubtasks: filters.showSubtasks || byPerson,
+    };
+  }, [selectedProjectId, aggregatedProjectIds, filters, currentUserId]);
+  const doneQueryKey = JSON.stringify(doneQuery);
+  const [doneCount, setDoneCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!selectedProjectId) return;
+    let cancelled = false;
+    listDoneTasks({ ...doneQuery, limit: 0 })
+      .then((page) => {
+        if (!cancelled) setDoneCount(page.total);
+      })
+      .catch(() => {
+        if (!cancelled) setDoneCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Si ricalcola a ogni ricarica della board (task completati altrove).
+  }, [doneQueryKey, board]);
+
   const filteredBoard = useMemo(
     () => filterBoard(board, filters, currentUserId),
     [board, filters, currentUserId],
@@ -535,7 +555,6 @@ export function App() {
         }}
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
-        onRefreshProject={refreshProject}
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
         onOpenEmailSettings={() => setShowEmailSettings(true)}
@@ -695,6 +714,12 @@ export function App() {
                   statusLabels={statusLabels}
                   onBoardChange={loadBoard}
                   onTaskClick={handleTaskClick}
+                  onRefresh={loadBoard}
+                  doneCount={doneCount}
+                  doneQuery={doneQuery}
+                  aiQueueProjectId={
+                    isAdmin && currentProject?.aiRoutineConfigured ? currentProject.id : null
+                  }
                 />
               </>
             )}
