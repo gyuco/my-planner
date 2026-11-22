@@ -281,7 +281,7 @@ export function ProjectSettingsModal({
 
         <ProjectStatusesSection projectId={project.id} onChanged={() => onStatusesChanged?.()} />
 
-        {isAdmin && <AiRoutineSection project={project} />}
+        {isAdmin && <AiRoutineSection project={project} onChanged={onChanged} />}
 
         <section className="drawer-section">
           <h3>{t.projectSettings.mcpTokens}</h3>

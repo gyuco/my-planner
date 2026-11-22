@@ -98,7 +98,7 @@ const it: GuideContent = {
       id: "troubleshooting",
       title: "6. Problemi comuni",
       bullets: [
-        "**La routine non parte**: in Impostazioni del progetto controlla **Ultimo errore**, poi prova **Avvia ora la coda**. Lo stesso passo non viene riavviato prima di 30 minuti.",
+        "**La routine non parte**: in Impostazioni del progetto controlla **Ultimo errore**, poi prova **Avvia coda AI** in alto a destra sulla board. Lo stesso passo non viene riavviato prima di 30 minuti.",
         "**Token del trigger rifiutato**: rigenera il token nella routine e salvalo di nuovo in My Planner. **Routine non trovata**: controlla l'ID `trig_…`.",
         "**Limite di avvii raggiunto**: massimo 30 avvii all'ora per routine; aspetta e riprova.",
         "**Task con badge «fermata»**: leggi il motivo nella scheda, aggiungi le informazioni mancanti e premi **Riprendi** (oppure sposta il task a mano).",
@@ -184,7 +184,7 @@ const en: GuideContent = {
       id: "troubleshooting",
       title: "6. Troubleshooting",
       bullets: [
-        "**The routine doesn't start**: in Project settings check **Last error**, then try **Start the queue now**. The same step isn't restarted within 30 minutes.",
+        "**The routine doesn't start**: in Project settings check **Last error**, then try **Start AI queue** at the top right of the board. The same step isn't restarted within 30 minutes.",
         "**Trigger token rejected**: regenerate the token in the routine and save it again in My Planner. **Routine not found**: check the `trig_…` ID.",
         "**Start limit reached**: at most 30 starts per hour per routine; wait and retry.",
         "**Task with a “stopped” badge**: read the reason in the task, add the missing information and press **Resume** (or move the task by hand).",
@@ -270,7 +270,7 @@ const es: GuideContent = {
       id: "troubleshooting",
       title: "6. Problemas comunes",
       bullets: [
-        "**La rutina no arranca**: en Ajustes del proyecto revisa **Último error** y prueba **Iniciar la cola ahora**. El mismo paso no se reinicia antes de 30 minutos.",
+        "**La rutina no arranca**: en Ajustes del proyecto revisa **Último error** y prueba **Iniciar cola IA** arriba a la derecha del tablero. El mismo paso no se reinicia antes de 30 minutos.",
         "**Token del trigger rechazado**: regenera el token en la rutina y guárdalo de nuevo en My Planner. **Rutina no encontrada**: revisa el ID `trig_…`.",
         "**Límite de inicios alcanzado**: máximo 30 inicios por hora por rutina; espera y vuelve a intentarlo.",
         "**Tarea con distintivo «detenida»**: lee el motivo en la ficha, añade la información que falta y pulsa **Reanudar** (o mueve la tarea a mano).",

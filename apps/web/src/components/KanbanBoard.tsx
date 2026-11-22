@@ -15,10 +15,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
-import { ApiRequestError, moveTask, sendBackTask as sendBackTaskRequest } from "../api";
+import { ApiRequestError, moveTask, runAiRoutine, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
-import { ArchiveCheckIcon } from "./Icons";
+import { ArchiveCheckIcon, RefreshIcon } from "./Icons";
+import { useToast } from "../lib/toast";
 import { useTouchBoard } from "../lib/useTouchBoard";
 import { useI18n } from "../i18n";
 import { boardStatusKeys, statusLabel } from "../lib/statuses";
@@ -80,6 +81,10 @@ interface KanbanBoardProps {
   showProject?: boolean;
   onBoardChange: () => void;
   onTaskClick?: (task: BoardTask) => void;
+  /** Ricarica la board (pulsante Aggiorna della toolbar). */
+  onRefresh?: () => Promise<void> | void;
+  /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
+  aiQueueProjectId?: string | null;
 }
 
 interface SortableTaskCardProps {
@@ -267,8 +272,38 @@ export function KanbanBoard({
   showProject,
   onBoardChange,
   onTaskClick,
+  onRefresh,
+  aiQueueProjectId,
 }: KanbanBoardProps) {
   const { t } = useI18n();
+  const toast = useToast();
+  const [refreshing, setRefreshing] = useState(false);
+  const [aiQueueBusy, setAiQueueBusy] = useState(false);
+
+  async function handleRefresh() {
+    if (!onRefresh || refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function handleRunAiQueue() {
+    if (!aiQueueProjectId || aiQueueBusy) return;
+    setAiQueueBusy(true);
+    try {
+      const res = await runAiRoutine(aiQueueProjectId);
+      if (res.fired) toast.success(t.aiRoutine.fired.replace("{count}", String(res.taskIds.length)));
+      else toast.error(t.aiRoutine.notFired.replace("{reason}", res.reason ?? "?"));
+      if (res.fired) onBoardChange();
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : t.aiRoutine.notFired.replace("{reason}", "?"));
+    } finally {
+      setAiQueueBusy(false);
+    }
+  }
   const boardStatuses = boardColumnKeys(board);
   const COLUMNS: { status: TaskStatusKey; label: string }[] = boardStatuses.map((status) => ({
     status,
@@ -498,6 +533,28 @@ export function KanbanBoard({
             <span className="spinner" aria-hidden="true" />
             {t.board.loadingProject}
           </span>
+        )}
+        {aiQueueProjectId && (
+          <button
+            type="button"
+            className="filter-chip ai-queue-button"
+            onClick={handleRunAiQueue}
+            disabled={aiQueueBusy || loading}
+            title={t.board.runAiQueueTitle}
+          >
+            {aiQueueBusy ? t.aiRoutine.running : t.board.runAiQueue}
+          </button>
+        )}
+        {onRefresh && (
+          <button
+            type="button"
+            className={`filter-chip board-refresh${refreshing ? " refreshing" : ""}`}
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            title={t.board.refreshTitle}
+          >
+            <RefreshIcon /> {t.board.refresh}
+          </button>
         )}
         <button
           type="button"
