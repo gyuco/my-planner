@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Project } from "@my-planner/core";
 import { useI18n } from "../i18n";
-import { LinkIcon, PlusIcon, RefreshIcon, SettingsIcon } from "./Icons";
+import { LinkIcon, PlusIcon, SettingsIcon } from "./Icons";
 import { copyText } from "../lib/clipboard";
 import { absoluteUrl, projectPath } from "../lib/routes";
 
@@ -65,7 +65,6 @@ interface SidebarProps {
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
   onOpenSettings: (projectId: string) => void;
-  onRefreshProject: (projectId: string) => void;
   onOpenArchived: () => void;
   onOpenStorageSettings: () => void;
   onOpenEmailSettings: () => void;
@@ -83,7 +82,6 @@ export function Sidebar({
   onSelect,
   onCreateProject,
   onOpenSettings,
-  onRefreshProject,
   onOpenArchived,
   onOpenStorageSettings,
   onOpenEmailSettings,
@@ -112,17 +110,6 @@ export function Sidebar({
           onClick={() => onSelect(p.id)}
         >
           {p.name}
-        </button>
-        <button
-          className="icon-button sidebar-project-refresh"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRefreshProject(p.id);
-          }}
-          title={t.sidebar.refreshProjectTitle}
-          aria-label={`${t.sidebar.refreshProjectTitle} ${p.name}`}
-        >
-          <RefreshIcon />
         </button>
         <button
           className="icon-button sidebar-project-link"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AiRoutineConfig, Project } from "@my-planner/core";
-import { ApiRequestError, getAiRoutine, removeAiRoutine, runAiRoutine, saveAiRoutine } from "../api";
+import { ApiRequestError, getAiRoutine, removeAiRoutine, saveAiRoutine } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { copyText } from "../lib/clipboard";
@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
  * Claude Code (solo admin). Il token del trigger si scrive e basta: il server
  * non lo restituisce mai.
  */
-export function AiRoutineSection({ project }: { project: Project }) {
+export function AiRoutineSection({ project, onChanged }: { project: Project; onChanged?: () => void }) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
   const [config, setConfig] = useState<AiRoutineConfig | null>(null);
@@ -50,6 +50,7 @@ export function AiRoutineSection({ project }: { project: Project }) {
       setConfig(saved);
       setToken("");
       toast.success(t.aiRoutine.saved);
+      onChanged?.();
     }
   }
 
@@ -60,15 +61,8 @@ export function AiRoutineSection({ project }: { project: Project }) {
       setRoutineId("");
       setToken("");
       toast.success(t.aiRoutine.removed);
+      onChanged?.();
     }
-  }
-
-  async function handleRunNow() {
-    const res = await run(() => runAiRoutine(project.id));
-    if (!res) return;
-    if (res.fired) toast.success(t.aiRoutine.fired.replace("{count}", String(res.taskIds.length)));
-    else toast.error(t.aiRoutine.notFired.replace("{reason}", res.reason ?? "?"));
-    setConfig(await getAiRoutine(project.id));
   }
 
   async function handleCopy() {
@@ -140,9 +134,6 @@ export function AiRoutineSection({ project }: { project: Project }) {
           </button>
           {config?.configured && (
             <>
-              <button type="button" onClick={handleRunNow} disabled={busy}>
-                {busy ? t.aiRoutine.running : t.aiRoutine.runNow}
-              </button>
               <button type="button" className="danger-button" onClick={handleRemove} disabled={busy}>
                 {t.aiRoutine.remove}
               </button>

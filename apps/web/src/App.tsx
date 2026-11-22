@@ -382,31 +382,6 @@ export function App() {
     loadBoard();
   }, [loadBoard]);
 
-  const refreshProject = useCallback(
-    async (projectId: string) => {
-      if (projectId !== selectedProjectId) {
-        navigate({
-          pathname: projectPath(projectId, view === "stats" ? "stats" : "board"),
-          search: filtersSearch(location.search, false),
-        });
-      }
-      const requestId = ++boardRequestId.current;
-      try {
-        const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
-        const data = await getProjectBoard(projectId, boardFilters);
-        if (requestId !== boardRequestId.current) return;
-        setBoard(data);
-        setBoardFor(projectId);
-        setLoadError(null);
-      } catch {
-        if (requestId !== boardRequestId.current) return;
-        setBoardFor(projectId);
-        setLoadError(t.app.loadBoardError);
-      }
-    },
-    [filters.search, filters.tag, t, navigate, selectedProjectId, view],
-  );
-
   const currentUserId = currentUser?.id ?? null;
   const filteredBoard = useMemo(
     () => filterBoard(board, filters, currentUserId),
@@ -535,7 +510,6 @@ export function App() {
         }}
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
-        onRefreshProject={refreshProject}
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
         onOpenEmailSettings={() => setShowEmailSettings(true)}
@@ -695,6 +669,10 @@ export function App() {
                   statusLabels={statusLabels}
                   onBoardChange={loadBoard}
                   onTaskClick={handleTaskClick}
+                  onRefresh={loadBoard}
+                  aiQueueProjectId={
+                    isAdmin && currentProject?.aiRoutineConfigured ? currentProject.id : null
+                  }
                 />
               </>
             )}

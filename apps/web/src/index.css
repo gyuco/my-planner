@@ -409,10 +409,9 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
   white-space: nowrap;
 }
 
-/* L'ingranaggio e il refresh appaiono solo all'hover della riga: meno rumore visivo. */
+/* L'ingranaggio e il link appaiono solo all'hover della riga: meno rumore visivo. */
 .sidebar-project-settings,
-.sidebar-project-link,
-.sidebar-project-refresh {
+.sidebar-project-link {
   flex-shrink: 0;
   width: 1.75rem;
   height: 1.75rem;
@@ -426,9 +425,7 @@ button:disabled { opacity: 0.55; cursor: default; transform: none; }
 .sidebar-project-row:hover .sidebar-project-settings,
 .sidebar-project-row:hover .sidebar-project-link,
 .sidebar-project-link:focus-visible,
-.sidebar-project-settings:focus-visible,
-.sidebar-project-row:hover .sidebar-project-refresh,
-.sidebar-project-refresh:focus-visible { opacity: 1; }
+.sidebar-project-settings:focus-visible { opacity: 1; }
 
 .sidebar-footer {
   padding: 0.6rem;
@@ -2697,8 +2694,7 @@ body.dnd-dragging * {
   }
 
   .sidebar-project-settings,
-  .sidebar-project-link,
-  .sidebar-project-refresh { opacity: 1; }
+  .sidebar-project-link { opacity: 1; }
 
   .sidebar-nav { flex-direction: column; }
 
@@ -4049,3 +4045,8 @@ body.dnd-dragging * {
 @media (hover: none) {
   .sidebar-project-nested .icon-button { display: inline-flex; }
 }
+
+/* Toolbar della board: Avvia coda AI e Aggiorna accanto a Done e Colonne. */
+.board-toolbar { gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.board-refresh svg { width: 14px; height: 14px; vertical-align: -2px; }
+.board-refresh.refreshing svg { animation: spin 0.8s linear infinite; }
