@@ -732,6 +732,9 @@ export function App() {
         <ProjectSettingsModal
           project={settingsProject}
           isAdmin={isAdmin}
+          existingGroups={Array.from(
+            new Set(projects.map((p) => p.groupName).filter((g): g is string => Boolean(g))),
+          ).sort((a, b) => a.localeCompare(b))}
           onClose={() => setSettingsProjectId(null)}
           onChanged={loadProjects}
           onStatusesChanged={() => {

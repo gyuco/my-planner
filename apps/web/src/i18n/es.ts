@@ -40,6 +40,7 @@ export const es: Dictionary = {
     taskNotFound: "Tarea no encontrada o no accesible",
   },
   sidebar: {
+    groupToggle: "Mostrar u ocultar los proyectos del grupo {name}",
     projects: "Proyectos",
     newProjectTitle: "Nuevo proyecto",
     allProjects: "Todos los proyectos",
@@ -156,6 +157,12 @@ export const es: Dictionary = {
     createError: "Error al crear el proyecto",
   },
   projectSettings: {
+    group: "Grupo",
+    groupPlaceholder: "p. ej. Producto X",
+    groupHint: "Solo visual: los proyectos con el mismo grupo aparecen juntos en la barra lateral. Déjalo vacío para no agrupar.",
+    groupSave: "Guardar grupo",
+    groupSaved: "Grupo actualizado",
+    groupError: "Error al guardar el grupo",
     repo: "Repositorio GitHub",
     repoPlaceholder: "https://github.com/owner/repo",
     repoHint: "Donde trabajan los agentes de IA (coder y reviewer). También acepta owner/repo.",

@@ -214,6 +214,11 @@ export function runAiRoutine(projectId: string): Promise<AiDispatchResult> {
   return apiFetch(`/projects/${projectId}/ai-routine/run`, { method: "POST" });
 }
 
+/** Gruppo del progetto nella sidebar (null o "" per toglierlo). */
+export function setProjectGroup(projectId: string, groupName: string | null): Promise<Project> {
+  return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ groupName }) });
+}
+
 /** Repository GitHub del progetto (null o "" per toglierlo). */
 export function setProjectRepo(projectId: string, repoUrl: string | null): Promise<Project> {
   return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ repoUrl }) });

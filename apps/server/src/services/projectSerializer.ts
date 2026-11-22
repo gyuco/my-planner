@@ -9,6 +9,7 @@ export function serializeProject<T extends {
   archived: boolean;
   createdAt: Date;
   repoUrl?: string | null;
+  groupName?: string | null;
   aiRoutineId?: string | null;
   aiRoutineTokenEncrypted?: string | null;
 }>(row: T) {
@@ -18,6 +19,7 @@ export function serializeProject<T extends {
     archived: row.archived,
     createdAt: row.createdAt,
     repoUrl: row.repoUrl ?? null,
+    groupName: row.groupName ?? null,
     /** true se la routine Claude Code per l'avvio automatico dei passi AI e' configurata. */
     aiRoutineConfigured: Boolean(row.aiRoutineId && row.aiRoutineTokenEncrypted),
   };
