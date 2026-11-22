@@ -177,6 +177,16 @@ describe("passi AI", () => {
   });
 });
 
+describe("gruppo del progetto", () => {
+  it("salva, normalizza gli spazi, toglie con stringa vuota; non tocca gli altri campi", async () => {
+    const p = await createProject("API");
+    expect((await updateProject(p.id, { groupName: "  Prodotto   X " })).groupName).toBe("Prodotto X");
+    expect((await updateProject(p.id, { name: "API v2" })).groupName).toBe("Prodotto X");
+    expect((await updateProject(p.id, { groupName: "" })).groupName).toBeNull();
+    await expect(updateProject(p.id, { groupName: "x".repeat(61) })).rejects.toMatchObject({ code: "VALIDATION_ERROR" });
+  });
+});
+
 describe("repository GitHub del progetto", () => {
   it("normalizza i formati comuni e rifiuta il resto", async () => {
     expect(normalizeRepoUrl("gyuco/my-planner")).toBe("https://github.com/gyuco/my-planner");

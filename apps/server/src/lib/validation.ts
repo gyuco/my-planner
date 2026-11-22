@@ -192,8 +192,11 @@ export const projectUpdateInputSchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
     repoUrl: z.string().max(300).nullable().optional(),
+    groupName: z.string().max(60).nullable().optional(),
   })
-  .refine((v) => v.name !== undefined || v.repoUrl !== undefined, { message: "Nessun campo da aggiornare" });
+  .refine((v) => v.name !== undefined || v.repoUrl !== undefined || v.groupName !== undefined, {
+    message: "Nessun campo da aggiornare",
+  });
 
 export const projectTokenInputSchema = z.object({
   label: z.string().optional(),

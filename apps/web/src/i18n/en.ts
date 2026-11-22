@@ -38,6 +38,7 @@ export const en = {
     taskNotFound: "Task not found or not accessible",
   },
   sidebar: {
+    groupToggle: "Show or hide the projects in group {name}",
     projects: "Projects",
     newProjectTitle: "New project",
     allProjects: "All projects",
@@ -154,6 +155,12 @@ export const en = {
     createError: "Error creating the project",
   },
   projectSettings: {
+    group: "Group",
+    groupPlaceholder: "e.g. Product X",
+    groupHint: "Visual only: projects with the same group sit together in the sidebar. Leave empty for no group.",
+    groupSave: "Save group",
+    groupSaved: "Group updated",
+    groupError: "Error saving the group",
     repo: "GitHub repository",
     repoPlaceholder: "https://github.com/owner/repo",
     repoHint: "Where AI agents (coder and reviewer) work. owner/repo also works.",

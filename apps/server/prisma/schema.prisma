@@ -71,6 +71,9 @@ model Project {
   // Repository GitHub del progetto (https://github.com/owner/repo): dove gli
   // agenti AI (coder/reviewer) lavorano. Facoltativo.
   repoUrl   String?
+  // Gruppo (solo visuale): nella sidebar i progetti con lo stesso nome di
+  // gruppo stanno in un contenitore apribile/richiudibile. null = nessun gruppo.
+  groupName String?
   // Avvio automatico dei passi AI (routine di Claude Code con trigger API):
   // id della routine (trig_...) e token del trigger, cifrato con secretBox.
   // Il token in chiaro non esce mai dal server.

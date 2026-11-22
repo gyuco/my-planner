@@ -231,9 +231,12 @@ export function normalizeRepoUrl(value: string | null | undefined): string | nul
   return `https://github.com/${m[1]}/${m[2]}`;
 }
 
-export async function updateProject(projectId: string, input: { name?: string; repoUrl?: string | null }) {
+export async function updateProject(
+  projectId: string,
+  input: { name?: string; repoUrl?: string | null; groupName?: string | null },
+) {
   await getProjectOrThrow(projectId);
-  const data: { name?: string; repoUrl?: string | null } = {};
+  const data: { name?: string; repoUrl?: string | null; groupName?: string | null } = {};
   if (input.name !== undefined) {
     if (input.name.trim().length === 0 || input.name.length > 200) {
       throw new ApiErrorException("VALIDATION_ERROR", "Il nome del progetto deve avere tra 1 e 200 caratteri");
@@ -241,6 +244,12 @@ export async function updateProject(projectId: string, input: { name?: string; r
     data.name = input.name;
   }
   if (input.repoUrl !== undefined) data.repoUrl = normalizeRepoUrl(input.repoUrl);
+  if (input.groupName !== undefined) {
+    // Spazi multipli compattati: "Prodotto  X" e "Prodotto X" sono lo stesso gruppo.
+    const group = (input.groupName ?? "").trim().replace(/\s+/g, " ");
+    if (group.length > 60) throw new ApiErrorException("VALIDATION_ERROR", "Il nome del gruppo deve avere al massimo 60 caratteri");
+    data.groupName = group || null;
+  }
   return serializeProject(await prisma.project.update({ where: { id: projectId }, data }));
 }
 

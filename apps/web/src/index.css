@@ -3993,3 +3993,59 @@ body.dnd-dragging * {
   .guide-page { padding: 0.75rem; }
   .guide-card { padding: 1.1rem; }
 }
+
+/* Sidebar: gruppi di progetti (contenitori apribili) */
+.sidebar-group { display: flex; flex-direction: column; }
+.sidebar-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 0;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--ink-500);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar-group-header:hover { background: rgba(0, 0, 0, 0.04); color: var(--ink-800); }
+.sidebar-group-header.has-active { color: var(--accent-600); }
+.sidebar-group-chevron {
+  width: 0.85rem;
+  height: 0.85rem;
+  flex-shrink: 0;
+  transition: transform 0.18s var(--ease);
+}
+.sidebar-group-header[aria-expanded="true"] .sidebar-group-chevron { transform: rotate(90deg); }
+.sidebar-group-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-group-count {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ink-400);
+  background: var(--surface-sunken);
+  border-radius: var(--r-full);
+  padding: 0 0.4rem;
+}
+.sidebar-group-items {
+  display: flex;
+  flex-direction: column;
+  margin-left: 0.85rem;
+  padding-left: 0.4rem;
+  border-left: 1px solid var(--line);
+}
+/* Progetti dentro un gruppo: meno rientro e icone solo al passaggio del
+   mouse (o per il progetto aperto), senza riservare spazio al nome. */
+.sidebar-group-items { margin-left: 0.6rem; padding-left: 0.3rem; }
+.sidebar-project-nested .icon-button { display: none; }
+.sidebar-project-nested:hover .icon-button,
+.sidebar-project-nested:focus-within .icon-button,
+.sidebar-project-nested:has(.sidebar-item.active) .icon-button { display: inline-flex; }
+@media (hover: none) {
+  .sidebar-project-nested .icon-button { display: inline-flex; }
+}
