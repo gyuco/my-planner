@@ -32,6 +32,7 @@ import { AttachmentThumb, MediaLightbox } from "./AttachmentPreview";
 import { previewKind } from "../lib/attachmentPreview";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
+import { TaskAiSection } from "./TaskAiSection";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const ACTIVITY_POLL_INTERVAL_MS = 10_000;
@@ -44,6 +45,8 @@ interface TaskDrawerProps {
   onChanged: () => void;
   /** Naviga il drawer su un altro task (sotto-task o parent), sostituendo quello mostrato. */
   onOpenTask: (taskId: string) => void;
+  /** Solo gli admin modificano la gestione AI (gli altri la vedono in sola lettura). */
+  isAdmin?: boolean;
 }
 
 interface CollapsibleSectionProps {
@@ -95,6 +98,7 @@ export function TaskDrawer({
   onClose,
   onChanged,
   onOpenTask,
+  isAdmin = false,
 }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
@@ -669,6 +673,15 @@ export function TaskDrawer({
                 {saving ? t.taskDrawer.saving : t.taskDrawer.save}
               </button>
             </section>
+
+            <TaskAiSection
+              task={task}
+              isAdmin={isAdmin}
+              onSaved={(updated) => {
+                setTask((prev) => (prev ? { ...prev, ai: updated.ai } : prev));
+                onChanged();
+              }}
+            />
 
             <CollapsibleSection
               {...sectionProps("dependencies")}

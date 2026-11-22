@@ -48,6 +48,7 @@ model User {
   assignedTasks Task[] @relation("TaskAssignee")
   ownedTasks    Task[] @relation("TaskOwner")
   mcpTokens     UserMcpToken[]
+  aiWatchedTasks Task[] @relation("TaskAiWatcher")
 }
 
 // Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
@@ -143,6 +144,18 @@ model Task {
   ownerId    String?
   owner      User?   @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
+  // Gestione AI (solo admin): il task e' lavorato da un modello nei passi
+  // scelti, ciascuno legato a una colonna di partenza: triage su draft (->
+  // todo), coder su todo (-> testing), reviewer su testing (-> done o di
+  // nuovo todo). aiSteps: CSV ordinato di "triage" | "coder" | "reviewer".
+  // aiNotify: "end" | "each" | "none", destinatario aiWatcherId (l'admin che
+  // ha attivato la gestione AI). SetNull: cancellare l'utente non tocca il task.
+  aiEnabled   Boolean @default(false)
+  aiSteps     String  @default("")
+  aiNotify    String  @default("end")
+  aiWatcherId String?
+  aiWatcher   User?   @relation("TaskAiWatcher", fields: [aiWatcherId], references: [id], onDelete: SetNull)
+
   // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
   // volta avere subtasks, vedi validazione in taskService.ts). Nessun
   // onDelete cascade: deleteTask rifiuta la cancellazione di un parent con
@@ -161,6 +174,7 @@ model Task {
 
   @@index([assigneeId])
   @@index([ownerId])
+  @@index([aiEnabled])
 }
 
 model TaskDependency {

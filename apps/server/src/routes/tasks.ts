@@ -14,8 +14,9 @@ import {
   listComments,
   createSubtasks,
   getTaskOrThrow,
+  setTaskAi,
 } from "../services/taskService.js";
-import { assertProjectAccess, assertTaskAccess, listProjectAssignees } from "../services/userService.js";
+import { assertAdmin, assertProjectAccess, assertTaskAccess, listProjectAssignees } from "../services/userService.js";
 import { userActor } from "../services/notificationService.js";
 import {
   taskFiltersQuerySchema,
@@ -23,6 +24,7 @@ import {
   taskUpdateInputSchema,
   moveTaskInputSchema,
   sendBackTaskInputSchema,
+  taskAiInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   createSubtasksInputSchema,
@@ -53,6 +55,16 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     return getTask(taskId);
+  });
+
+  // Gestione AI del task: solo admin (API_CONTRACT.md §4).
+  app.put("/tasks/:taskId/ai", { onRequest: [app.authenticate] }, async (req) => {
+    const { taskId } = req.params as { taskId: string };
+    const user = (req as any).authUser;
+    assertAdmin(user);
+    await assertTaskAccess(user, taskId);
+    const body = taskAiInputSchema.parse(req.body ?? {});
+    return setTaskAi(taskId, body, user.id, userActor(user));
   });
 
   app.patch("/tasks/:taskId", { onRequest: [app.authenticate] }, async (req) => {

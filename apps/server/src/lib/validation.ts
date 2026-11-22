@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TASK_EVENT_TYPES } from "@my-planner/core";
+import { AI_NOTIFY_MODES, AI_STEPS, TASK_EVENT_TYPES } from "@my-planner/core";
 
 /**
  * Schemi zod condivisi tra le route REST, allineati agli enum e ai formati
@@ -118,6 +118,18 @@ export const commentInputSchema = z.object({
 export const sendBackTaskInputSchema = z.object({
   message: z.string().min(1),
 });
+
+/** Gestione AI del task (solo admin): con enabled true serve almeno un passo. */
+export const taskAiInputSchema = z
+  .object({
+    enabled: z.boolean(),
+    steps: z.array(z.enum(AI_STEPS)).max(AI_STEPS.length).optional(),
+    notify: z.enum(AI_NOTIFY_MODES).optional(),
+  })
+  .refine((v) => !v.enabled || (v.steps?.length ?? 0) > 0, {
+    message: "Scegli almeno un passo AI (triage, coder, reviewer)",
+    path: ["steps"],
+  });
 
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({

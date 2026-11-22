@@ -3,6 +3,7 @@ import type {
   Board,
   Project,
   ProjectToken,
+  TaskAiInput,
   UserMcpToken,
   Task,
   TaskPriority,
@@ -395,6 +396,11 @@ export interface UpdateTaskInput {
 
 export function updateTask(taskId: string, input: UpdateTaskInput): Promise<Task> {
   return apiFetch(`/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+/** Gestione AI del task (solo admin): passi, modalita' di avviso, attiva/spenta. */
+export function setTaskAi(taskId: string, input: TaskAiInput): Promise<Task> {
+  return apiFetch(`/tasks/${taskId}/ai`, { method: "PUT", body: JSON.stringify(input) });
 }
 
 export function deleteTask(taskId: string): Promise<{ id: string; deleted: true }> {
