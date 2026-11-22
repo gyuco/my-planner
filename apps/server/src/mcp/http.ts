@@ -85,7 +85,7 @@ async function bridgeOAuth(req: any, reply: any) {
   return reply.send(Buffer.from(await response.arrayBuffer()));
 }
 
-for (const path of ["/.well-known/*", "/authorize", "/token", "/register"]) {
+for (const path of ["/.well-known/*", "/authorize", "/token", "/register", "/global/*"]) {
   app.route({ method: ["GET", "POST", "OPTIONS"], url: path, handler: bridgeOAuth });
 }
 

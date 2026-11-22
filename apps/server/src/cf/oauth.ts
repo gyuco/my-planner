@@ -31,6 +31,16 @@ import { prisma } from "../lib/prisma.js";
 
 export const GLOBAL_MCP_PATH = "/mcp/global";
 
+/**
+ * Authorization server dedicato all'MCP globale (issuer `<origin>/global`).
+ * Deve essere DISTINTO da quello dei token di progetto (issuer `<origin>`):
+ * claude.ai associa le credenziali OAuth all'authorization server, quindi con
+ * un issuer condiviso il connector globale riusava il token del connector di
+ * progetto gia' presente e /mcp/global lo rifiutava (token emesso ma "mai
+ * usato"). Endpoint: /global/authorize, /global/token, /global/register.
+ */
+export const GLOBAL_AS_PATH = "/global";
+
 const CODE_TTL_MS = 5 * 60 * 1000;
 
 const ALLOWED_REDIRECTS = new Set([
@@ -163,8 +173,9 @@ button{margin-top:16px;width:100%;padding:10px;border:0;border-radius:8px;backgr
 .switch{display:block;margin-top:16px;font-size:13px;color:var(--muted);text-align:center}
 .switch a{color:inherit}`;
 
-function renderAuthorizePage(p: AuthParams, error?: string): Response {
-  const mode: AuthMode = p.mode === "user" ? "user" : "project";
+function renderAuthorizePage(p: AuthParams, error?: string, globalAs = false): Response {
+  const mode: AuthMode = globalAs || p.mode === "user" ? "user" : "project";
+  const action = globalAs ? `${GLOBAL_AS_PATH}/authorize` : "/authorize";
   const hidden = AUTH_FIELDS.filter((k) => k !== "mode")
     .map((k) => `<input type="hidden" name="${k}" value="${escapeHtml(p[k])}">`)
     .join("") + `<input type="hidden" name="mode" value="${mode}">`;
@@ -184,7 +195,7 @@ function renderAuthorizePage(p: AuthParams, error?: string): Response {
     mode === "user"
       ? `<h1>Collega My Planner — tutti i progetti</h1>
 <p>Accedi con il tuo account My Planner per autorizzare questo client MCP a leggere e modificare <strong>tutti i progetti a cui hai accesso</strong>. Puoi revocare l'accesso in qualunque momento dal tuo profilo.</p>
-<form method="post" action="/authorize">${hidden}
+<form method="post" action="${action}">${hidden}
 <label for="email">Email</label>
 <input id="email" name="email" type="email" autocomplete="username" required autofocus aria-required="true"${errAttrs}>
 <label for="password">Password</label>
@@ -194,7 +205,7 @@ ${errBlock}
 </form>`
       : `<h1>Collega My Planner</h1>
 <p>Incolla il token MCP del progetto. Lo trovi nelle impostazioni del progetto in My Planner.</p>
-<form method="post" action="/authorize">${hidden}
+<form method="post" action="${action}">${hidden}
 <label for="token">Token MCP</label>
 <input id="token" name="token" type="password" autocomplete="off" required autofocus aria-required="true"${errAttrs}>
 ${errBlock}
@@ -206,7 +217,7 @@ ${errBlock}
 <title>Collega My Planner</title>
 <style>${PAGE_STYLE}</style></head><body><main>
 ${body}
-<span class="switch"><a href="/authorize?${escapeHtml(switchQuery.toString())}">${switchLabel}</a></span>
+${globalAs ? "" : `<span class="switch"><a href="/authorize?${escapeHtml(switchQuery.toString())}">${switchLabel}</a></span>`}
 </main></body></html>`, error ? 400 : 200, new URL(p.redirect_uri).origin);
 }
 
@@ -238,19 +249,21 @@ function connectorLabel(redirectUri: string): string {
   }
 }
 
-async function handleAuthorize(request: Request): Promise<Response> {
+async function handleAuthorize(request: Request, globalAs = false): Promise<Response> {
   if (request.method === "GET") {
     const q = new URL(request.url).searchParams;
     const p = readAuthParams((k) => q.get(k));
+    if (globalAs) p.mode = "user";
     const invalid = validateAuthParams(p, q.get("response_type"));
     if (invalid) return html(`<!doctype html><meta charset="utf-8"><title>Errore</title><p>Richiesta non valida: ${escapeHtml(invalid)}</p>`, 400);
-    return renderAuthorizePage(p);
+    return renderAuthorizePage(p, undefined, globalAs);
   }
 
   if (request.method !== "POST") return new Response(null, { status: 405, headers: { Allow: "GET, POST" } });
 
   const form = await request.formData();
   const p = readAuthParams((k) => (typeof form.get(k) === "string" ? (form.get(k) as string) : null));
+  if (globalAs) p.mode = "user";
   const invalid = validateAuthParams(p, null);
   if (invalid) return html(`<!doctype html><meta charset="utf-8"><title>Errore</title><p>Richiesta non valida: ${escapeHtml(invalid)}</p>`, 400);
 
@@ -258,7 +271,7 @@ async function handleAuthorize(request: Request): Promise<Response> {
   let payload: CodePayload;
   if (p.mode === "user") {
     const userId = await verifyCredentials(String(form.get("email") ?? ""), String(form.get("password") ?? ""));
-    if (!userId) return renderAuthorizePage(p, "Email o password non validi.");
+    if (!userId) return renderAuthorizePage(p, "Email o password non validi.", globalAs);
     payload = { ...base, u: userId };
   } else {
     const token = String(form.get("token") ?? "").trim();
@@ -277,7 +290,7 @@ async function handleAuthorize(request: Request): Promise<Response> {
   return new Response(null, { status: 302, headers: { Location: redirect.toString(), "Cache-Control": "no-store" } });
 }
 
-async function handleToken(request: Request): Promise<Response> {
+async function handleToken(request: Request, globalAs = false): Promise<Response> {
   if (request.method !== "POST") return oauthError("invalid_request", "Usare POST", 405);
 
   const contentType = request.headers.get("content-type") ?? "";
@@ -311,6 +324,9 @@ async function handleToken(request: Request): Promise<Response> {
   if (!verifier || (await sha256Base64Url(verifier)) !== payload.c) {
     return oauthError("invalid_grant", "code_verifier non valido");
   }
+
+  // L'authorization server globale emette solo token utente.
+  if (globalAs && !payload.u) return oauthError("invalid_grant", "Codice non valido per l'MCP globale");
 
   if (payload.u) {
     // MCP globale: il token utente nasce qui, dopo PKCE. L'utente potrebbe
@@ -362,18 +378,46 @@ export async function handleOAuthRequest(request: Request): Promise<Response | n
   const origin = url.origin;
   const path = url.pathname;
 
+  const G = GLOBAL_AS_PATH;
   const isOAuthPath =
-    path.startsWith("/.well-known/oauth-") || path === "/authorize" || path === "/token" || path === "/register";
+    path.startsWith("/.well-known/oauth-") ||
+    path.startsWith("/.well-known/openid-configuration") ||
+    path === "/authorize" ||
+    path === "/token" ||
+    path === "/register" ||
+    path.startsWith(`${G}/`);
   if (!isOAuthPath) return null;
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
 
   if (path === `/.well-known/oauth-protected-resource${GLOBAL_MCP_PATH}`) {
     return json({
       resource: `${origin}${GLOBAL_MCP_PATH}`,
-      authorization_servers: [origin],
+      authorization_servers: [`${origin}${G}`],
       bearer_methods_supported: ["header"],
     });
   }
+  // Metadata dell'authorization server globale: tutte le varianti che i
+  // client provano per un issuer con path (RFC 8414 path insertion, OIDC).
+  if (
+    path === `/.well-known/oauth-authorization-server${G}` ||
+    path === `/.well-known/openid-configuration${G}` ||
+    path === `${G}/.well-known/oauth-authorization-server` ||
+    path === `${G}/.well-known/openid-configuration`
+  ) {
+    return json({
+      issuer: `${origin}${G}`,
+      authorization_endpoint: `${origin}${G}/authorize`,
+      token_endpoint: `${origin}${G}/token`,
+      registration_endpoint: `${origin}${G}/register`,
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+    });
+  }
+  if (path === `${G}/authorize`) return handleAuthorize(request, true);
+  if (path === `${G}/token`) return handleToken(request, true);
+  if (path === `${G}/register`) return handleRegister(request);
   if (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp") {
     return json({
       resource: `${origin}/mcp`,

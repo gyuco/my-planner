@@ -181,7 +181,75 @@ describe("cf oauth", () => {
 
     it("espone i metadata della risorsa globale", async () => {
       const pr = await (await handleOAuthRequest(new Request(`${BASE}/.well-known/oauth-protected-resource/mcp/global`)))!.json();
-      expect(pr).toMatchObject({ resource: GLOBAL_RESOURCE, authorization_servers: [BASE] });
+      // Authorization server distinto da quello dei token di progetto (BASE):
+      // altrimenti claude.ai riusa il token del connector di progetto.
+      expect(pr).toMatchObject({ resource: GLOBAL_RESOURCE, authorization_servers: [`${BASE}/global`] });
+
+      for (const path of [
+        "/.well-known/oauth-authorization-server/global",
+        "/.well-known/openid-configuration/global",
+        "/global/.well-known/oauth-authorization-server",
+      ]) {
+        const as = await (await handleOAuthRequest(new Request(`${BASE}${path}`)))!.json();
+        expect(as).toMatchObject({
+          issuer: `${BASE}/global`,
+          authorization_endpoint: `${BASE}/global/authorize`,
+          token_endpoint: `${BASE}/global/token`,
+          registration_endpoint: `${BASE}/global/register`,
+        });
+      }
+      const legacy = await (await handleOAuthRequest(new Request(`${BASE}/.well-known/oauth-authorization-server`)))!.json();
+      expect(legacy.issuer).toBe(BASE);
+    });
+
+    it("flusso completo sull'authorization server globale (/global/*)", async () => {
+      const user = await createUser({ email: "glob@test.dev", password: "password-123", role: "admin" });
+      const reg = (await handleOAuthRequest(
+        new Request(`${BASE}/global/register`, { method: "POST", body: JSON.stringify({ redirect_uris: [REDIRECT] }) }),
+      ))!;
+      expect(reg.status).toBe(201);
+
+      const { verifier, challenge } = await pkce();
+      // Nessun resource/mode: su /global/authorize e' sempre il login utente.
+      const q = new URLSearchParams({
+        response_type: "code", client_id: "client-1", redirect_uri: REDIRECT, state: "s",
+        code_challenge: challenge, code_challenge_method: "S256",
+      });
+      const page = await (await handleOAuthRequest(new Request(`${BASE}/global/authorize?${q}`)))!.text();
+      expect(page).toContain('action="/global/authorize"');
+      expect(page).toContain('name="password"');
+      expect(page).not.toContain("token MCP di progetto");
+
+      const form = new FormData();
+      for (const [k, v] of q) if (k !== "response_type") form.set(k, v);
+      form.set("email", "glob@test.dev");
+      form.set("password", "password-123");
+      const res = (await handleOAuthRequest(new Request(`${BASE}/global/authorize`, { method: "POST", body: form })))!;
+      expect(res.status).toBe(302);
+      const code = new URL(res.headers.get("Location")!).searchParams.get("code")!;
+
+      const tok = (await handleOAuthRequest(
+        new Request(`${BASE}/global/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: REDIRECT }).toString(),
+        }),
+      ))!;
+      expect(tok.status).toBe(200);
+      expect(await resolveUserFromMcpToken((await tok.json()).access_token)).toBe(user.id);
+    });
+
+    it("/global/token rifiuta codici del flusso con token di progetto", async () => {
+      const { verifier, challenge } = await pkce();
+      const code = await getCode(challenge);
+      const res = (await handleOAuthRequest(
+        new Request(`${BASE}/global/token`, {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ grant_type: "authorization_code", code, code_verifier: verifier }).toString(),
+        }),
+      ))!;
+      expect(res.status).toBe(400);
     });
 
     it("con resource=/mcp/global mostra il login email/password", async () => {
