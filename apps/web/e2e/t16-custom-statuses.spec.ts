@@ -37,7 +37,7 @@ test.describe("T16 - stati personalizzati per progetto", () => {
     // Rinomina: cambia il nome, la chiave resta.
     await row.getByRole("button", { name: "Rename" }).click();
     await modal.getByLabel("Status name", { exact: true }).fill("Bloccante");
-    await modal.getByRole("button", { name: "Save" }).click();
+    await modal.getByRole("button", { name: "Save", exact: true }).click();
     await expect(modal.locator(".status-list li", { hasText: "bloqueante" })).toContainText("Bloccante");
     // Gli stati di base non hanno azioni.
     await expect(modal.locator(".status-list li", { hasText: "Testing" }).getByRole("button")).toHaveCount(0);
