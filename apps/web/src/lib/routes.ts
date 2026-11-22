@@ -1,6 +1,6 @@
 import { matchPath } from "react-router-dom";
 
-export type AppView = "board" | "stats" | "profile" | "activity";
+export type AppView = "board" | "stats" | "profile" | "activity" | "guide";
 
 export interface ParsedRoute {
   view: AppView;
@@ -13,12 +13,13 @@ export interface ParsedRoute {
 /**
  * Schema URL dell'app (vedi API_CONTRACT.md):
  *   /projects/all | /projects/:projectId | /projects/:projectId/stats
- *   /activity | /profile
+ *   /activity | /profile | /guide
  * Il task aperto nel drawer e' nel query param `?task=:taskId`.
  */
 export function parseRoute(pathname: string): ParsedRoute {
   if (matchPath("/activity", pathname)) return { view: "activity", projectId: null, valid: true };
   if (matchPath("/profile", pathname)) return { view: "profile", projectId: null, valid: true };
+  if (matchPath("/guide", pathname)) return { view: "guide", projectId: null, valid: true };
   const stats = matchPath("/projects/:projectId/stats", pathname);
   if (stats) {
     const id = stats.params.projectId as string;

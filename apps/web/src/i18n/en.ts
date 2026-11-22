@@ -331,6 +331,14 @@ export const en = {
     denied: "You blocked notifications for this site: allow them again in the browser settings, then retry.",
     error: "Unable to enable push notifications",
   },
+  guide: {
+    sidebar: "AI guide",
+    open: "Guide",
+    contents: "In this guide",
+    copy: "Copy",
+    copied: "Copied!",
+    readGuide: "Read the AI guide",
+  },
   aiRoutine: {
     title: "Automatic AI start (Claude Code)",
     intro: "When a task in this project has an AI step waiting, My Planner starts a Claude Code routine on your subscription: the cloud session works the task and moves it by itself.",

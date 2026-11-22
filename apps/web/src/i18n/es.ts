@@ -334,6 +334,14 @@ export const es: Dictionary = {
     denied: "Bloqueaste las notificaciones de este sitio: vuelve a permitirlas en los ajustes del navegador e inténtalo de nuevo.",
     error: "No se pudieron activar las notificaciones push",
   },
+  guide: {
+    sidebar: "Guía IA",
+    open: "Guía",
+    contents: "En esta guía",
+    copy: "Copiar",
+    copied: "¡Copiado!",
+    readGuide: "Leer la guía IA",
+  },
   aiRoutine: {
     title: "Inicio automático IA (Claude Code)",
     intro: "Cuando una tarea de este proyecto tiene un paso de IA pendiente, My Planner inicia una rutina de Claude Code con tu suscripción: la sesión en la nube trabaja la tarea y la mueve sola.",

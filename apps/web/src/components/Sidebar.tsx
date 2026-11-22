@@ -9,6 +9,8 @@ interface SidebarProps {
   selectedProjectId: string | "all" | null;
   /** Evidenzia la voce "Log attivita'" quando la pagina e' aperta. */
   activityActive: boolean;
+  guideActive?: boolean;
+  onOpenGuide?: () => void;
   isAdmin: boolean;
   onSelect: (projectId: string | "all") => void;
   onCreateProject: () => void;
@@ -25,6 +27,8 @@ export function Sidebar({
   projects,
   selectedProjectId,
   activityActive,
+  guideActive = false,
+  onOpenGuide,
   isAdmin,
   onSelect,
   onCreateProject,
@@ -96,6 +100,11 @@ export function Sidebar({
         <button className={`sidebar-item${activityActive ? " active" : ""}`} onClick={onOpenActivity}>
           {t.sidebar.activityLog}
         </button>
+        {onOpenGuide && (
+          <button className={`sidebar-item${guideActive ? " active" : ""}`} onClick={onOpenGuide}>
+            {t.guide.sidebar}
+          </button>
+        )}
         {isAdmin && (
           <button className="sidebar-item" onClick={onOpenUsers}>
             {t.sidebar.users}

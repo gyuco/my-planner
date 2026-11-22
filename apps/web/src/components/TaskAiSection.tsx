@@ -4,6 +4,7 @@ import type { AiNotifyMode, AiStep, Task } from "@my-planner/core";
 import { ApiRequestError, setTaskAi } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
+import { Link } from "react-router-dom";
 
 interface TaskAiSectionProps {
   task: Task;
@@ -122,7 +123,12 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
 
   return (
     <section className="drawer-section ai-section" aria-label={t.taskAi.title}>
-      <h3>{t.taskAi.title}</h3>
+      <h3>
+        {t.taskAi.title}{" "}
+        <Link className="guide-link" to="/guide#guide-use">
+          {t.guide.open}
+        </Link>
+      </h3>
       <label className="ai-option ai-toggle">
         <input
           type="checkbox"
