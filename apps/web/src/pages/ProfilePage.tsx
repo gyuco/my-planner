@@ -3,6 +3,7 @@ import type { AuthUser, Project } from "@my-planner/core";
 import { ApiRequestError, changeMyPassword, deleteMyAvatar, updateMyProfile, uploadMyAvatar } from "../api";
 import { OwnAvatarContent, primeAvatarCache } from "../lib/avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
+import { GlobalMcpSection } from "../components/GlobalMcpSection";
 import { useI18n } from "../i18n";
 import { displayName } from "../lib/user";
 
@@ -331,6 +332,8 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
             </button>
           </div>
         </form>
+
+        <GlobalMcpSection />
       </div>
     </div>
   );

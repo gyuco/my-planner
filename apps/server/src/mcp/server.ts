@@ -4,6 +4,7 @@ import { ApiErrorException, apiError, FIBONACCI_COMPLEXITY } from "@my-planner/c
 import { prisma } from "../lib/prisma.js";
 import {
   getBoard,
+  getAggregatedBoard,
   listTasks,
   getTask,
   createTask,
@@ -18,7 +19,13 @@ import {
   createSubtasks,
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
-import { listProjectAssignees } from "../services/userService.js";
+import {
+  assertProjectAccess,
+  getAuthUser,
+  listProjectAssignees,
+  listProjectsForUser,
+  restrictProjectIds,
+} from "../services/userService.js";
 import { listProjectStatuses, resolveStatus } from "../services/statusService.js";
 import { buildTaskUrl, getAppUrl } from "../services/emailSettingsService.js";
 import type { Actor } from "../services/notificationService.js";
@@ -42,47 +49,158 @@ const complexitySchema = z
 void FIBONACCI_COMPLEXITY; // referenziato in taskService per la validazione condivisa
 
 /**
+ * Ambito di un server MCP: decide su quali progetti operano i tool.
+ *  - "project": token di progetto, un solo progetto implicito (nessun
+ *    parametro projectId nei tool);
+ *  - "global": token utente (login web OAuth), tutti i progetti visibili
+ *    all'utente; i tool a livello progetto richiedono `projectId`.
+ * I tool che partono da un taskId/attachmentId ricavano il progetto dal task
+ * e verificano l'accesso con `assertTask`.
+ */
+interface McpScope {
+  kind: "project" | "global";
+  /** Parametri aggiuntivi dei tool a livello progetto ({} o { projectId }). */
+  projectShape: { projectId: z.ZodString };
+  /** Progetto su cui operare a partire dall'input del tool (verificato). */
+  resolveProject(input: { projectId?: string }): Promise<string>;
+  /** Carica il task e verifica che sia nell'ambito; errore altrimenti. */
+  assertTask(taskId: string): Promise<{ id: string; projectId: string }>;
+  /** Frase usata nelle descrizioni dei tool per indicare il progetto. */
+  projectRef: string;
+}
+
+/**
  * Crea un'istanza McpServer scoped a un singolo progetto (token-based, vedi auth.ts).
  * Tutti i tool operano solo sul progetto risolto dal token: nessuna fuga di dati
  * tra progetti diversi. Segue API_CONTRACT.md §7: stesso service layer di REST,
  * stesso envelope errore (isError + JSON code/message).
  */
 export function createProjectMcpServer(projectId: string) {
-  const server = new McpServer({ name: "my-planner", version: "0.1.0" });
+  return buildServer({
+    kind: "project",
+    // Nessun parametro projectId: il progetto e' quello del token.
+    projectShape: {} as McpScope["projectShape"],
+    resolveProject: async () => projectId,
+    async assertTask(taskId) {
+      const task = await prisma.task.findUnique({ where: { id: taskId } });
+      if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
+      if (task.projectId !== projectId) {
+        throw new ApiErrorException("FORBIDDEN", "Il task non appartiene al progetto del token");
+      }
+      return task;
+    },
+    projectRef: "del progetto associato al token",
+  });
+}
 
-  function ok(data: unknown) {
-    return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+/**
+ * MCP globale (API_CONTRACT.md §7bis): un token per utente, ottenuto solo col
+ * login web OAuth, che da' accesso a tutti i progetti visibili all'utente
+ * (admin: tutti; manager: quelli assegnati). Ruolo e progetti vengono riletti
+ * a ogni chiamata, quindi le modifiche fatte dalla UI valgono subito.
+ */
+export function createGlobalMcpServer(userId: string) {
+  async function currentUser() {
+    const user = await getAuthUser(userId);
+    if (!user) throw new ApiErrorException("UNAUTHORIZED", "Utente del token MCP non piu' esistente");
+    return user;
   }
 
-  function fail(code: Parameters<typeof apiError>[0], message: string) {
-    return { isError: true, content: [{ type: "text" as const, text: JSON.stringify(apiError(code, message)) }] };
-  }
+  return buildServer(
+    {
+      kind: "global",
+      projectShape: {
+        projectId: z.string().min(1).describe("Id del progetto (vedi list_projects)"),
+      },
+      async resolveProject(input) {
+        if (!input.projectId) throw new ApiErrorException("VALIDATION_ERROR", "projectId obbligatorio (vedi list_projects)");
+        await assertProjectAccess(await currentUser(), input.projectId);
+        return input.projectId;
+      },
+      async assertTask(taskId) {
+        const task = await prisma.task.findUnique({ where: { id: taskId } });
+        if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
+        await assertProjectAccess(await currentUser(), task.projectId);
+        return task;
+      },
+      projectRef: "del progetto indicato da projectId",
+    },
+    (server, { withErrors }) => {
+      server.tool(
+        "list_projects",
+        "Elenca i progetti a cui l'utente del token ha accesso (admin: tutti; manager: quelli assegnati). " +
+          "Usa l'id come projectId negli altri tool.",
+        { includeArchived: z.boolean().default(false) },
+        async ({ includeArchived }) =>
+          withErrors(async () => {
+            const projects = await listProjectsForUser(await currentUser(), includeArchived);
+            return projects.map((p) => ({
+              id: p.id,
+              name: p.name,
+              archived: p.archived,
+              createdAt: p.createdAt.toISOString(),
+            }));
+          })
+      );
+
+      server.tool(
+        "get_aggregated_board",
+        "Board Kanban aggregata su piu' progetti (tutti quelli accessibili non archiviati, o quelli in projectIds). " +
+          "Ogni task include `project` (id e nome). Le colonne sono gli stati di base piu' gli stati personalizzati dei progetti inclusi.",
+        {
+          projectIds: z.array(z.string()).optional(),
+          priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+          tag: z.string().optional(),
+          search: z.string().optional(),
+          assigneeId: z.string().optional(),
+          ownerId: z.string().optional(),
+        },
+        async ({ projectIds, ...filters }) =>
+          withErrors(async () => {
+            const allowed = restrictProjectIds(await currentUser(), projectIds);
+            return getAggregatedBoard(allowed, filters);
+          })
+      );
+    }
+  );
+}
+
+type ToolHelpers = { withErrors: <T>(fn: () => Promise<T>) => Promise<ReturnType<typeof okResult> | ReturnType<typeof failResult>> };
+
+function okResult(data: unknown) {
+  return { content: [{ type: "text" as const, text: JSON.stringify(data) }] };
+}
+
+function failResult(code: Parameters<typeof apiError>[0], message: string) {
+  return { isError: true, content: [{ type: "text" as const, text: JSON.stringify(apiError(code, message)) }] };
+}
+
+function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: ToolHelpers) => void) {
+  const server = new McpServer({ name: scope.kind === "global" ? "my-planner-global" : "my-planner", version: "0.1.0" });
+  const P = scope.projectShape;
+  const ref = scope.projectRef;
 
   function withErrors<T>(fn: () => Promise<T>) {
     return fn().then(
-      (data) => ok(data),
+      (data) => okResult(data),
       (err) => {
-        if (err instanceof ApiErrorException) return fail(err.code, err.message);
-        return fail("INTERNAL_ERROR", (err as Error)?.message ?? "Errore interno");
+        if (err instanceof ApiErrorException) return failResult(err.code, err.message);
+        return failResult("INTERNAL_ERROR", (err as Error)?.message ?? "Errore interno");
       }
     );
   }
 
-  async function assertTaskInProject(taskId: string) {
-    const task = await prisma.task.findUnique({ where: { id: taskId } });
-    if (!task) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
-    if (task.projectId !== projectId) {
-      throw new ApiErrorException("FORBIDDEN", "Il task non appartiene al progetto del token");
-    }
-    return task;
-  }
+  const assertTaskInProject = scope.assertTask;
+
+  extraTools?.(server, { withErrors });
 
   // --- Task ----------------------------------------------------------------
 
   server.tool(
     "list_tasks",
-    "Elenca i task del progetto associato al token",
+    `Elenca i task ${ref}`,
     {
+      ...P,
       status: z.string().min(1).describe("Stato: draft | todo | in_progress | testing | done oppure uno stato personalizzato del progetto (chiave o nome, vedi list_statuses)").optional(),
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
@@ -90,19 +208,20 @@ export function createProjectMcpServer(projectId: string) {
       assigneeId: z.string().optional(),
       ownerId: z.string().optional(),
     },
-    async (input) => withErrors(() => listTasks(projectId, input))
+    async ({ projectId: _p, ...filters }) =>
+      withErrors(async () => listTasks(await scope.resolveProject({ projectId: _p }), filters))
   );
 
   server.tool(
     "list_assignees",
     "Elenca gli utenti a cui si possono assegnare i task del progetto (admin e membri del progetto): usa l'id come assigneeId",
-    {},
-    async () => withErrors(() => listProjectAssignees(projectId))
+    { ...P },
+    async (input) => withErrors(async () => listProjectAssignees(await scope.resolveProject(input)))
   );
 
   server.tool(
     "get_task",
-    "Recupera un task del progetto associato al token. Se il task ha sotto-task, la risposta include " +
+    "Recupera un task a cui il token ha accesso. Se il task ha sotto-task, la risposta include " +
       "subtaskCount/openSubtaskCount/subtaskStatusCounts e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
       "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro. " +
       "Se l'URL pubblico dell'app e' configurato, la risposta include `url`: link diretto al task nella UI.",
@@ -118,9 +237,10 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "create_task",
-    "Crea un task nel progetto associato al token. Passa parentId per creare direttamente una sotto-task di un " +
+    `Crea un task ${ref.replace(/^del /, "nel ")}. Passa parentId per creare direttamente una sotto-task di un ` +
       "task esistente (che non deve essere a sua volta una sotto-task: un solo livello di annidamento).",
     {
+      ...P,
       title: z.string().min(1).max(300),
       description: z.string().default(""),
       type: z.enum(["bug", "feature", "analysis"]).default("feature"),
@@ -131,7 +251,8 @@ export function createProjectMcpServer(projectId: string) {
       parentId: z.string().nullable().optional(),
       assigneeId: z.string().nullable().optional(),
     },
-    async (input) => withErrors(() => createTask(projectId, input, MCP_ACTOR))
+    async ({ projectId: _p, ...input }) =>
+      withErrors(async () => createTask(await scope.resolveProject({ projectId: _p }), input, MCP_ACTOR))
   );
 
   server.tool(
@@ -157,14 +278,14 @@ export function createProjectMcpServer(projectId: string) {
     },
     async ({ parentId, subtasks }) =>
       withErrors(async () => {
-        await assertTaskInProject(parentId);
-        return createSubtasks(projectId, parentId, subtasks, MCP_ACTOR);
+        const parent = await assertTaskInProject(parentId);
+        return createSubtasks(parent.projectId, parentId, subtasks, MCP_ACTOR);
       })
   );
 
   server.tool(
     "update_task",
-    "Aggiorna un task del progetto associato al token. parentId puo' essere impostato per riassegnare la task " +
+    "Aggiorna un task a cui il token ha accesso. parentId puo' essere impostato per riassegnare la task " +
       "come sotto-task di un'altra (null per staccarla e renderla di nuovo un task di primo livello). " +
       "status (opzionale) sposta il task come move_task, anche in uno stato personalizzato.",
     {
@@ -182,9 +303,9 @@ export function createProjectMcpServer(projectId: string) {
     },
     async ({ taskId, status, ...rest }) =>
       withErrors(async () => {
-        await assertTaskInProject(taskId);
+        const task = await assertTaskInProject(taskId);
         // Valida lo stato prima di salvare gli altri campi: niente update a meta'.
-        if (status !== undefined) await resolveStatus(projectId, status);
+        if (status !== undefined) await resolveStatus(task.projectId, status);
         const hasFields = Object.values(rest).some((v) => v !== undefined);
         const updated = hasFields ? await updateTask(taskId, rest, MCP_ACTOR) : undefined;
         if (status === undefined) return updated ?? getTask(taskId);
@@ -192,7 +313,7 @@ export function createProjectMcpServer(projectId: string) {
       })
   );
 
-  server.tool("delete_task", "Elimina un task del progetto associato al token (cascade)", { taskId: z.string() }, async ({ taskId }) =>
+  server.tool("delete_task", "Elimina un task a cui il token ha accesso (cascade)", { taskId: z.string() }, async ({ taskId }) =>
     withErrors(async () => {
       await assertTaskInProject(taskId);
       return deleteTask(taskId, MCP_ACTOR);
@@ -219,7 +340,7 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "add_dependency",
-    "Dichiara che taskId e' bloccato da blockedByTaskId (entrambi nel progetto del token)",
+    "Dichiara che taskId e' bloccato da blockedByTaskId (entrambi devono essere accessibili al token)",
     { taskId: z.string(), blockedByTaskId: z.string() },
     async ({ taskId, blockedByTaskId }) =>
       withErrors(async () => {
@@ -295,7 +416,7 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "get_attachment_url",
-    "Restituisce l'URL di download per un allegato (autenticato con lo stesso token MCP del progetto)",
+    "Restituisce l'URL di download per un allegato (autenticato con lo stesso token MCP)",
     { attachmentId: z.string() },
     async ({ attachmentId }) =>
       withErrors(async () => {
@@ -310,23 +431,25 @@ export function createProjectMcpServer(projectId: string) {
 
   server.tool(
     "get_board",
-    "Restituisce la board Kanban del progetto associato al token. Ogni task include subtaskCount/openSubtaskCount/subtaskStatusCounts " +
+    `Restituisce la board Kanban ${ref}. Ogni task` + " include subtaskCount/openSubtaskCount/subtaskStatusCounts " +
       "(0 se non ha sotto-task) cosi' da distinguere a colpo d'occhio i task singoli da quelli con un gruppo di sotto-task. " +
       "Oltre agli stati di base ha una colonna per ogni stato personalizzato del progetto (chiave dello stato).",
     {
+      ...P,
       priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
       tag: z.string().optional(),
       search: z.string().optional(),
     },
-    async (filters) => withErrors(() => getBoard(projectId, filters))
+    async ({ projectId: _p, ...filters }) =>
+      withErrors(async () => getBoard(await scope.resolveProject({ projectId: _p }), filters))
   );
 
   server.tool(
     "list_statuses",
     "Elenca gli stati del progetto nell'ordine delle colonne: i 5 di base (builtIn true) e quelli personalizzati " +
       "(es. bloqueante). Usa `key` (o il nome) come status in move_task, update_task e list_tasks.",
-    {},
-    async () => withErrors(() => listProjectStatuses(projectId))
+    { ...P },
+    async (input) => withErrors(async () => listProjectStatuses(await scope.resolveProject(input)))
   );
 
   return server;
