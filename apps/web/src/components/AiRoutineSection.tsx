@@ -4,6 +4,7 @@ import { ApiRequestError, getAiRoutine, removeAiRoutine, runAiRoutine, saveAiRou
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { copyText } from "../lib/clipboard";
+import { Link } from "react-router-dom";
 
 /**
  * Impostazioni progetto -> avvio automatico dei passi AI con una routine di
@@ -85,7 +86,12 @@ export function AiRoutineSection({ project }: { project: Project }) {
           {config?.configured ? t.aiRoutine.configured : t.aiRoutine.notConfigured}
         </span>
       </h3>
-      <p className="ai-hint">{t.aiRoutine.intro}</p>
+      <p className="ai-hint">
+        {t.aiRoutine.intro}{" "}
+        <Link className="guide-link" to="/guide#guide-routine">
+          {t.guide.readGuide}
+        </Link>
+      </p>
       {!project.repoUrl && <p className="push-notice">{t.aiRoutine.noRepo}</p>}
       <ol className="ai-routine-steps">
         <li>{t.aiRoutine.step1}</li>

@@ -4,6 +4,7 @@ import { ApiRequestError, listMyMcpTokens, revokeMyMcpToken } from "../api";
 import { useI18n } from "../i18n";
 import { copyText } from "../lib/clipboard";
 import { mcpBaseUrl } from "../lib/mcp";
+import { Link } from "react-router-dom";
 
 /**
  * MCP globale (/mcp/global) nella pagina profilo: URL del connector da
@@ -48,7 +49,12 @@ export function GlobalMcpSection() {
   return (
     <div className="profile-section global-mcp-section">
       <span className="field-label">{t.globalMcp.title}</span>
-      <p className="profile-hint">{t.globalMcp.hint}</p>
+      <p className="profile-hint">
+        {t.globalMcp.hint}{" "}
+        <Link className="guide-link" to="/guide#guide-connector">
+          {t.guide.readGuide}
+        </Link>
+      </p>
 
       <span className="field-label profile-subsection">{t.globalMcp.urlLabel}</span>
       <div className="token-reveal-row">

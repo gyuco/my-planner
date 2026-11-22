@@ -86,4 +86,22 @@ test.describe("T17 - gestione AI del task", () => {
     await section.getByRole("button", { name: "Resume" }).click();
     await expect(section).toContainText("Pending step: Triage");
   });
+
+  test("guida AI: dalla sidebar e dalla scheda del task", async ({ page }) => {
+    const project = await createProjectViaApi(`T17 Guida ${Date.now()}`);
+    await createTaskViaApi(project.id, { title: "Ticket guida" });
+    await loginViaUi(page);
+    await selectProjectInSidebar(page, project.name);
+
+    await page.getByRole("button", { name: "AI guide" }).click();
+    await expect(page).toHaveURL(/\/guide$/);
+    await expect(page.locator(".guide-card h2")).toHaveText("Guide: AI-handled tasks");
+    await expect(page.locator(".guide-url code")).toContainText("/mcp/global");
+    await expect(page.locator("#guide-routine")).toContainText("Generate token");
+
+    await selectProjectInSidebar(page, project.name);
+    await page.locator(".task-card", { hasText: "Ticket guida" }).click();
+    await page.locator(".drawer .ai-section").getByRole("link", { name: "Guide" }).click();
+    await expect(page).toHaveURL(/\/guide#guide-use$/);
+  });
 });
