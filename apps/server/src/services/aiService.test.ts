@@ -230,4 +230,41 @@ describe("tool MCP ai_*", () => {
     const forbidden = await pc.callTool({ name: "ai_start_step", arguments: { taskId: task.id } });
     expect(forbidden.isError).toBe(true);
   });
+
+  it("prompt work_ai_queue: istruzioni con progetto, repository e passo; accesso verificato", async () => {
+    const { project, admin } = await setup(["triage"]);
+    await updateProject(project.id, { repoUrl: "gyuco/clinica" });
+    const other = await createProject("Riservato");
+    const manager = await createUser({ email: "mgr@test.it", password: "password123", role: "manager", projectIds: [project.id] });
+
+    const connect = async (server: ReturnType<typeof createGlobalMcpServer>) => {
+      const [ct, st] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: "t", version: "0" });
+      await Promise.all([client.connect(ct), server.connect(st)]);
+      return client;
+    };
+
+    const global = await connect(createGlobalMcpServer(admin.id));
+    expect((await global.listPrompts()).prompts.map((p) => p.name)).toContain("work_ai_queue");
+    const all = await global.getPrompt({ name: "work_ai_queue", arguments: {} });
+    const allText = (all.messages[0].content as any).text as string;
+    expect(allText).toContain("list_ai_tasks");
+    expect(allText).toContain("TRIAGE");
+    expect(allText).toContain("REVIEWER");
+    expect(allText).toContain("Non usare move_task");
+
+    const one = await global.getPrompt({ name: "work_ai_queue", arguments: { projectId: project.id, step: "reviewer" } });
+    const oneText = (one.messages[0].content as any).text as string;
+    expect(oneText).toContain(`projectId ${project.id}`);
+    expect(oneText).toContain("https://github.com/gyuco/clinica");
+    expect(oneText).toContain("REVIEWER");
+    expect(oneText).not.toContain("TRIAGE (");
+
+    const mgr = await connect(createGlobalMcpServer(manager.id));
+    await expect(mgr.getPrompt({ name: "work_ai_queue", arguments: { projectId: other.id } })).rejects.toThrow();
+
+    const projectClient = await connect(createProjectMcpServer(project.id) as any);
+    const scoped = await projectClient.getPrompt({ name: "work_ai_queue", arguments: {} });
+    expect((scoped.messages[0].content as any).text).toContain(`Progetto: "Clinica"`);
+  });
 });

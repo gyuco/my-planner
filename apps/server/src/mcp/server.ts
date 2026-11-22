@@ -20,6 +20,7 @@ import {
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
 import { completeAiStep, failAiStep, listAiQueue, rejectAiStep, startAiStep } from "../services/aiService.js";
+import { aiWorkerInstructions } from "../services/aiInstructions.js";
 import { AI_STEPS } from "@my-planner/core";
 import {
   assertProjectAccess,
@@ -71,6 +72,8 @@ interface McpScope {
   projectRef: string;
   /** Progetti della coda AI: projectId (verificato) o tutti quelli accessibili. */
   queueProjectIds(projectId?: string): Promise<string[] | undefined>;
+  /** Progetto di riferimento per il prompt work_ai_queue (verificato), se determinato. */
+  promptProject(projectId?: string): Promise<string | null>;
 }
 
 /**
@@ -95,6 +98,7 @@ export function createProjectMcpServer(projectId: string) {
     },
     projectRef: "del progetto associato al token",
     queueProjectIds: async () => [projectId],
+    promptProject: async () => projectId,
   });
 }
 
@@ -136,6 +140,11 @@ export function createGlobalMcpServer(userId: string) {
           return [requested];
         }
         return restrictProjectIds(user, undefined);
+      },
+      async promptProject(requested) {
+        if (!requested) return null;
+        await assertProjectAccess(await currentUser(), requested);
+        return requested;
       },
     },
     (server, { withErrors }) => {
@@ -526,6 +535,37 @@ function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: 
         await assertTaskInProject(taskId);
         return failAiStep(taskId, reason, MCP_ACTOR);
       })
+  );
+
+  // Prompt MCP: in Claude Code compare come comando slash del connector.
+  server.registerPrompt(
+    "work_ai_queue",
+    {
+      title: "Lavora la coda AI di My Planner",
+      description:
+        "Istruzioni per lavorare i task gestiti da AI (triage, coder, reviewer) con i tool ai_*: " +
+        "presa in carico, lavoro sul codice, chiusura del passo. Il server sposta i task tra le colonne.",
+      argsSchema: {
+        ...(scope.kind === "global" ? { projectId: z.string().optional().describe("Solo questo progetto (vedi list_projects)") } : {}),
+        step: z.string().optional().describe("Solo un passo: triage | coder | reviewer"),
+      },
+    },
+    async (args: { projectId?: string; step?: string }) => {
+      const step = (AI_STEPS as readonly string[]).includes(args.step ?? "") ? (args.step as (typeof AI_STEPS)[number]) : undefined;
+      const projectId = await scope.promptProject(args.projectId);
+      const project = projectId
+        ? await prisma.project.findUnique({ where: { id: projectId }, select: { id: true, name: true, repoUrl: true } })
+        : null;
+      const text = [
+        "Lavora la coda AI di My Planner seguendo queste istruzioni.",
+        "",
+        aiWorkerInstructions({ project, step }),
+      ].join("\n");
+      return {
+        description: "Lavora la coda AI di My Planner",
+        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
+      };
+    }
   );
 
   server.tool(
