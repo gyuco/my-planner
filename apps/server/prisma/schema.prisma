@@ -49,6 +49,7 @@ model User {
   ownedTasks    Task[] @relation("TaskOwner")
   mcpTokens     UserMcpToken[]
   aiWatchedTasks Task[] @relation("TaskAiWatcher")
+  pushSubscriptions PushSubscription[]
 }
 
 // Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
@@ -281,4 +282,33 @@ model NotificationState {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   lastSeenEventId Int      @default(0)
   updatedAt       DateTime @updatedAt
+}
+
+// Dispositivo (browser) registrato per le notifiche push di un utente.
+// `endpoint` e' l'URL del push service del browser: unico, perche' un
+// browser re-iscritto con un altro utente passa a quell'utente.
+model PushSubscription {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    @unique
+  p256dh        String
+  auth          String
+  // Lingua dei testi delle notifiche per questo dispositivo (it | en | es).
+  locale        String    @default("it")
+  label         String?
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+
+  @@index([userId])
+}
+
+// Chiavi VAPID dell'applicazione (riga unica id = "default"), generate al
+// primo uso. La privata e' cifrata con secretBox (SETTINGS_ENCRYPTION_KEY /
+// JWT_SECRET): il DB da solo non basta per inviare push a nome dell'app.
+model PushSettings {
+  id                  String   @id @default("default")
+  publicKey           String
+  privateKeyEncrypted String
+  createdAt           DateTime @default(now())
 }

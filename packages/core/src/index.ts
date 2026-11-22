@@ -311,6 +311,17 @@ export interface EmailSettings {
   updatedAt: string | null;
 }
 
+/** Dispositivo registrato per le notifiche push (GET /auth/me/push-subscriptions). */
+export interface PushDevice {
+  id: string;
+  label: string | null;
+  locale: string;
+  /** Host del push service (es. fcm.googleapis.com): indica il browser. */
+  service: string;
+  createdAt: string;
+  lastSuccessAt: string | null;
+}
+
 /** Connector MCP globale dell'utente (/mcp/global), creato col login web OAuth. */
 export interface UserMcpToken {
   id: string;

@@ -73,6 +73,7 @@ import {
   moveTaskInputSchema,
   sendBackTaskInputSchema,
   taskAiInputSchema,
+  pushSubscriptionInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -95,6 +96,7 @@ import {
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
+import { getVapidPublicKey, listDevices, removeDevice, sendTestPush, subscribeDevice } from "../services/pushService.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -168,6 +170,7 @@ export function buildRestApp() {
     "/users",
     "/users/*",
     "/avatars/*",
+    "/push/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -226,6 +229,18 @@ export function buildRestApp() {
     if (!revoked) throw new ApiErrorException("NOT_FOUND", "Token non trovato");
     return c.json(revoked);
   });
+
+  // Notifiche push: chiave VAPID e dispositivi dell'utente (stesse route del runtime Node).
+  app.get("/push/public-key", async (c) => c.json({ publicKey: await getVapidPublicKey() }));
+  app.get("/auth/me/push-subscriptions", async (c) => c.json(await listDevices(c.get("user").id)));
+  app.post("/auth/me/push-subscriptions", async (c) => {
+    const body = pushSubscriptionInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await subscribeDevice(c.get("user").id, body), 201);
+  });
+  app.post("/auth/me/push-subscriptions/test", async (c) => c.json(await sendTestPush(c.get("user").id)));
+  app.delete("/auth/me/push-subscriptions/:deviceId", async (c) =>
+    c.json(await removeDevice(c.get("user").id, c.req.param("deviceId"))),
+  );
 
   app.get("/avatars/:userId", async (c) =>
     c.json(await getUserAvatar(c.get("user"), c.req.param("userId"))),
