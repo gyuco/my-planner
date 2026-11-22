@@ -3,6 +3,7 @@ import type {
   Board,
   Project,
   ProjectToken,
+  PushDevice,
   TaskAiInput,
   UserMcpToken,
   Task,
@@ -200,6 +201,33 @@ export function archiveProject(projectId: string): Promise<Project> {
 
 export function unarchiveProject(projectId: string): Promise<Project> {
   return apiFetch(`/projects/${projectId}/unarchive`, { method: "POST" });
+}
+
+// --- Notifiche push ----------------------------------------------------------
+
+export function getPushPublicKey(): Promise<{ publicKey: string }> {
+  return apiFetch(`/push/public-key`);
+}
+
+export function listPushDevices(): Promise<PushDevice[]> {
+  return apiFetch(`/auth/me/push-subscriptions`);
+}
+
+export function registerPushDevice(input: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  locale: string;
+  label: string;
+}): Promise<PushDevice> {
+  return apiFetch(`/auth/me/push-subscriptions`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function removePushDevice(deviceId: string): Promise<{ id: string; deleted: true }> {
+  return apiFetch(`/auth/me/push-subscriptions/${deviceId}`, { method: "DELETE" });
+}
+
+export function sendTestPush(): Promise<{ sent: number; failed: number }> {
+  return apiFetch(`/auth/me/push-subscriptions/test`, { method: "POST" });
 }
 
 // --- Token MCP -------------------------------------------------------------

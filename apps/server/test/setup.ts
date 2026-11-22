@@ -33,6 +33,8 @@ export async function cleanDatabase() {
   await prisma.task.deleteMany();
   await prisma.projectToken.deleteMany();
   await prisma.userMcpToken.deleteMany();
+  await prisma.pushSubscription.deleteMany();
+  await prisma.pushSettings.deleteMany();
   await prisma.projectStatus.deleteMany();
   await prisma.project.deleteMany();
   await prisma.user.deleteMany();

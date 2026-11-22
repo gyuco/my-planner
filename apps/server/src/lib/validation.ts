@@ -131,6 +131,17 @@ export const taskAiInputSchema = z
     path: ["steps"],
   });
 
+/** Registrazione di un dispositivo per le notifiche push (PushSubscription del browser). */
+export const pushSubscriptionInputSchema = z.object({
+  endpoint: z.string().url().max(2000),
+  keys: z.object({
+    p256dh: z.string().min(1).max(200),
+    auth: z.string().min(1).max(100),
+  }),
+  locale: z.string().max(10).optional(),
+  label: z.string().max(100).nullable().optional(),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),

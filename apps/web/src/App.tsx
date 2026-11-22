@@ -43,6 +43,7 @@ import {
 import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
 import { parseRoute, projectPath } from "./lib/routes";
+import { syncPushSubscription } from "./lib/push";
 import {
   filtersSearch,
   parseFilters,
@@ -127,7 +128,7 @@ function collectTags(board: Board): string[] {
 }
 
 export function App() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
@@ -171,6 +172,13 @@ export function App() {
     routeProjectId === "all" || (routeProjectId !== null && projects.some((p) => p.id === routeProjectId))
       ? routeProjectId
       : null;
+  // Notifiche push: se questo browser e' gia' iscritto, riallinea la
+  // subscription sul server (rinnovi del browser, utente o lingua cambiati).
+  const pushUserId = currentUser?.id;
+  useEffect(() => {
+    if (pushUserId) void syncPushSubscription(locale);
+  }, [pushUserId, locale]);
+
   // Ultimo progetto visitato: serve per tornare alla board da profilo/attivita'.
   const lastProjectRef = useRef<string | "all" | null>(null);
   useEffect(() => {

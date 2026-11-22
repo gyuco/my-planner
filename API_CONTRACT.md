@@ -165,6 +165,15 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - 200: `[{ id, email, name }]` — admin e manager del progetto (`name` = nome e cognome, oppure email)
 - `POST /projects`, `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
+### Notifiche push (Web Push)
+- `GET /push/public-key` → `{ publicKey }`: chiave pubblica VAPID (base64url, P-256 non compressa) da passare a `pushManager.subscribe` come `applicationServerKey`. Le chiavi sono generate al primo uso e salvate in `PushSettings` (privata cifrata con secretBox).
+- `GET /auth/me/push-subscriptions` → `PushDevice[]` (`{ id, label, locale, service, createdAt, lastSuccessAt }`, `service` = host del push service).
+- `POST /auth/me/push-subscriptions` body `{ endpoint, keys: { p256dh, auth }, locale?, label? }` → 201 `PushDevice`. Endpoint ammessi solo verso i push service dei browser (FCM, Mozilla, Apple, Windows) in https, altrimenti 400 (anti SSRF). Lo stesso endpoint ri-registrato passa all'utente corrente.
+- `DELETE /auth/me/push-subscriptions/:deviceId` → `{ id, deleted: true }` (404 se non e' dell'utente).
+- `POST /auth/me/push-subscriptions/test` → `{ sent, failed }`: notifica di prova ai propri dispositivi.
+- Invio: in background dopo gli eventi notificabili. Destinatario della campanella (assegnatario) per gli stessi eventi; per i task con gestione AI, l'admin che la segue sui cambi di stato: `notify = each` a ogni cambio, `end` solo all'arrivo nella colonna finale dell'ultimo passo (triage → todo, coder → testing, reviewer → done), `none` mai. Mai per le proprie azioni, una sola push per utente. Testi nella lingua del dispositivo (it/en/es); payload `{ title, body, url, tag }` cifrato (RFC 8291) con VAPID (RFC 8292). Subscription scadute (404/410) rimosse.
+- Frontend: service worker `/sw.js` (mostra la notifica, al clic apre `url`), manifest `/manifest.webmanifest` (su iPhone/iPad le push funzionano solo con l'app aggiunta alla Home).
+
 ### MCP — token di progetto
 - stdio: `MCP_PROJECT_TOKEN` da env.
 - HTTP: header `Authorization: Bearer <token>` su `POST /mcp`.
