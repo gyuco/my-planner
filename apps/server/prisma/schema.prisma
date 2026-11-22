@@ -68,6 +68,9 @@ model Project {
   id        String   @id @default(cuid())
   name      String
   archived  Boolean  @default(false)
+  // Repository GitHub del progetto (https://github.com/owner/repo): dove gli
+  // agenti AI (coder/reviewer) lavorano. Facoltativo.
+  repoUrl   String?
   createdAt DateTime @default(now())
 
   tasks    Task[]
@@ -156,6 +159,15 @@ model Task {
   aiNotify    String  @default("end")
   aiWatcherId String?
   aiWatcher   User?   @relation("TaskAiWatcher", fields: [aiWatcherId], references: [id], onDelete: SetNull)
+  // Esecuzione (tool MCP ai_*): passo preso in carico da un agente (blocco
+  // che scade dopo AI_RUN_TTL_MS), rimandi del reviewer nel giro corrente,
+  // fallimento (il task si ferma finche' un admin non riprende o un utente
+  // lo sposta).
+  aiRunStep      String?
+  aiRunStartedAt DateTime?
+  aiRejectCount  Int       @default(0)
+  aiFailedAt     DateTime?
+  aiFailReason   String?
 
   // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
   // volta avere subtasks, vedi validazione in taskService.ts). Nessun

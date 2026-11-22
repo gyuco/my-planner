@@ -17,6 +17,8 @@ export const ACTIVITY_KEYS: Record<TaskEventType, ActivityKey> = {
   "dependency.removed": "dependencyRemoved",
   "attachment.added": "attachmentAdded",
   "attachment.deleted": "attachmentDeleted",
+  "ai.step_started": "aiStarted",
+  "ai.failed": "aiFailed",
 };
 
 /** Sostituisce i segnaposto `{nome}` nei messaggi i18n. */
@@ -27,6 +29,8 @@ function fill(template: string, vars: Record<string, string>): string {
 function toneOf(type: TaskEventType): string {
   if (type === "task.status_changed") return "status";
   if (type === "comment.created") return "comment";
+  if (type === "ai.failed") return "removed";
+  if (type === "ai.step_started") return "updated";
   if (type === "task.deleted" || type.endsWith(".removed") || type.endsWith(".deleted")) return "removed";
   if (type === "task.updated" || type === "task.assigned") return "updated";
   return "created";
@@ -72,6 +76,7 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
       to: item.to ? statusLabel[item.to] ?? item.to : "?",
       related: item.relatedTaskTitle ?? "?",
       file: item.fileName ?? "?",
+      step: item.aiStep ? t.taskAi.step[item.aiStep] : "AI",
     });
   }
 

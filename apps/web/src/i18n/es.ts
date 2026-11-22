@@ -156,6 +156,12 @@ export const es: Dictionary = {
     createError: "Error al crear el proyecto",
   },
   projectSettings: {
+    repo: "Repositorio GitHub",
+    repoPlaceholder: "https://github.com/owner/repo",
+    repoHint: "Donde trabajan los agentes de IA (coder y reviewer). También acepta owner/repo.",
+    repoSave: "Guardar repositorio",
+    repoSaved: "Repositorio actualizado",
+    repoError: "Repositorio no válido",
     statuses: "Estados",
     statusesHint: "Los 5 estados base son fijos. Los estados personalizados (p. ej. Bloqueante) aparecen como columnas del tablero entre En curso y Testing y se usan por MCP con su clave o nombre.",
     statusPlaceholder: "Nombre del nuevo estado (p. ej. Bloqueante)",
@@ -329,6 +335,13 @@ export const es: Dictionary = {
     error: "No se pudieron activar las notificaciones push",
   },
   taskAi: {
+    running: "{step} en curso desde hace {minutes} min",
+    runningBadge: "{step} en curso",
+    failedBadge: "detenida",
+    failed: "Gestión IA detenida: {reason}",
+    resume: "Reanudar",
+    resumed: "Gestión IA reanudada",
+    rejects: "Devoluciones del reviewer: {count}/{max}",
     title: "Gestión IA",
     enable: "Gestionar con un modelo de IA",
     steps: "Pasos",
@@ -498,6 +511,7 @@ export const es: Dictionary = {
     assigned: '{actor} te ha asignado "{title}"',
     statusChanged: '{actor} ha movido "{title}" de {from} a {to}',
     commented: '{actor} ha comentado en "{title}"',
+    aiFailed: "Gestión IA detenida en \"{title}\"",
     close: "Cerrar notificaciones",
   },
   activity: {
@@ -535,6 +549,8 @@ export const es: Dictionary = {
       dependencyRemoved: "Dependencia eliminada",
       attachmentAdded: "Adjunto añadido",
       attachmentDeleted: "Adjunto eliminado",
+      aiStarted: "IA: paso iniciado",
+      aiFailed: "IA: detenida",
     },
     messages: {
       created: '{actor} ha creado "{title}"',
@@ -548,6 +564,8 @@ export const es: Dictionary = {
       dependencyRemoved: '{actor} ha quitado el bloqueo de "{related}" sobre "{title}"',
       attachmentAdded: '{actor} ha adjuntado "{file}" a "{title}"',
       attachmentDeleted: '{actor} ha eliminado "{file}" de "{title}"',
+      aiStarted: "{actor} tomó \"{title}\" ({step})",
+      aiFailed: "Gestión IA detenida en \"{title}\" ({step})",
     },
     fields: {
       type: "Tipo",

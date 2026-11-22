@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AI_NOTIFY_MODES, AI_STEPS, aiPendingStep, normalizeAiSteps } from "@my-planner/core";
+import { AI_MAX_REJECTS, AI_NOTIFY_MODES, AI_STEPS, aiPendingStep, aiRunningStep, normalizeAiSteps } from "@my-planner/core";
 import type { AiNotifyMode, AiStep, Task } from "@my-planner/core";
 import { ApiRequestError, setTaskAi } from "../api";
 import { useI18n } from "../i18n";
@@ -36,6 +36,30 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
 
   const pending = aiPendingStep(task);
   const pendingText = pending ? t.taskAi.pending.replace("{step}", t.taskAi.step[pending]) : t.taskAi.noPending;
+  const running = aiRunningStep(task);
+  const runningText =
+    running && ai?.running
+      ? t.taskAi.running
+          .replace("{step}", t.taskAi.step[running])
+          .replace("{minutes}", String(Math.max(1, Math.round((Date.now() - new Date(ai.running.startedAt).getTime()) / 60000))))
+      : null;
+  const failure = ai?.enabled ? ai.failure : null;
+  const rejectCount = ai?.rejectCount ?? 0;
+
+  // Stato dell'esecuzione (passo in corso, rimandi, percorso fermato): uguale per admin e manager.
+  const runState = (
+    <>
+      {runningText && <p className="ai-running">🤖 {runningText}</p>}
+      {rejectCount > 0 && (
+        <p className="ai-hint">{t.taskAi.rejects.replace("{count}", String(rejectCount)).replace("{max}", String(AI_MAX_REJECTS))}</p>
+      )}
+      {failure && (
+        <p className="ai-failure" role="status">
+          {t.taskAi.failed.replace("{reason}", failure.reason)}
+        </p>
+      )}
+    </>
+  );
 
   if (!isAdmin) {
     if (!ai?.enabled) return null;
@@ -45,7 +69,8 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
         <p className="ai-summary">
           {ai.steps.map((s) => t.taskAi.step[s]).join(" → ")} · {t.taskAi.notifyMode[ai.notify]}
         </p>
-        <p className="ai-pending">{pendingText}</p>
+        {!failure && !runningText && <p className="ai-pending">{pendingText}</p>}
+        {runState}
         <p className="ai-hint">{t.taskAi.readOnly}</p>
       </section>
     );
@@ -59,6 +84,22 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
   function toggleStep(step: AiStep, on: boolean) {
     setSteps((prev) => normalizeAiSteps(on ? [...prev, step] : prev.filter((s) => s !== step)));
     setError(null);
+  }
+
+  async function handleResume() {
+    if (!ai) return;
+    setSaving(true);
+    setError(null);
+    try {
+      // Salvare di nuovo la configurazione azzera fallimento, blocco e rimandi.
+      const updated = await setTaskAi(task.id, { enabled: true, steps: ai.steps, notify: ai.notify });
+      onSaved(updated);
+      toast.success(t.taskAi.resumed);
+    } catch (err) {
+      setError(err instanceof ApiRequestError ? err.message : t.taskAi.saveError);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSave() {
@@ -128,9 +169,15 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
 
       {ai?.enabled && (
         <p className="ai-pending">
-          {pendingText}
-          {ai.watcherName && <> · {t.taskAi.watcher.replace("{name}", ai.watcherName)}</>}
+          {failure || runningText ? null : <>{pendingText} · </>}
+          {ai.watcherName && t.taskAi.watcher.replace("{name}", ai.watcherName)}
         </p>
+      )}
+      {ai?.enabled && runState}
+      {failure && (
+        <button type="button" onClick={handleResume} disabled={saving}>
+          {t.taskAi.resume}
+        </button>
       )}
       {!enabled && !ai?.enabled && <p className="ai-hint">{t.taskAi.disabled}</p>}
       {error && <p className="login-error" role="alert">{error}</p>}

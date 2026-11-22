@@ -201,6 +201,7 @@ const TEXT = {
     aiEndTitle: (p: string) => `AI completata · ${p}`,
     aiEnd: (t: string, to: string) => `«${t}» è ora in ${to}`,
     aiEachTitle: (p: string) => `AI · ${p}`,
+    aiFailed: (t: string) => `Gestione AI fermata su «${t}»`,
   },
   en: {
     mcp: "An AI agent",
@@ -213,6 +214,7 @@ const TEXT = {
     aiEndTitle: (p: string) => `AI done · ${p}`,
     aiEnd: (t: string, to: string) => `“${t}” is now in ${to}`,
     aiEachTitle: (p: string) => `AI · ${p}`,
+    aiFailed: (t: string) => `AI handling stopped on “${t}”`,
   },
   es: {
     mcp: "Un agente de IA",
@@ -225,6 +227,7 @@ const TEXT = {
     aiEndTitle: (p: string) => `IA completada · ${p}`,
     aiEnd: (t: string, to: string) => `«${t}» ahora está en ${to}`,
     aiEachTitle: (p: string) => `IA · ${p}`,
+    aiFailed: (t: string) => `Gestión IA detenida en «${t}»`,
   },
 } as const;
 
@@ -275,6 +278,9 @@ export function renderEventPush(input: RecordTaskEventInput, ctx: EventContext, 
       break;
     case "comment.created":
       body = t.commented(actor, title) + (input.data.excerpt ? `\n${input.data.excerpt.slice(0, 140)}` : "");
+      break;
+    case "ai.failed":
+      body = t.aiFailed(title) + (input.data.excerpt ? `\n${input.data.excerpt.slice(0, 140)}` : "");
       break;
     default:
       body = title;

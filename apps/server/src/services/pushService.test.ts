@@ -170,12 +170,14 @@ describe("pushService — regole di invio", () => {
     await moveTask(task.id, "testing", undefined, { type: "mcp" });
     await moveTask(task.id, "todo", undefined, { type: "user", id: admin.id });
     await flush();
-    const msgs = pushesFor(adminEndpoints);
-    expect(msgs.map((m) => m.body)).toEqual([
-      "Un agente AI ha spostato «Login rotto» da Draft a TODO",
-      "«Login rotto» è ora in Testing",
+    // Le push partono in background in parallelo: l'ordine di arrivo non e' garantito.
+    const msgs = pushesFor(adminEndpoints)
+      .map((m) => [m.title, m.body])
+      .sort();
+    expect(msgs).toEqual([
+      ["AI completata · Clinica", "«Login rotto» è ora in Testing"],
+      ["AI · Clinica", "Un agente AI ha spostato «Login rotto» da Draft a TODO"],
     ]);
-    expect(msgs.map((m) => m.title)).toEqual(["AI · Clinica", "AI completata · Clinica"]);
   });
 
   it("AI 'alla fine': una sola push quando il task arriva alla colonna finale dell'ultimo passo", async () => {

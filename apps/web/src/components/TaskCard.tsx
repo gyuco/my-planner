@@ -1,4 +1,4 @@
-import { aiPendingStep, isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
+import { aiPendingStep, aiRunningStep, isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
@@ -302,13 +302,30 @@ export function TaskCard({
   );
 }
 
-/** Badge "AI" sulla card: con il passo in attesa sulla colonna corrente, se c'e'. */
+/** Badge "AI" sulla card: passo in corso, percorso fermato o passo in attesa sulla colonna corrente. */
 function AiBadge({ task }: { task: Task }) {
   const { t } = useI18n();
+  const running = aiRunningStep(task);
   const pending = aiPendingStep(task);
-  const title = pending ? t.taskAi.badgeTitle.replace("{step}", t.taskAi.step[pending]) : t.taskAi.badgeIdle;
+  const failure = task.ai?.failure;
+  let label: string | null = null;
+  let tone = "";
+  let title = t.taskAi.badgeIdle;
+  if (failure) {
+    label = t.taskAi.failedBadge;
+    tone = " badge-ai-failed";
+    title = t.taskAi.failed.replace("{reason}", failure.reason);
+  } else if (running) {
+    label = t.taskAi.runningBadge.replace("{step}", t.taskAi.step[running]);
+    tone = " badge-ai-running";
+    title = label;
+  } else if (pending) {
+    label = t.taskAi.step[pending];
+    tone = " badge-ai-pending";
+    title = t.taskAi.badgeTitle.replace("{step}", label);
+  }
   return (
-    <span className={`badge badge-ai${pending ? " badge-ai-pending" : ""}`} title={title} aria-label={title}>
+    <span className={`badge badge-ai${tone}`} title={title} aria-label={title}>
       <svg viewBox="0 0 16 16" aria-hidden="true" width="11" height="11">
         <path
           d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4L8 1.5zM12.5 10.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4z"
@@ -316,7 +333,7 @@ function AiBadge({ task }: { task: Task }) {
         />
       </svg>
       {t.taskAi.badge}
-      {pending && <span className="badge-ai-step">· {t.taskAi.step[pending]}</span>}
+      {label && <span className="badge-ai-step">· {label}</span>}
     </span>
   );
 }
