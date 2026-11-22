@@ -704,6 +704,7 @@ export function App() {
           onClose={() => setTaskParam(null, true)}
           onChanged={loadBoard}
           onOpenTask={handleOpenTask}
+          isAdmin={isAdmin}
         />
       )}
 

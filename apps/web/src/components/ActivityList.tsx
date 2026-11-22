@@ -1,5 +1,5 @@
-import { TASK_TYPES } from "@my-planner/core";
-import type { ActivityLogItem, TaskEventType, TaskFieldChange, TaskType } from "@my-planner/core";
+import { AI_NOTIFY_MODES, TASK_TYPES, normalizeAiSteps } from "@my-planner/core";
+import type { ActivityLogItem, AiNotifyMode, TaskEventType, TaskFieldChange, TaskType } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import type { Dictionary } from "../i18n/en";
 
@@ -76,6 +76,14 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
   }
 
   function changeValue(change: TaskFieldChange, value: string | null): string {
+    // Gestione AI: "triage,coder|end" (passi | avvisi), null = spenta.
+    if (change.field === "ai") {
+      if (value === null) return t.taskAi.off;
+      const [steps, notify] = value.split("|");
+      const stepText = normalizeAiSteps(steps.split(",")).map((s) => t.taskAi.step[s]).join(" → ");
+      const mode = (AI_NOTIFY_MODES as readonly string[]).includes(notify) ? t.taskAi.notifyMode[notify as AiNotifyMode] : "";
+      return mode ? `${stepText} · ${mode}` : stepText;
+    }
     if (value === null) return "—";
     if (change.field === "dueDate") return formatDate(value);
     if (change.field === "type" && (TASK_TYPES as readonly string[]).includes(value)) {

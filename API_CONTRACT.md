@@ -296,6 +296,16 @@ Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta un
 - 404 `NOT_FOUND`
 - 400 `VALIDATION_ERROR` se `parentId` creerebbe un annidamento a più livelli, un self-parenting, o se il task ha già proprie sotto-task (non può diventare a sua volta una sotto-task)
 
+### `PUT /tasks/:taskId/ai` (solo admin)
+Gestione AI del task: il task viene lavorato da un modello nei passi scelti, ognuno legato alla colonna da cui parte.
+- Body: `{ "enabled": boolean, "steps"?: ("triage"|"coder"|"reviewer")[], "notify"?: "end"|"each"|"none" }`. Con `enabled: true` serve almeno un passo (400 `VALIDATION_ERROR`); i passi vengono normalizzati nell'ordine triage -> coder -> reviewer, senza doppioni.
+- Passi: **triage** lavora su `draft` (-> `todo`), **coder** su `todo` (-> `testing`), **reviewer** su `testing` (-> `done`, oppure di nuovo `todo` se rimanda indietro). Il passo in attesa e' quello che parte dalla colonna corrente (`aiPendingStep` in `@my-planner/core`); spostare il task a mano non spegne la gestione AI.
+- `notify`: avvisi al destinatario alla fine del percorso (`end`), a ogni cambio di stato (`each`) o mai (`none`). Il destinatario (`watcherId`) e' l'admin che salva con `enabled: true`.
+- Spegnere (`enabled: false`) conserva passi e modalita'. Ogni cambio scrive un evento `task.updated` con `changes: [{ field: "ai", from, to }]` (`"triage,coder|end"`, `null` = spenta).
+- 200: `Task`. 403 per i manager.
+- Ogni `Task` restituito (REST e MCP) include `ai: { enabled, steps, notify, watcherId, watcherName }`.
+- Esecuzione dei passi da parte degli agenti, notifiche push e tool MCP dedicati: fasi successive.
+
 ### `POST /tasks/:taskId/move`
 - Body: `{ "status": "draft"|"todo"|"in_progress"|"testing"|"done"|<stato personalizzato>, "position"?: number }` (vedi §3 Stati personalizzati)
 - `position` opzionale: indice manuale nella colonna target (drag&drop); se omesso, il task va in coda alla colonna.

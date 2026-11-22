@@ -1,4 +1,4 @@
-import { isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
+import { aiPendingStep, isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
 import { useI18n } from "../i18n";
 import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
@@ -165,6 +165,7 @@ export function TaskCard({
           {PRIORITY_LABEL[task.priority]}
         </span>
         {task.complexity != null && <span className="badge badge-complexity">{task.complexity}</span>}
+        {task.ai?.enabled && <AiBadge task={task} />}
         {task.parentId && (
           <span
             className="badge badge-parent"
@@ -298,5 +299,24 @@ export function TaskCard({
         )}
       </div>
     </div>
+  );
+}
+
+/** Badge "AI" sulla card: con il passo in attesa sulla colonna corrente, se c'e'. */
+function AiBadge({ task }: { task: Task }) {
+  const { t } = useI18n();
+  const pending = aiPendingStep(task);
+  const title = pending ? t.taskAi.badgeTitle.replace("{step}", t.taskAi.step[pending]) : t.taskAi.badgeIdle;
+  return (
+    <span className={`badge badge-ai${pending ? " badge-ai-pending" : ""}`} title={title} aria-label={title}>
+      <svg viewBox="0 0 16 16" aria-hidden="true" width="11" height="11">
+        <path
+          d="M8 1.5l1.4 3.6 3.6 1.4-3.6 1.4L8 11.5 6.6 7.9 3 6.5l3.6-1.4L8 1.5zM12.5 10.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6.6-1.4z"
+          fill="currentColor"
+        />
+      </svg>
+      {t.taskAi.badge}
+      {pending && <span className="badge-ai-step">· {t.taskAi.step[pending]}</span>}
+    </span>
   );
 }
