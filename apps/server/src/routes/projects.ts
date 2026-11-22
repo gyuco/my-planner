@@ -1,11 +1,12 @@
 import type { FastifyInstance } from "fastify";
+import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
 import { apiError } from "@my-planner/core";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
 import { createProject, renameProject, updateProject, archiveProject, unarchiveProject } from "../services/taskService.js";
-import { assertProjectAccess, listProjectsForUser } from "../services/userService.js";
-import { projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import { assertAdmin, assertProjectAccess, listProjectsForUser } from "../services/userService.js";
+import { aiRoutineInputSchema, projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 import {
   createProjectStatus,
   deleteProjectStatus,
@@ -118,5 +119,30 @@ export async function projectRoutes(app: FastifyInstance) {
     }
     const updated = await prisma.projectToken.update({ where: { id: tokenId }, data: { revokedAt: new Date() } });
     return { id: updated.id, revokedAt: updated.revokedAt };
+  });
+
+  // Routine Claude Code per l'avvio automatico dei passi AI (solo admin).
+  app.get("/projects/:projectId/ai-routine", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
+    return getRoutineConfig(projectId);
+  });
+
+  app.put("/projects/:projectId/ai-routine", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
+    return setRoutineConfig(projectId, aiRoutineInputSchema.parse(req.body ?? {}));
+  });
+
+  app.delete("/projects/:projectId/ai-routine", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
+    return clearRoutineConfig(projectId);
+  });
+
+  app.post("/projects/:projectId/ai-routine/run", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
+    return dispatchProject(projectId, { force: true });
   });
 }

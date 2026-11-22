@@ -665,6 +665,14 @@ Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
 - `ai_fail { taskId, reason }` → `Task`: commento, il task resta dov'è, percorso fermato. Evento `ai.failed` (notificabile: campanella, email, push) al destinatario della gestione AI, salvo `notify = none` o se è l'autore.
 - Nuovi tipi di evento: `ai.step_started` (solo log), `ai.failed` (log + notifica). Gli item di notifiche e log hanno `aiStep`.
 
+### Avvio automatico dei passi AI (routine Claude Code, solo admin)
+- `GET /projects/:projectId/ai-routine` → `{ configured, routineId, lastFiredAt, lastError, lastSessionUrl, prompt }`. `prompt` è il testo da incollare nella routine (istruzioni per lavorare la coda con i tool `ai_*`).
+- `PUT /projects/:projectId/ai-routine` body `{ routineId: "trig_…", token? }`: il token del trigger API della routine è salvato cifrato (secretBox) e non viene mai restituito; omesso = resta quello salvato.
+- `DELETE /projects/:projectId/ai-routine`: rimuove la configurazione.
+- `POST /projects/:projectId/ai-routine/run` → `{ fired, taskIds, sessionUrl, reason }`: avvia subito la routine per tutti i task in attesa (anche se già avviati di recente).
+- Avvio automatico: dopo un cambio di stato o una modifica della gestione AI fatti da un utente (non dagli agenti MCP), se il progetto ha la routine configurata, il server chiama `POST https://api.anthropic.com/v1/claude_code/routines/{id}/fire` con `{ text }` che contiene solo `projectId` e `taskId (step)` dei task in attesa. Una chiamata per progetto; lo stesso passo non viene riavviato prima di 30 minuti. Errori (token rifiutato, 429 con `Retry-After`, rete) salvati in `lastError`. Ogni `Task.ai.dispatch` riporta `{ step, at, sessionUrl }` dell'ultimo avvio.
+- I progetti esposti da REST e MCP non includono mai le colonne della routine: solo `aiRoutineConfigured: boolean`.
+
 ### Repository GitHub del progetto
 - `PATCH /projects/:projectId` accetta `{ name?, repoUrl? }` (almeno uno). `repoUrl` accetta `owner/repo`, `github.com/owner/repo`, URL https anche con `.git`; viene salvato come `https://github.com/owner/repo`. `null`/`""` lo toglie. `Project.repoUrl` è esposto da REST, `list_projects` e `list_ai_tasks`.
 

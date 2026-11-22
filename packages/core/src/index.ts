@@ -123,6 +123,27 @@ export interface Project {
   createdAt: string;
   /** Repository GitHub (https://github.com/owner/repo) dove lavorano gli agenti AI. */
   repoUrl?: string | null;
+  /** true se e' configurata la routine Claude Code per l'avvio automatico dei passi AI. */
+  aiRoutineConfigured?: boolean;
+}
+
+/** Configurazione della routine di un progetto (GET /projects/:id/ai-routine, solo admin). */
+export interface AiRoutineConfig {
+  configured: boolean;
+  routineId: string | null;
+  lastFiredAt: string | null;
+  lastError: string | null;
+  lastSessionUrl: string | null;
+  /** Prompt da incollare nella routine. */
+  prompt: string;
+}
+
+/** Esito di un avvio della routine (POST /projects/:id/ai-routine/run). */
+export interface AiDispatchResult {
+  fired: boolean;
+  taskIds: string[];
+  sessionUrl: string | null;
+  reason: string | null;
 }
 
 /** Riepilogo di una sotto-task, presente solo nell'array `subtasks` del dettaglio (GET /tasks/:taskId). */
@@ -207,6 +228,8 @@ export interface TaskAi {
   rejectCount?: number;
   /** Percorso fermato (ai_fail o troppi rimandi): nessun passo in attesa finche' non si riprende. */
   failure?: { at: string; reason: string } | null;
+  /** Ultimo avvio automatico (routine Claude Code): passo, quando, link alla sessione. */
+  dispatch?: { step: AiStep | null; at: string; sessionUrl: string | null } | null;
 }
 
 /** Input di PUT /tasks/:taskId/ai (solo admin). */
