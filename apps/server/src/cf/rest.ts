@@ -75,6 +75,7 @@ import {
   sendBackTaskInputSchema,
   taskAiInputSchema,
   pushSubscriptionInputSchema,
+  aiRoutineInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -99,6 +100,7 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 import { getVapidPublicKey, listDevices, removeDevice, sendTestPush, subscribeDevice } from "../services/pushService.js";
+import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -297,6 +299,25 @@ export function buildRestApp() {
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
     const body = projectUpdateInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await updateProject(c.req.param("projectId"), body));
+  });
+
+  // Routine Claude Code per l'avvio automatico dei passi AI (solo admin).
+  app.get("/projects/:projectId/ai-routine", async (c) => {
+    assertAdmin(c.get("user"));
+    return c.json(await getRoutineConfig(c.req.param("projectId")));
+  });
+  app.put("/projects/:projectId/ai-routine", async (c) => {
+    assertAdmin(c.get("user"));
+    const body = aiRoutineInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await setRoutineConfig(c.req.param("projectId"), body));
+  });
+  app.delete("/projects/:projectId/ai-routine", async (c) => {
+    assertAdmin(c.get("user"));
+    return c.json(await clearRoutineConfig(c.req.param("projectId")));
+  });
+  app.post("/projects/:projectId/ai-routine/run", async (c) => {
+    assertAdmin(c.get("user"));
+    return c.json(await dispatchProject(c.req.param("projectId"), { force: true }));
   });
 
   app.post("/projects/:projectId/archive", async (c) => {

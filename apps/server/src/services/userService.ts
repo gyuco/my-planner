@@ -8,6 +8,7 @@ import {
 } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
 import { initNotificationStateForUser } from "./notificationService.js";
+import { serializeProject } from "./projectSerializer.js";
 
 /**
  * Gestione utenti e autorizzazione per progetto, condivisa tra runtime Node
@@ -123,10 +124,11 @@ export async function listProjectsForUser(user: AuthUser, includeArchived = fals
   if (!isAdmin(user)) {
     where.members = { some: { userId: user.id } };
   }
-  return prisma.project.findMany({
+  const rows = await prisma.project.findMany({
     where,
     orderBy: { createdAt: "asc" },
   });
+  return rows.map(serializeProject);
 }
 
 /**

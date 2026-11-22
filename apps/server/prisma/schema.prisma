@@ -71,6 +71,14 @@ model Project {
   // Repository GitHub del progetto (https://github.com/owner/repo): dove gli
   // agenti AI (coder/reviewer) lavorano. Facoltativo.
   repoUrl   String?
+  // Avvio automatico dei passi AI (routine di Claude Code con trigger API):
+  // id della routine (trig_...) e token del trigger, cifrato con secretBox.
+  // Il token in chiaro non esce mai dal server.
+  aiRoutineId             String?
+  aiRoutineTokenEncrypted String?
+  aiRoutineLastFiredAt    DateTime?
+  aiRoutineLastError      String?
+  aiRoutineLastSessionUrl String?
   createdAt DateTime @default(now())
 
   tasks    Task[]
@@ -168,6 +176,11 @@ model Task {
   aiRejectCount  Int       @default(0)
   aiFailedAt     DateTime?
   aiFailReason   String?
+  // Ultimo avvio automatico (routine) per il passo in attesa: evita di
+  // avviare piu' sessioni per lo stesso passo.
+  aiDispatchedStep String?
+  aiDispatchedAt   DateTime?
+  aiSessionUrl     String?
 
   // Sotto-task: un solo livello di annidamento (una subtask non puo' a sua
   // volta avere subtasks, vedi validazione in taskService.ts). Nessun

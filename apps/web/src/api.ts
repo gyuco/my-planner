@@ -3,6 +3,8 @@ import type {
   Board,
   Project,
   ProjectToken,
+  AiRoutineConfig,
+  AiDispatchResult,
   PushDevice,
   TaskAiInput,
   UserMcpToken,
@@ -193,6 +195,23 @@ export function createProject(name: string): Promise<Project> {
 
 export function renameProject(projectId: string, name: string): Promise<Project> {
   return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
+/** Routine Claude Code del progetto per l'avvio automatico dei passi AI (solo admin). */
+export function getAiRoutine(projectId: string): Promise<AiRoutineConfig> {
+  return apiFetch(`/projects/${projectId}/ai-routine`);
+}
+
+export function saveAiRoutine(projectId: string, input: { routineId: string; token?: string | null }): Promise<AiRoutineConfig> {
+  return apiFetch(`/projects/${projectId}/ai-routine`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function removeAiRoutine(projectId: string): Promise<AiRoutineConfig> {
+  return apiFetch(`/projects/${projectId}/ai-routine`, { method: "DELETE" });
+}
+
+export function runAiRoutine(projectId: string): Promise<AiDispatchResult> {
+  return apiFetch(`/projects/${projectId}/ai-routine/run`, { method: "POST" });
 }
 
 /** Repository GitHub del progetto (null o "" per toglierlo). */

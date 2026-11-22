@@ -11,6 +11,7 @@ import {
 } from "../api";
 import { useI18n } from "../i18n";
 import { ProjectStatusesSection } from "./ProjectStatusesSection";
+import { AiRoutineSection } from "./AiRoutineSection";
 import { mcpBaseUrl } from "../lib/mcp";
 
 interface ProjectSettingsModalProps {
@@ -19,9 +20,11 @@ interface ProjectSettingsModalProps {
   onChanged: () => void;
   /** Stati personalizzati creati/rinominati/cancellati. */
   onStatusesChanged?: () => void;
+  /** La sezione dell'avvio automatico AI (routine) e' solo per gli admin. */
+  isAdmin?: boolean;
 }
 
-export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesChanged }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesChanged, isAdmin = false }: ProjectSettingsModalProps) {
   const { t, formatDate } = useI18n();
   const [name, setName] = useState(project.name);
   const [renaming, setRenaming] = useState(false);
@@ -217,6 +220,8 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
         </section>
 
         <ProjectStatusesSection projectId={project.id} onChanged={() => onStatusesChanged?.()} />
+
+        {isAdmin && <AiRoutineSection project={project} />}
 
         <section className="drawer-section">
           <h3>{t.projectSettings.mcpTokens}</h3>

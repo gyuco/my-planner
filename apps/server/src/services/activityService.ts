@@ -15,6 +15,7 @@ import {
 } from "./notificationService.js";
 import { queueTaskEventEmail } from "./emailNotificationService.js";
 import { queueTaskEventPush } from "./pushService.js";
+import { queueAiDispatch } from "./aiRoutineService.js";
 
 /**
  * Log attivita': ogni mutazione rilevante di un task scrive una riga in
@@ -41,6 +42,13 @@ export async function emitEvent(input: RecordTaskEventInput): Promise<void> {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[my-planner] impossibile registrare l'evento di attivita'", err);
+  }
+  try {
+    // Avvio automatico dei passi AI (routine Claude Code), solo se configurata.
+    await queueAiDispatch(input);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[my-planner] impossibile accodare l'avvio della routine AI", err);
   }
   if (!NOTIFIABLE.has(input.type)) return;
   try {
