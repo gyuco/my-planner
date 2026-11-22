@@ -6,6 +6,7 @@ import {
   createProjectToken,
   listProjectTokens,
   renameProject,
+  setProjectRepo,
   revokeProjectToken,
 } from "../api";
 import { useI18n } from "../i18n";
@@ -25,6 +26,10 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
   const [name, setName] = useState(project.name);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [repoUrl, setRepoUrl] = useState(project.repoUrl ?? "");
+  const [savingRepo, setSavingRepo] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
+  const [repoSaved, setRepoSaved] = useState(false);
 
   const [tokens, setTokens] = useState<ProjectToken[]>([]);
   const [tokensError, setTokensError] = useState<string | null>(null);
@@ -65,6 +70,23 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
       setRenameError(err instanceof ApiRequestError ? err.message : t.projectSettings.renameError);
     } finally {
       setRenaming(false);
+    }
+  }
+
+  async function handleSaveRepo(e: React.FormEvent) {
+    e.preventDefault();
+    setRepoError(null);
+    setRepoSaved(false);
+    setSavingRepo(true);
+    try {
+      const updated = await setProjectRepo(project.id, repoUrl.trim() || null);
+      setRepoUrl(updated.repoUrl ?? "");
+      setRepoSaved(true);
+      onChanged();
+    } catch (err) {
+      setRepoError(err instanceof ApiRequestError ? err.message : t.projectSettings.repoError);
+    } finally {
+      setSavingRepo(false);
     }
   }
 
@@ -168,6 +190,30 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
             </button>
           </form>
           {renameError && <p className="login-error">{renameError}</p>}
+
+          <label htmlFor="project-repo" className="field-label repo-label">
+            {t.projectSettings.repo}
+          </label>
+          <form className="drawer-inline-form" onSubmit={handleSaveRepo}>
+            <input
+              id="project-repo"
+              value={repoUrl}
+              onChange={(e) => {
+                setRepoUrl(e.target.value);
+                setRepoSaved(false);
+              }}
+              placeholder={t.projectSettings.repoPlaceholder}
+              maxLength={300}
+              inputMode="url"
+              autoComplete="off"
+            />
+            <button type="submit" disabled={savingRepo || repoUrl.trim() === (project.repoUrl ?? "")}>
+              {savingRepo ? t.projectSettings.saving : t.projectSettings.repoSave}
+            </button>
+          </form>
+          <p className="ai-hint">{t.projectSettings.repoHint}</p>
+          {repoSaved && <p className="profile-saved">{t.projectSettings.repoSaved}</p>}
+          {repoError && <p className="login-error">{repoError}</p>}
         </section>
 
         <ProjectStatusesSection projectId={project.id} onChanged={() => onStatusesChanged?.()} />

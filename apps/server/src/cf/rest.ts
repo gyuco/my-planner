@@ -29,6 +29,7 @@ import {
 import {
   createProject,
   renameProject,
+  updateProject,
   archiveProject,
   unarchiveProject,
   listTasks,
@@ -77,6 +78,7 @@ import {
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
+  projectUpdateInputSchema,
   projectTokenInputSchema,
   projectStatusInputSchema,
   boardFiltersQuerySchema,
@@ -293,8 +295,8 @@ export function buildRestApp() {
 
   app.patch("/projects/:projectId", async (c) => {
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
-    const { name } = projectNameInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await renameProject(c.req.param("projectId"), name));
+    const body = projectUpdateInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await updateProject(c.req.param("projectId"), body));
   });
 
   app.post("/projects/:projectId/archive", async (c) => {

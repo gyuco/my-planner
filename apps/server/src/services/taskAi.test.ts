@@ -17,7 +17,16 @@ async function setup() {
 describe("gestione AI del task", () => {
   it("di default un task non e' AI", async () => {
     const { task } = await setup();
-    expect(task.ai).toEqual({ enabled: false, steps: [], notify: "end", watcherId: null, watcherName: null });
+    expect(task.ai).toEqual({
+      enabled: false,
+      steps: [],
+      notify: "end",
+      watcherId: null,
+      watcherName: null,
+      running: null,
+      rejectCount: 0,
+      failure: null,
+    });
   });
 
   it("attiva con passi normalizzati, avvisi e destinatario; il log registra il cambio", async () => {

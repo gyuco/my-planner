@@ -313,7 +313,8 @@ Gestione AI del task: il task viene lavorato da un modello nei passi scelti, ogn
 - Spegnere (`enabled: false`) conserva passi e modalita'. Ogni cambio scrive un evento `task.updated` con `changes: [{ field: "ai", from, to }]` (`"triage,coder|end"`, `null` = spenta).
 - 200: `Task`. 403 per i manager.
 - Ogni `Task` restituito (REST e MCP) include `ai: { enabled, steps, notify, watcherId, watcherName }`.
-- Esecuzione dei passi da parte degli agenti, notifiche push e tool MCP dedicati: fasi successive.
+- `ai` include anche lo stato di esecuzione: `running` (`{ step, startedAt }`, passo preso in carico; scade dopo 60 minuti), `rejectCount` (rimandi del reviewer nel giro corrente) e `failure` (`{ at, reason }`, percorso fermato). Salvare la configurazione (o "Riprendi" nella UI) azzera fallimento, blocco e rimandi; anche uno spostamento fatto da un utente libera il blocco e riprende il percorso.
+- Esecuzione dei passi da parte degli agenti: tool MCP `ai_*` (§7, "Gestione AI").
 
 ### `POST /tasks/:taskId/move`
 - Body: `{ "status": "draft"|"todo"|"in_progress"|"testing"|"done"|<stato personalizzato>, "position"?: number }` (vedi §3 Stati personalizzati)
@@ -654,6 +655,18 @@ z.object({
 - **Nessun `get_aggregated_board` via MCP** (per costruzione: il token è scoped a un progetto).
 
 ---
+
+### Gestione AI (tool `ai_*`, server di progetto e globale)
+Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
+- `list_ai_tasks { step?, projectId? (solo globale) }` → `[{ taskId, projectId, projectName, repoUrl, title, status, step, priority, type, rejectCount }]`: task con un passo in attesa (triage su `draft`, coder su `todo` senza blocchi aperti, reviewer su `testing`), esclusi quelli presi in carico (blocco non scaduto) o fermati e i progetti archiviati; ordinati per priorità.
+- `ai_start_step { taskId, step? }` → `Task`: prende in carico il passo in attesa (blocco 60 min, evento `ai.step_started`). `CONFLICT` se già in carico o fermato, `DEPENDENCY_BLOCKED` per il coder con blocchi aperti, `VALIDATION_ERROR` se nessun passo è in attesa o `step` non coincide.
+- `ai_complete_step { taskId, summary }` → `Task`: commento `🤖 <Passo> completato` + spostamento (triage → `todo`, coder → `testing`, reviewer → `done`, che azzera i rimandi). Funziona anche senza `ai_start_step`. `CONFLICT` se il task non è più nella colonna del passo.
+- `ai_reject { taskId, reason }` → `Task`: solo reviewer; commento + ritorno in `todo`, `rejectCount + 1`. Al 3° rimando il percorso si ferma (`ai.failed`).
+- `ai_fail { taskId, reason }` → `Task`: commento, il task resta dov'è, percorso fermato. Evento `ai.failed` (notificabile: campanella, email, push) al destinatario della gestione AI, salvo `notify = none` o se è l'autore.
+- Nuovi tipi di evento: `ai.step_started` (solo log), `ai.failed` (log + notifica). Gli item di notifiche e log hanno `aiStep`.
+
+### Repository GitHub del progetto
+- `PATCH /projects/:projectId` accetta `{ name?, repoUrl? }` (almeno uno). `repoUrl` accetta `owner/repo`, `github.com/owner/repo`, URL https anche con `.git`; viene salvato come `https://github.com/owner/repo`. `null`/`""` lo toglie. `Project.repoUrl` è esposto da REST, `list_projects` e `list_ai_tasks`.
 
 ## 8. Modifiche allo schema Prisma
 

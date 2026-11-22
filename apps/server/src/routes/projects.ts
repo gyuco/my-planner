@@ -3,9 +3,9 @@ import { apiError } from "@my-planner/core";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
-import { createProject, renameProject, archiveProject, unarchiveProject } from "../services/taskService.js";
+import { createProject, renameProject, updateProject, archiveProject, unarchiveProject } from "../services/taskService.js";
 import { assertProjectAccess, listProjectsForUser } from "../services/userService.js";
-import { projectNameInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import { projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 import {
   createProjectStatus,
   deleteProjectStatus,
@@ -30,8 +30,7 @@ export async function projectRoutes(app: FastifyInstance) {
   app.patch("/projects/:projectId", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
     await assertProjectAccess((req as any).authUser, projectId);
-    const { name } = projectNameInputSchema.parse(req.body ?? {});
-    return renameProject(projectId, name);
+    return updateProject(projectId, projectUpdateInputSchema.parse(req.body ?? {}));
   });
 
   app.post("/projects/:projectId/archive", { onRequest: [app.authenticate] }, async (req) => {

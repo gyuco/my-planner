@@ -90,6 +90,9 @@ export function renderTaskEventEmail(
     case "comment.created":
       summary = `${ctx.actorName} ha commentato "${title}"`;
       break;
+    case "ai.failed":
+      summary = `Gestione AI fermata su "${title}"`;
+      break;
     default:
       summary = `${ctx.actorName} ha aggiornato "${title}"`;
   }

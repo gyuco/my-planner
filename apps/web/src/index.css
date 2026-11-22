@@ -3914,3 +3914,27 @@ body.dnd-dragging * {
   color: var(--info);
   font-size: 0.84rem;
 }
+
+/* Gestione AI: passo in corso / percorso fermato */
+.badge-ai-running {
+  color: var(--surface);
+  background: var(--ochre-400);
+  border-color: var(--ochre-400);
+}
+.badge-ai-failed {
+  color: var(--surface);
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.ai-running { margin: 0; font-size: 0.82rem; color: var(--warning); font-weight: 600; }
+.ai-failure {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--r-md);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+.notifications-dot-ai-failed { background: var(--danger); }
+.repo-label { display: block; margin-top: 0.75rem; }
