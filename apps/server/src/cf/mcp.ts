@@ -51,6 +51,9 @@ async function resolveTokenOrReject<T>(request: Request, resolve: (token: string
   try {
     return await resolve(token);
   } catch {
+    // Diagnostica (Workers Logs): che tipo di token e' stato rifiutato, mai il valore.
+    const kind = token.startsWith("mpu_") ? "globale" : "di progetto/altro";
+    console.warn(`MCP ${new URL(request.url).pathname}: token ${kind} rifiutato (non valido o revocato)`);
     return tokenError(request, "Token MCP non valido o revocato");
   }
 }

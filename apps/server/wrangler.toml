@@ -7,6 +7,12 @@ main = "src/cf/index.ts"
 compatibility_date = "2025-07-18"
 compatibility_flags = ["nodejs_compat"]
 
+# ---- Workers Logs ------------------------------------------------------------
+# console.log/warn del Worker consultabili dalla dashboard Cloudflare
+# (Workers -> my-planner -> Logs), es. i token rifiutati su /mcp/global.
+[observability]
+enabled = true
+
 # ---- Binding D1 (DB principale, sostituisce SQLite) -------------------------
 [[d1_databases]]
 binding = "DB"
