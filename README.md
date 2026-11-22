@@ -185,6 +185,22 @@ errore esplicito prima di toccare la produzione.
 
 I token si generano/revocano dalla UI, uno per progetto.
 
+### MCP globale (tutti i progetti)
+
+Un unico connector che vede tutti i progetti dell'utente (admin: tutti; manager:
+quelli assegnati). URL: `<MCP_HTTP_BASE_URL>/mcp/global` (lo trovi già pronto in
+**Profilo → MCP globale**).
+
+- **Claude web / desktop / mobile:** Impostazioni → Connectors → aggiungi un
+  connector personalizzato con quell'URL. Al primo collegamento si apre la pagina
+  web di My Planner: accedi con email e password e il connector è autorizzato.
+- **Claude Code:** `claude mcp add --transport http my-planner <url>/mcp/global`,
+  poi `/mcp` → autenticazione nel browser.
+
+Nessun token da copiare: il permesso si concede solo dal link web (OAuth con PKCE)
+e ogni connessione si revoca da **Profilo → MCP globale**. Su Cloudflare serve la
+migrazione D1 `0014_add_user_mcp_tokens.sql` (applicata dal deploy CI, oppure `npm run --workspace apps/server d1:migrate:remote`).
+
 ## Standup giornaliero (Cron Trigger + Gmail)
 
 Il Worker CF invia ogni giorno alle 06:00 UTC (`apps/server/wrangler.toml`

@@ -257,6 +257,15 @@ export interface EmailSettings {
   updatedAt: string | null;
 }
 
+/** Connector MCP globale dell'utente (/mcp/global), creato col login web OAuth. */
+export interface UserMcpToken {
+  id: string;
+  label: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 export interface ProjectToken {
   id: string;
   projectId: string;

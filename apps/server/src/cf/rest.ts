@@ -92,7 +92,7 @@ import {
   projectStatsQuerySchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
-import { hashToken } from "../mcp/auth.js";
+import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -214,6 +214,16 @@ export function buildRestApp() {
   });
 
   app.delete("/auth/me/avatar", async (c) => c.json(await setOwnAvatar(c.get("user").id, null)));
+
+  // Connector MCP globali (/mcp/global): creati solo dal login web OAuth,
+  // qui solo elenco e revoca (stesse regole del runtime Node).
+  app.get("/auth/me/mcp-tokens", async (c) => c.json(await listUserMcpTokens(c.get("user").id)));
+
+  app.delete("/auth/me/mcp-tokens/:tokenId", async (c) => {
+    const revoked = await revokeUserMcpToken(c.get("user").id, c.req.param("tokenId"));
+    if (!revoked) throw new ApiErrorException("NOT_FOUND", "Token non trovato");
+    return c.json(revoked);
+  });
 
   app.get("/avatars/:userId", async (c) =>
     c.json(await getUserAvatar(c.get("user"), c.req.param("userId"))),

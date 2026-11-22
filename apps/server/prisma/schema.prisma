@@ -47,6 +47,7 @@ model User {
   taskEvents TaskEvent[]
   assignedTasks Task[] @relation("TaskAssignee")
   ownedTasks    Task[] @relation("TaskOwner")
+  mcpTokens     UserMcpToken[]
 }
 
 // Associazione manager <-> progetto (molti-a-molti). Per gli admin non viene
@@ -99,6 +100,23 @@ model ProjectToken {
   label     String?
   createdAt DateTime  @default(now())
   revokedAt DateTime?
+}
+
+// Token MCP globale di un utente: accesso a tutti i progetti che l'utente
+// vede (admin: tutti, manager: quelli in UserProject), valutati a ogni
+// richiesta. Si ottiene SOLO col login web OAuth (/authorize con email e
+// password), mai copiandolo dalla UI; la UI lo elenca e lo revoca.
+model UserMcpToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
 }
 
 model Task {

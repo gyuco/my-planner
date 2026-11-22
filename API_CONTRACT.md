@@ -174,6 +174,14 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
   - stdio transport: processo termina con `console.error` + `process.exit(1)` riportando lo stesso messaggio (nessuna risposta JSON-RPC possibile prima della connessione).
 - Ogni tool verifica che le entità coinvolte (task, commento, allegato) appartengano al `projectId` risolto dal token; in caso contrario → `FORBIDDEN` ("... non appartiene al progetto del token").
 
+### MCP globale — token utente (login web)
+- Endpoint: `POST /mcp/global` (Worker e `mcp/http.ts` Node). Un solo connector per **tutti i progetti visibili all'utente**: admin tutti, manager solo quelli in `UserProject`. Ruolo e progetti sono riletti a **ogni chiamata** (togliere un progetto dalla UI vale subito).
+- Il token (`mpu_` + 64 hex, solo l'hash SHA-256 in `UserMcpToken.tokenHash`) si ottiene **solo** dal flusso OAuth del connector: `GET /authorize` con `resource=<origin>/mcp/global` (RFC 8707) o `mode=user` mostra il login email/password di My Planner; dopo PKCE, `POST /token` emette un token nuovo. Non esiste un endpoint REST per crearlo: il permesso passa sempre dal link web. Metadata risorsa: `/.well-known/oauth-protected-resource/mcp/global`; il `401` di `/mcp/global` ha `WWW-Authenticate: Bearer resource_metadata=...` che punta lì.
+- stdio: `MCP_USER_TOKEN` da env (alternativo a `MCP_PROJECT_TOKEN`).
+- Gestione dal profilo (JWT): `GET /auth/me/mcp-tokens` → `[{ id, label, createdAt, lastUsedAt, revokedAt }]`; `DELETE /auth/me/mcp-tokens/:tokenId` → token revocato (404 se non e' dell'utente). Eliminare l'utente elimina i suoi token.
+- Tool: gli stessi di §7, ma i tool a livello progetto (`list_tasks`, `create_task`, `get_board`, `list_statuses`, `list_assignees`) richiedono `projectId`; quelli che partono da `taskId`/`attachmentId` ricavano il progetto dal task. Accesso negato → `FORBIDDEN`. In piu': `list_projects { includeArchived? }` e `get_aggregated_board { projectIds?, priority?, tag?, search?, assigneeId?, ownerId? }` (limitata ai progetti accessibili).
+- `GET /mcp/attachments/:id/download` accetta sia token di progetto sia token globali.
+
 ---
 
 ## 3. REST — Progetti (B6)

@@ -15,7 +15,8 @@ Gestore di progetti e task personale, classico, con board Kanban, utilizzabile i
   - **Bootstrap utente:** al primo avvio, se non esiste nessun utente, il server lo crea leggendo email/password da variabili d'ambiente. Nessuna registrazione self-service, nessun comando manuale richiesto.
   - **Scadenza JWT:** token a lunga scadenza (es. 30 giorni), senza refresh token né blacklist — coerente con utente singolo locale a basso rischio.
 - **MCP:** autenticazione separata tramite **token per progetto**. Un token dà accesso a un solo progetto. I token si creano/revocano dalla UI (Impostazioni progetto → Token MCP).
-  - `get_aggregated_board` **non è esposto via MCP** (incompatibile con lo scope a singolo progetto del token): resta una funzionalità solo UI/JWT. Via MCP resta `get_board`, scoped al progetto del token.
+  - `get_aggregated_board` **non è esposto via MCP di progetto** (incompatibile con lo scope a singolo progetto del token). Via token di progetto resta `get_board`.
+- **MCP globale** (`/mcp/global`): un connector per utente con accesso a tutti i progetti che l'utente vede in UI (admin: tutti; manager: gli assegnati). Si autorizza **solo dal link web**: al collegamento il client (Claude web/desktop/mobile, Claude Code) apre la pagina `/authorize` dove l'utente accede con email e password; nessun token da copiare. Espone gli stessi tool con `projectId` esplicito, più `list_projects` e `get_aggregated_board`. Le connessioni si vedono e si revocano dal profilo.
   - Per lo stesso motivo, anche la **gestione progetti** (creare/rinominare/archiviare/ripristinare) resta solo UI/JWT: non è esposta via MCP.
   - **Transizioni di stato:** libere in entrambe le direzioni (`draft ↔ todo ↔ in_progress ↔ testing ↔ done`); l'unico vincolo è il blocco per dipendenze non risolte all'ingresso in `in_progress`.
   - **Download allegati via MCP:** stesso token MCP del progetto, nessuna autenticazione aggiuntiva.
@@ -57,7 +58,7 @@ Tool esposti, con parità funzionale rispetto alla UI:
 - Dipendenze: `add_dependency`, `remove_dependency`, `list_blockers`
 - Commenti: `add_comment`, `list_comments`
 - Allegati: `list_attachments`, `attach_file`, `get_attachment_url`
-- Board: `get_board` (scoped al progetto del token — nessun equivalente aggregato via MCP)
+- Board: `get_board` (scoped al progetto del token); con l'MCP globale anche `list_projects` e `get_aggregated_board`
 
 ### UI mobile
 - Web responsive, usabile da browser smartphone. Nessuna app nativa.
