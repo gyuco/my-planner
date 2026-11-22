@@ -195,6 +195,11 @@ export function renameProject(projectId: string, name: string): Promise<Project>
   return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ name }) });
 }
 
+/** Repository GitHub del progetto (null o "" per toglierlo). */
+export function setProjectRepo(projectId: string, repoUrl: string | null): Promise<Project> {
+  return apiFetch(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify({ repoUrl }) });
+}
+
 export function archiveProject(projectId: string): Promise<Project> {
   return apiFetch(`/projects/${projectId}/archive`, { method: "POST" });
 }

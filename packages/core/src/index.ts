@@ -121,6 +121,8 @@ export interface Project {
   name: string;
   archived: boolean;
   createdAt: string;
+  /** Repository GitHub (https://github.com/owner/repo) dove lavorano gli agenti AI. */
+  repoUrl?: string | null;
 }
 
 /** Riepilogo di una sotto-task, presente solo nell'array `subtasks` del dettaglio (GET /tasks/:taskId). */
@@ -178,6 +180,19 @@ export const AI_STEP_STATUS: Record<AiStep, TaskStatusKey> = {
   reviewer: "testing",
 };
 
+/** Colonna in cui il task arriva quando il passo si chiude con successo. */
+export const AI_STEP_TARGET: Record<AiStep, TaskStatusKey> = {
+  triage: "todo",
+  coder: "testing",
+  reviewer: "done",
+};
+
+/** Un passo preso in carico da un agente scade dopo questo tempo (agente bloccato o caduto). */
+export const AI_RUN_TTL_MS = 60 * 60 * 1000;
+
+/** Rimandi del reviewer dopo i quali il percorso AI si ferma e avvisa. */
+export const AI_MAX_REJECTS = 3;
+
 export interface TaskAi {
   enabled: boolean;
   /** Passi scelti, nell'ordine triage -> coder -> reviewer. */
@@ -186,6 +201,12 @@ export interface TaskAi {
   /** Destinatario degli avvisi (l'admin che ha attivato la gestione AI). */
   watcherId: string | null;
   watcherName: string | null;
+  /** Passo preso in carico da un agente (ai_start_step), se c'e'. */
+  running?: { step: AiStep; startedAt: string } | null;
+  /** Rimandi del reviewer nel giro corrente (al massimo AI_MAX_REJECTS). */
+  rejectCount?: number;
+  /** Percorso fermato (ai_fail o troppi rimandi): nessun passo in attesa finche' non si riprende. */
+  failure?: { at: string; reason: string } | null;
 }
 
 /** Input di PUT /tasks/:taskId/ai (solo admin). */
@@ -200,9 +221,17 @@ export interface TaskAiInput {
  * si trova, se e' tra i passi scelti. null se la gestione AI e' spenta o se
  * nessun passo parte da quella colonna (es. `in_progress`, `done`).
  */
-export function aiPendingStep(task: { status: string; ai?: TaskAi | null }): AiStep | null {
-  if (!task.ai?.enabled) return null;
+export function aiPendingStep(task: { status: string; ai?: TaskAi | null }, now = Date.now()): AiStep | null {
+  if (!task.ai?.enabled || task.ai.failure) return null;
+  if (aiRunningStep(task, now)) return null;
   return task.ai.steps.find((step) => AI_STEP_STATUS[step] === task.status) ?? null;
+}
+
+/** Passo in corso (preso in carico e non scaduto), se c'e'. */
+export function aiRunningStep(task: { ai?: TaskAi | null }, now = Date.now()): AiStep | null {
+  const running = task.ai?.enabled ? task.ai.running : null;
+  if (!running) return null;
+  return now - new Date(running.startedAt).getTime() < AI_RUN_TTL_MS ? running.step : null;
 }
 
 /** Normalizza un elenco di passi: solo valori validi, senza doppioni, in ordine canonico. */
@@ -363,6 +392,8 @@ export const TASK_EVENT_TYPES = [
   "dependency.removed",
   "attachment.added",
   "attachment.deleted",
+  "ai.step_started",
+  "ai.failed",
 ] as const;
 
 export type TaskEventType = (typeof TASK_EVENT_TYPES)[number];
@@ -376,6 +407,7 @@ export const NOTIFICATION_EVENT_TYPES = [
   "task.status_changed",
   "task.assigned",
   "comment.created",
+  "ai.failed",
 ] as const satisfies readonly TaskEventType[];
 
 /** Campi del task tracciati da un evento `task.updated`. */
@@ -419,6 +451,8 @@ export interface NotificationItem {
   from: TaskStatusKey | null;
   to: TaskStatusKey | null;
   excerpt: string | null;
+  /** Passo AI coinvolto (`ai.*`). */
+  aiStep?: AiStep | null;
   createdAt: string;
 }
 

@@ -1,4 +1,5 @@
 import type {
+  AiStep,
   AuthUser,
   MarkNotificationsReadResponse,
   NotificationItem,
@@ -58,6 +59,8 @@ export interface TaskEventData {
   fileName?: string;
   /** Nuovo assegnatario (`task.assigned`), null se rimosso. */
   assigneeName?: string | null;
+  /** Passo AI (`ai.*`). */
+  aiStep?: AiStep;
 }
 
 export interface RecordTaskEventInput {
@@ -165,6 +168,7 @@ export function serializeEvent(row: any): NotificationItem {
     from: data.from ?? null,
     to: data.to ?? null,
     excerpt: data.excerpt ?? null,
+    aiStep: data.aiStep ?? null,
     createdAt: new Date(row.createdAt).toISOString(),
   };
 }

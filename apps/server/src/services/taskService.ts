@@ -1,5 +1,6 @@
 import {
   AI_NOTIFY_MODES,
+  AI_STEPS,
   ApiErrorException,
   normalizeAiSteps,
   type TaskAi,
@@ -85,12 +86,23 @@ function serializeAi(task: any): TaskAi {
     notify: (AI_NOTIFY_MODES as readonly string[]).includes(task.aiNotify) ? task.aiNotify : "end",
     watcherId: task.aiWatcherId ?? null,
     watcherName: userDisplayName(task.aiWatcher),
+    running:
+      task.aiRunStep && task.aiRunStartedAt && (AI_STEPS as readonly string[]).includes(task.aiRunStep)
+        ? { step: task.aiRunStep, startedAt: new Date(task.aiRunStartedAt).toISOString() }
+        : null,
+    rejectCount: task.aiRejectCount ?? 0,
+    failure: task.aiFailedAt ? { at: new Date(task.aiFailedAt).toISOString(), reason: task.aiFailReason ?? "" } : null,
   };
 }
 
 function serializeTask(task: any): any {
-  const { tags, assignee, owner, aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, ...rest } = task;
-  void aiEnabled; void aiSteps; void aiNotify; void aiWatcherId; void aiWatcher;
+  const {
+    tags, assignee, owner,
+    aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher,
+    aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason,
+    ...rest
+  } = task;
+  void [aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason];
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
   out.ai = serializeAi(task);
   out.assigneeId = task.assigneeId ?? null;
@@ -195,6 +207,34 @@ export async function renameProject(projectId: string, name: string) {
     throw new ApiErrorException("VALIDATION_ERROR", "Il nome del progetto deve avere tra 1 e 200 caratteri");
   }
   return prisma.project.update({ where: { id: projectId }, data: { name } });
+}
+
+/**
+ * Normalizza il repository GitHub del progetto: accetta "owner/repo",
+ * "github.com/owner/repo", URL https (anche con .git o / finale) e
+ * restituisce https://github.com/owner/repo. null/"" = nessun repository.
+ */
+export function normalizeRepoUrl(value: string | null | undefined): string | null {
+  const raw = (value ?? "").trim();
+  if (!raw) return null;
+  const m = raw.match(/^(?:https?:\/\/)?(?:www\.)?(?:github\.com\/)?([A-Za-z0-9-]{1,39})\/([A-Za-z0-9._-]{1,100}?)(?:\.git)?\/?$/);
+  if (!m || (!/github\.com/i.test(raw) && raw.includes("://"))) {
+    throw new ApiErrorException("VALIDATION_ERROR", "Repository non valido: usa https://github.com/owner/repo oppure owner/repo");
+  }
+  return `https://github.com/${m[1]}/${m[2]}`;
+}
+
+export async function updateProject(projectId: string, input: { name?: string; repoUrl?: string | null }) {
+  await getProjectOrThrow(projectId);
+  const data: { name?: string; repoUrl?: string | null } = {};
+  if (input.name !== undefined) {
+    if (input.name.trim().length === 0 || input.name.length > 200) {
+      throw new ApiErrorException("VALIDATION_ERROR", "Il nome del progetto deve avere tra 1 e 200 caratteri");
+    }
+    data.name = input.name;
+  }
+  if (input.repoUrl !== undefined) data.repoUrl = normalizeRepoUrl(input.repoUrl);
+  return prisma.project.update({ where: { id: projectId }, data });
 }
 
 export async function archiveProject(projectId: string) {
@@ -516,7 +556,17 @@ export async function setTaskAi(taskId: string, input: TaskAiInput, watcherId: s
     throw new ApiErrorException("VALIDATION_ERROR", "Scegli almeno un passo AI (triage, coder, reviewer)");
   }
 
-  const data: any = { aiEnabled: input.enabled, aiSteps: steps.join(",") };
+  // Salvare la configurazione riprende anche un percorso fermato: azzera
+  // fallimento, passo in corso e rimandi.
+  const data: any = {
+    aiEnabled: input.enabled,
+    aiSteps: steps.join(","),
+    aiFailedAt: null,
+    aiFailReason: null,
+    aiRunStep: null,
+    aiRunStartedAt: null,
+    aiRejectCount: 0,
+  };
   if (input.notify !== undefined) data.aiNotify = input.notify;
   if (input.enabled) data.aiWatcherId = watcherId;
 
@@ -611,9 +661,16 @@ export async function moveTask(
     targetPosition = (maxPosition._max.position ?? -1) + 1;
   }
 
+  const data: any = { status, position: targetPosition };
+  // Un utente che sposta il task (gestione AI) libera il passo in corso e
+  // riprende un percorso fermato: il passo in attesa diventa quello della
+  // nuova colonna. Gli spostamenti degli agenti passano dai tool ai_*.
+  if (actor.type === "user" && existing.status !== status && (existing.aiRunStep || existing.aiFailedAt)) {
+    Object.assign(data, { aiRunStep: null, aiRunStartedAt: null, aiFailedAt: null, aiFailReason: null });
+  }
   const updated = await prisma.task.update({
     where: { id: taskId },
-    data: { status, position: targetPosition },
+    data,
     include: TASK_INCLUDE,
   });
 

@@ -154,6 +154,12 @@ export const en = {
     createError: "Error creating the project",
   },
   projectSettings: {
+    repo: "GitHub repository",
+    repoPlaceholder: "https://github.com/owner/repo",
+    repoHint: "Where AI agents (coder and reviewer) work. owner/repo also works.",
+    repoSave: "Save repository",
+    repoSaved: "Repository updated",
+    repoError: "Invalid repository",
     statuses: "Statuses",
     statusesHint: "The 5 base statuses are fixed. Custom statuses (e.g. Blocking) appear as board columns between In progress and Testing and can be used via MCP by key or name.",
     statusPlaceholder: "New status name (e.g. Blocking)",
@@ -326,6 +332,13 @@ export const en = {
     error: "Unable to enable push notifications",
   },
   taskAi: {
+    running: "{step} running for {minutes} min",
+    runningBadge: "{step} running",
+    failedBadge: "stopped",
+    failed: "AI handling stopped: {reason}",
+    resume: "Resume",
+    resumed: "AI handling resumed",
+    rejects: "Reviewer send-backs: {count}/{max}",
     title: "AI handling",
     enable: "Handle with an AI model",
     steps: "Steps",
@@ -495,6 +508,7 @@ export const en = {
     assigned: '{actor} assigned you "{title}"',
     statusChanged: '{actor} moved "{title}" from {from} to {to}',
     commented: '{actor} commented on "{title}"',
+    aiFailed: "AI handling stopped on \"{title}\"",
     close: "Close notifications",
   },
   activity: {
@@ -532,6 +546,8 @@ export const en = {
       dependencyRemoved: "Dependency removed",
       attachmentAdded: "Attachment added",
       attachmentDeleted: "Attachment deleted",
+      aiStarted: "AI: step started",
+      aiFailed: "AI: stopped",
     },
     messages: {
       created: '{actor} created "{title}"',
@@ -545,6 +561,8 @@ export const en = {
       dependencyRemoved: '{actor} removed the block of "{related}" on "{title}"',
       attachmentAdded: '{actor} attached "{file}" to "{title}"',
       attachmentDeleted: '{actor} removed "{file}" from "{title}"',
+      aiStarted: "{actor} took \"{title}\" ({step})",
+      aiFailed: "AI handling stopped on \"{title}\" ({step})",
     },
     fields: {
       type: "Type",

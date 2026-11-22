@@ -19,6 +19,8 @@ import {
   createSubtasks,
 } from "../services/taskService.js";
 import { createAttachment, listAttachments, getAttachmentOrThrow, getAttachmentUrl } from "../services/attachmentService.js";
+import { completeAiStep, failAiStep, listAiQueue, rejectAiStep, startAiStep } from "../services/aiService.js";
+import { AI_STEPS } from "@my-planner/core";
 import {
   assertProjectAccess,
   getAuthUser,
@@ -67,6 +69,8 @@ interface McpScope {
   assertTask(taskId: string): Promise<{ id: string; projectId: string }>;
   /** Frase usata nelle descrizioni dei tool per indicare il progetto. */
   projectRef: string;
+  /** Progetti della coda AI: projectId (verificato) o tutti quelli accessibili. */
+  queueProjectIds(projectId?: string): Promise<string[] | undefined>;
 }
 
 /**
@@ -90,6 +94,7 @@ export function createProjectMcpServer(projectId: string) {
       return task;
     },
     projectRef: "del progetto associato al token",
+    queueProjectIds: async () => [projectId],
   });
 }
 
@@ -124,6 +129,14 @@ export function createGlobalMcpServer(userId: string) {
         return task;
       },
       projectRef: "del progetto indicato da projectId",
+      async queueProjectIds(requested) {
+        const user = await currentUser();
+        if (requested) {
+          await assertProjectAccess(user, requested);
+          return [requested];
+        }
+        return restrictProjectIds(user, undefined);
+      },
     },
     (server, { withErrors }) => {
       server.tool(
@@ -137,6 +150,7 @@ export function createGlobalMcpServer(userId: string) {
             return projects.map((p) => ({
               id: p.id,
               name: p.name,
+              repoUrl: p.repoUrl ?? null,
               archived: p.archived,
               createdAt: p.createdAt.toISOString(),
             }));
@@ -442,6 +456,76 @@ function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: 
     },
     async ({ projectId: _p, ...filters }) =>
       withErrors(async () => getBoard(await scope.resolveProject({ projectId: _p }), filters))
+  );
+
+  // --- Gestione AI (passi triage / coder / reviewer) ----------------------
+
+  const AI_WORKFLOW =
+    "Flusso dei task gestiti da AI: list_ai_tasks per la coda -> ai_start_step per prendere il task (blocco 60 min) -> " +
+    "lavoro (triage: analizza e arricchisci il task con update_task; coder: implementa nel repository del progetto su un branch " +
+    "dedicato e apri una PR; reviewer: rivedi la PR) -> ai_complete_step con il riepilogo (il server sposta il task: " +
+    "triage Draft->TODO, coder TODO->Testing, reviewer Testing->Done), oppure ai_reject (solo reviewer: torna in TODO) " +
+    "o ai_fail se non riesci a completare. Non spostare i task AI con move_task.";
+
+  server.tool(
+    "list_ai_tasks",
+    `Coda dei task gestiti da AI con un passo in attesa (${ref.replace(/^del /, "nel ")}${scope.kind === "global" ? ", o in tutti i progetti accessibili se projectId e' omesso" : ""}), ` +
+      "dal piu' urgente. Ogni voce ha step (triage | coder | reviewer), repoUrl del progetto e rejectCount. " +
+      "Esclude task gia' in lavorazione, fermati o (per coder) bloccati da dipendenze aperte. " + AI_WORKFLOW,
+    {
+      ...(scope.kind === "global" ? { projectId: z.string().optional() } : {}),
+      step: z.enum(AI_STEPS).optional(),
+    },
+    async (input: { projectId?: string; step?: (typeof AI_STEPS)[number] }) =>
+      withErrors(async () => listAiQueue(await scope.queueProjectIds(input.projectId), input.step))
+  );
+
+  server.tool(
+    "ai_start_step",
+    "Prende in carico il passo AI in attesa di taskId (blocco di 60 minuti: altri agenti non lo vedono in coda). " +
+      "step facoltativo: se indicato deve coincidere con il passo in attesa. Restituisce il task completo. " + AI_WORKFLOW,
+    { taskId: z.string(), step: z.enum(AI_STEPS).optional() },
+    async ({ taskId, step }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        return startAiStep(taskId, MCP_ACTOR, step);
+      })
+  );
+
+  server.tool(
+    "ai_complete_step",
+    "Chiude con successo il passo AI di taskId: summary (markdown) diventa un commento e il server sposta il task alla " +
+      "colonna successiva (triage -> TODO, coder -> Testing, reviewer -> Done). Per il coder includi branch e link alla PR.",
+    { taskId: z.string(), summary: z.string().min(1) },
+    async ({ taskId, summary }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        return completeAiStep(taskId, summary, MCP_ACTOR);
+      })
+  );
+
+  server.tool(
+    "ai_reject",
+    "Solo per il passo reviewer: rimanda taskId in TODO con il motivo (commento) cosi' il coder lo riprende. " +
+      "Dopo 3 rimandi il percorso AI si ferma e l'admin viene avvisato.",
+    { taskId: z.string(), reason: z.string().min(1) },
+    async ({ taskId, reason }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        return rejectAiStep(taskId, reason, MCP_ACTOR);
+      })
+  );
+
+  server.tool(
+    "ai_fail",
+    "Il passo AI di taskId non si puo' completare (informazioni mancanti, errore, task fuori portata): il task resta " +
+      "dov'e', il percorso AI si ferma e l'admin viene avvisato con il motivo.",
+    { taskId: z.string(), reason: z.string().min(1) },
+    async ({ taskId, reason }) =>
+      withErrors(async () => {
+        await assertTaskInProject(taskId);
+        return failAiStep(taskId, reason, MCP_ACTOR);
+      })
   );
 
   server.tool(

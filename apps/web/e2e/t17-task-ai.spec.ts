@@ -1,5 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { API_BASE, createProjectViaApi, createTaskViaApi, getJwt, loginViaUi, selectProjectInSidebar } from "./helpers";
+import {
+  API_BASE,
+  callMcpTool,
+  createProjectTokenViaApi,
+  createProjectViaApi,
+  createTaskViaApi,
+  getJwt,
+  loginViaUi,
+  parseMcpToolResult,
+  selectProjectInSidebar,
+} from "./helpers";
 
 async function getTask(taskId: string): Promise<any> {
   const token = await getJwt();
@@ -32,5 +42,48 @@ test.describe("T17 - gestione AI del task", () => {
     // Badge sulla card con il passo in attesa (il task e' in Draft -> Triage).
     await page.locator(".drawer").getByRole("button", { name: "Close" }).first().click();
     await expect(card.locator(".badge-ai")).toContainText("Triage");
+  });
+
+  test("un agente lavora la coda via MCP: presa in carico, passo completato, percorso fermato", async ({ page }) => {
+    const project = await createProjectViaApi(`T17 MCP ${Date.now()}`);
+    const token = await getJwt();
+    await fetch(`${API_BASE}/projects/${project.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ repoUrl: "gyuco/demo" }),
+    });
+    const a = await createTaskViaApi(project.id, { title: "Ticket A" });
+    const b = await createTaskViaApi(project.id, { title: "Ticket B" });
+    for (const id of [a.id, b.id]) {
+      await fetch(`${API_BASE}/tasks/${id}/ai`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: true, steps: ["triage"], notify: "end" }),
+      });
+    }
+    const mcpToken = await createProjectTokenViaApi(project.id);
+
+    const queue = parseMcpToolResult((await callMcpTool(mcpToken, "list_ai_tasks", {})).body);
+    expect(queue.map((q: any) => [q.title, q.step, q.repoUrl])).toEqual([
+      ["Ticket A", "triage", "https://github.com/gyuco/demo"],
+      ["Ticket B", "triage", "https://github.com/gyuco/demo"],
+    ]);
+    await callMcpTool(mcpToken, "ai_start_step", { taskId: a.id });
+    const done = parseMcpToolResult((await callMcpTool(mcpToken, "ai_complete_step", { taskId: a.id, summary: "Analisi fatta" })).body);
+    expect(done.status).toBe("todo");
+    await callMcpTool(mcpToken, "ai_fail", { taskId: b.id, reason: "Mancano i dettagli" });
+
+    await loginViaUi(page);
+    await selectProjectInSidebar(page, project.name);
+    await expect(page.locator(".task-card", { hasText: "Ticket A" })).toBeVisible();
+    await expect(page.locator(".column").nth(1).locator(".task-card", { hasText: "Ticket A" })).toBeVisible();
+    await expect(page.locator(".task-card", { hasText: "Ticket B" }).locator(".badge-ai-failed")).toBeVisible();
+
+    // L'admin riprende il percorso dalla scheda.
+    await page.locator(".task-card", { hasText: "Ticket B" }).click();
+    const section = page.locator(".drawer .ai-section");
+    await expect(section).toContainText("Mancano i dettagli");
+    await section.getByRole("button", { name: "Resume" }).click();
+    await expect(section).toContainText("Pending step: Triage");
   });
 });
