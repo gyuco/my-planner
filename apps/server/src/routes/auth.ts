@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import bcrypt from "bcryptjs";
 import { apiError } from "@my-planner/core";
 import { prisma } from "../lib/prisma.js";
+import { listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 import { avatarInputSchema, changePasswordInputSchema, updateProfileInputSchema } from "../lib/validation.js";
 import {
   changeOwnPassword,
@@ -103,6 +104,19 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.delete("/auth/me/avatar", { onRequest: [app.authenticate] }, async (req) => {
     return setOwnAvatar((req as any).authUser.id, null);
+  });
+
+  // Connector MCP globali dell'utente (/mcp/global). Si creano solo col login
+  // web OAuth (/authorize); da qui si possono solo elencare e revocare.
+  app.get("/auth/me/mcp-tokens", { onRequest: [app.authenticate] }, async (req) => {
+    return listUserMcpTokens((req as any).authUser.id);
+  });
+
+  app.delete("/auth/me/mcp-tokens/:tokenId", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const { tokenId } = req.params as { tokenId: string };
+    const revoked = await revokeUserMcpToken((req as any).authUser.id, tokenId);
+    if (!revoked) return reply.code(404).send(apiError("NOT_FOUND", "Token non trovato"));
+    return revoked;
   });
 
   // Avatar di un utente visibile (assegnatari sulle card).

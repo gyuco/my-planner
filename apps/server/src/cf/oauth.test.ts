@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("../mcp/auth.js", () => ({
+vi.mock("../mcp/auth.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../mcp/auth.js")>()),
   resolveProjectFromToken: vi.fn(async (token: string) => {
     if (token === "good-token") return "project-1";
     throw new Error("Token MCP non valido o revocato");
@@ -9,6 +10,9 @@ vi.mock("../mcp/auth.js", () => ({
 
 import { handleOAuthRequest, isAllowedRedirectUri } from "./oauth.js";
 import { setSecretKeyProvider } from "../lib/secretBox.js";
+import { createUser } from "../services/userService.js";
+import { resolveUserFromMcpToken } from "../mcp/auth.js";
+import { prisma } from "../lib/prisma.js";
 
 const BASE = "https://planner.test";
 const REDIRECT = "https://claude.ai/api/mcp/auth_callback";
@@ -157,5 +161,67 @@ describe("cf oauth", () => {
     expect(isAllowedRedirectUri("http://localhost:6274/oauth/callback")).toBe(true);
     expect(isAllowedRedirectUri("https://claude.ai.evil.test/api/mcp/auth_callback")).toBe(false);
     expect(isAllowedRedirectUri("https://localhost/cb")).toBe(false);
+  });
+
+  describe("MCP globale (login web)", () => {
+    const GLOBAL_RESOURCE = `${BASE}/mcp/global`;
+
+    function userForm(challenge: string, email: string, password: string, extra: Record<string, string> = {}) {
+      const form = new FormData();
+      form.set("client_id", "client-1");
+      form.set("redirect_uri", REDIRECT);
+      form.set("state", "st-g");
+      form.set("code_challenge", challenge);
+      form.set("code_challenge_method", "S256");
+      form.set("email", email);
+      form.set("password", password);
+      for (const [k, v] of Object.entries(extra)) form.set(k, v);
+      return new Request(`${BASE}/authorize`, { method: "POST", body: form });
+    }
+
+    it("espone i metadata della risorsa globale", async () => {
+      const pr = await (await handleOAuthRequest(new Request(`${BASE}/.well-known/oauth-protected-resource/mcp/global`)))!.json();
+      expect(pr).toMatchObject({ resource: GLOBAL_RESOURCE, authorization_servers: [BASE] });
+    });
+
+    it("con resource=/mcp/global mostra il login email/password", async () => {
+      const { challenge } = await pkce();
+      const q = new URLSearchParams({
+        response_type: "code", client_id: "c", redirect_uri: REDIRECT, state: "s",
+        code_challenge: challenge, code_challenge_method: "S256", resource: GLOBAL_RESOURCE,
+      });
+      const page = (await handleOAuthRequest(new Request(`${BASE}/authorize?${q}`)))!;
+      expect(page.status).toBe(200);
+      const text = await page.text();
+      expect(text).toContain('name="email"');
+      expect(text).toContain('name="password"');
+      expect(text).toContain('name="mode" value="user"');
+      expect(text).not.toContain('name="token"');
+    });
+
+    it("login + PKCE emette un token utente valido e revocabile", async () => {
+      const user = await createUser({ email: "mgr@test.dev", password: "password-123", role: "admin" });
+      const { verifier, challenge } = await pkce();
+
+      const bad = (await handleOAuthRequest(userForm(challenge, "mgr@test.dev", "sbagliata", { mode: "user" })))!;
+      expect(bad.status).toBe(400);
+      expect(await bad.text()).toContain("Email o password non validi");
+
+      const res = (await handleOAuthRequest(userForm(challenge, " MGR@test.dev ", "password-123", { resource: GLOBAL_RESOURCE })))!;
+      expect(res.status).toBe(302);
+      const code = new URL(res.headers.get("Location")!).searchParams.get("code")!;
+
+      const tok = (await handleOAuthRequest(
+        tokenRequest({ grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: REDIRECT }),
+      ))!;
+      expect(tok.status).toBe(200);
+      const { access_token } = await tok.json();
+      expect(access_token).toMatch(/^mpu_[0-9a-f]{64}$/);
+      expect(await resolveUserFromMcpToken(access_token)).toBe(user.id);
+
+      const stored = await prisma.userMcpToken.findFirstOrThrow({ where: { userId: user.id } });
+      expect(stored.label).toBe("claude.ai");
+      expect(stored.tokenHash).not.toContain(access_token);
+    });
   });
 });

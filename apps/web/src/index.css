@@ -3840,3 +3840,6 @@ body.dnd-dragging * {
   cursor: pointer;
   font-size: 16px; /* evita lo zoom automatico di iOS sul focus */
 }
+
+/* MCP globale nel profilo: l'URL lungo scorre dentro il code senza allargare la pagina. */
+.global-mcp-section .token-reveal-row code { min-width: 0; }

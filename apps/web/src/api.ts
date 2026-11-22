@@ -3,6 +3,7 @@ import type {
   Board,
   Project,
   ProjectToken,
+  UserMcpToken,
   Task,
   TaskPriority,
   TaskStatusKey,
@@ -201,6 +202,15 @@ export function unarchiveProject(projectId: string): Promise<Project> {
 }
 
 // --- Token MCP -------------------------------------------------------------
+
+/** Connector MCP globali dell'utente (creati solo dal login web OAuth). */
+export function listMyMcpTokens(): Promise<UserMcpToken[]> {
+  return apiFetch(`/auth/me/mcp-tokens`);
+}
+
+export function revokeMyMcpToken(tokenId: string): Promise<UserMcpToken> {
+  return apiFetch(`/auth/me/mcp-tokens/${tokenId}`, { method: "DELETE" });
+}
 
 export interface ProjectTokenWithSecret extends ProjectToken {
   token: string;

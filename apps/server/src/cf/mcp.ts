@@ -1,13 +1,19 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { apiError } from "@my-planner/core";
 import type { CfEnv } from "./env.js";
-import { createProjectMcpServer } from "../mcp/server.js";
-import { resolveProjectFromToken } from "../mcp/auth.js";
+import { createGlobalMcpServer, createProjectMcpServer } from "../mcp/server.js";
+import {
+  mcpAccessCanReadProject,
+  resolveMcpAccess,
+  resolveProjectFromToken,
+  resolveUserFromMcpToken,
+  type McpAccess,
+} from "../mcp/auth.js";
 import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { getAttachmentOrThrow } from "../services/attachmentService.js";
 import { prisma } from "../lib/prisma.js";
 import { ApiErrorException } from "@my-planner/core";
-import { protectedResourceMetadataUrl } from "./oauth.js";
+import { GLOBAL_MCP_PATH, protectedResourceMetadataUrl } from "./oauth.js";
 
 /**
  * MCP HTTP su Workers (CF9/CF10): sostituisce Fastify +
@@ -17,12 +23,18 @@ import { protectedResourceMetadataUrl } from "./oauth.js";
  *
  * Il token di progetto arriva in `Authorization: Bearer <token>` e viene
  * risolto contro D1 (mcp/auth.ts); il server è scoped al progetto del token.
+ *
+ * /mcp/global e' l'MCP globale (tutti i progetti dell'utente): accetta solo
+ * token utente `mpu_…`, emessi dal login web OAuth (src/cf/oauth.ts).
  */
 
 function tokenError(request: Request, message: string): Response {
   // WWW-Authenticate punta ai metadata OAuth (RFC 9728): e' cosi' che i
   // custom connector di Claude scoprono il flusso di login (src/cf/oauth.ts).
-  const metadata = protectedResourceMetadataUrl(new URL(request.url).origin);
+  // Ogni risorsa (/mcp, /mcp/global) ha i propri metadata.
+  const url = new URL(request.url);
+  const resourcePath = url.pathname === GLOBAL_MCP_PATH ? GLOBAL_MCP_PATH : "/mcp";
+  const metadata = protectedResourceMetadataUrl(url.origin, resourcePath);
   return new Response(JSON.stringify(apiError("MCP_TOKEN_INVALID", message)), {
     status: 401,
     headers: {
@@ -32,12 +44,12 @@ function tokenError(request: Request, message: string): Response {
   });
 }
 
-async function resolveTokenOrReject(request: Request): Promise<string | Response> {
+async function resolveTokenOrReject<T>(request: Request, resolve: (token: string) => Promise<T>): Promise<T | Response> {
   const auth = request.headers.get("authorization");
   const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
   if (!token) return tokenError(request, "Token MCP mancante");
   try {
-    return await resolveProjectFromToken(token);
+    return await resolve(token);
   } catch {
     return tokenError(request, "Token MCP non valido o revocato");
   }
@@ -68,14 +80,20 @@ function sseNotSupported(): Response {
   );
 }
 
-/** Handler MCP Streamable HTTP (POST/DELETE) per /mcp. */
+/** Handler MCP Streamable HTTP (POST/DELETE) per /mcp e /mcp/global. */
 export async function handleMcpRequest(request: Request, _env: CfEnv): Promise<Response> {
   if (request.method === "GET") return sseNotSupported();
 
-  const projectIdOrResponse = await resolveTokenOrReject(request);
-  if (projectIdOrResponse instanceof Response) return projectIdOrResponse;
-
-  const server = createProjectMcpServer(projectIdOrResponse);
+  let server;
+  if (new URL(request.url).pathname === GLOBAL_MCP_PATH) {
+    const userIdOrResponse = await resolveTokenOrReject(request, resolveUserFromMcpToken);
+    if (userIdOrResponse instanceof Response) return userIdOrResponse;
+    server = createGlobalMcpServer(userIdOrResponse);
+  } else {
+    const projectIdOrResponse = await resolveTokenOrReject(request, resolveProjectFromToken);
+    if (projectIdOrResponse instanceof Response) return projectIdOrResponse;
+    server = createProjectMcpServer(projectIdOrResponse);
+  }
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
   return transport.handleRequest(request);
@@ -83,11 +101,11 @@ export async function handleMcpRequest(request: Request, _env: CfEnv): Promise<R
 
 /**
  * Download allegati via MCP (CF11, API_CONTRACT.md §7 get_attachment_url):
- * stessa autenticazione a token di progetto, stream diretto da R2.
+ * stessa autenticazione a token MCP (di progetto o globale), stream diretto da R2.
  */
 export async function handleMcpAttachmentDownload(request: Request, _env: CfEnv): Promise<Response> {
-  const projectIdOrResponse = await resolveTokenOrReject(request);
-  if (projectIdOrResponse instanceof Response) return projectIdOrResponse;
+  const accessOrResponse = await resolveTokenOrReject<McpAccess>(request, resolveMcpAccess);
+  if (accessOrResponse instanceof Response) return accessOrResponse;
 
   const url = new URL(request.url);
   const match = url.pathname.match(/^\/mcp\/attachments\/([^/]+)\/download$/);
@@ -102,8 +120,8 @@ export async function handleMcpAttachmentDownload(request: Request, _env: CfEnv)
   try {
     const attachment = await getAttachmentOrThrow(attachmentId);
     const task = await prisma.task.findUnique({ where: { id: attachment.taskId } });
-    if (!task || task.projectId !== projectIdOrResponse) {
-      return new Response(JSON.stringify(apiError("FORBIDDEN", "L'allegato non appartiene al progetto del token")), {
+    if (!task || !(await mcpAccessCanReadProject(accessOrResponse, task.projectId))) {
+      return new Response(JSON.stringify(apiError("FORBIDDEN", "Il token non ha accesso a questo allegato")), {
         status: 403,
         headers: { "Content-Type": "application/json" },
       });
