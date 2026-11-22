@@ -35,6 +35,7 @@ import {
   getTask,
   createTask,
   updateTask,
+  setTaskAi,
   deleteTask,
   moveTask,
   sendBackTask,
@@ -71,6 +72,7 @@ import {
   taskUpdateInputSchema,
   moveTaskInputSchema,
   sendBackTaskInputSchema,
+  taskAiInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -394,6 +396,15 @@ export function buildRestApp() {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     const body = taskUpdateInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await updateTask(c.req.param("taskId"), body, userActor(c.get("user"))));
+  });
+
+  // Gestione AI del task: solo admin (stessa regola del runtime Node).
+  app.put("/tasks/:taskId/ai", async (c) => {
+    const user = c.get("user");
+    assertAdmin(user);
+    await assertTaskAccess(user, c.req.param("taskId"));
+    const body = taskAiInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await setTaskAi(c.req.param("taskId"), body, user.id, userActor(user)));
   });
 
   app.delete("/tasks/:taskId", async (c) => {

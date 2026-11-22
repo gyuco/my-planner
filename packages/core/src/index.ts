@@ -158,6 +158,58 @@ export function suggestParentStatus(counts: SubtaskStatusCounts): TaskStatus | n
   return "todo";
 }
 
+/**
+ * Gestione AI di un task (solo admin). Ogni passo lavora su una colonna:
+ * triage su `draft` (-> `todo`), coder su `todo` (-> `testing`), reviewer su
+ * `testing` (-> `done`, oppure di nuovo `todo` se rimanda indietro). I passi
+ * scelti sono un sottoinsieme qualunque, sempre in quest'ordine.
+ */
+export const AI_STEPS = ["triage", "coder", "reviewer"] as const;
+export type AiStep = (typeof AI_STEPS)[number];
+
+/** Avvisi al destinatario: alla fine del percorso, a ogni cambio di stato, mai. */
+export const AI_NOTIFY_MODES = ["end", "each", "none"] as const;
+export type AiNotifyMode = (typeof AI_NOTIFY_MODES)[number];
+
+/** Colonna da cui parte ciascun passo AI. */
+export const AI_STEP_STATUS: Record<AiStep, TaskStatusKey> = {
+  triage: "draft",
+  coder: "todo",
+  reviewer: "testing",
+};
+
+export interface TaskAi {
+  enabled: boolean;
+  /** Passi scelti, nell'ordine triage -> coder -> reviewer. */
+  steps: AiStep[];
+  notify: AiNotifyMode;
+  /** Destinatario degli avvisi (l'admin che ha attivato la gestione AI). */
+  watcherId: string | null;
+  watcherName: string | null;
+}
+
+/** Input di PUT /tasks/:taskId/ai (solo admin). */
+export interface TaskAiInput {
+  enabled: boolean;
+  steps?: AiStep[];
+  notify?: AiNotifyMode;
+}
+
+/**
+ * Passo AI in attesa sul task: quello che parte dalla colonna in cui il task
+ * si trova, se e' tra i passi scelti. null se la gestione AI e' spenta o se
+ * nessun passo parte da quella colonna (es. `in_progress`, `done`).
+ */
+export function aiPendingStep(task: { status: string; ai?: TaskAi | null }): AiStep | null {
+  if (!task.ai?.enabled) return null;
+  return task.ai.steps.find((step) => AI_STEP_STATUS[step] === task.status) ?? null;
+}
+
+/** Normalizza un elenco di passi: solo valori validi, senza doppioni, in ordine canonico. */
+export function normalizeAiSteps(steps: readonly string[]): AiStep[] {
+  return AI_STEPS.filter((step) => steps.includes(step));
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -198,6 +250,8 @@ export interface Task {
   commentsCount?: number;
   attachmentsCount?: number;
   subtasks?: SubtaskSummary[];
+  /** Gestione AI: sempre presente nelle risposte del server (enabled false se spenta). */
+  ai?: TaskAi;
 }
 
 export interface TaskDependency {
@@ -322,7 +376,8 @@ export type TaskTrackedField =
   | "complexity"
   | "tags"
   | "dueDate"
-  | "parentId";
+  | "parentId"
+  | "ai";
 
 /**
  * Singola modifica di un campo. Per `description` i valori non vengono

@@ -3843,3 +3843,62 @@ body.dnd-dragging * {
 
 /* MCP globale nel profilo: l'URL lungo scorre dentro il code senza allargare la pagina. */
 .global-mcp-section .token-reveal-row code { min-width: 0; }
+
+/* =========================================================================
+   Gestione AI del task (badge sulla card, sezione nel drawer)
+   ========================================================================= */
+.badge-ai {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-600);
+  background: var(--accent-50);
+  border: 1px solid var(--accent-100);
+  border-radius: var(--r-full);
+  padding: 0 0.45rem;
+  white-space: nowrap;
+}
+.badge-ai-pending {
+  color: var(--surface);
+  background: var(--accent-500);
+  border-color: var(--accent-500);
+}
+.badge-ai-step { font-weight: 500; }
+
+.ai-section h3 { margin: 0 0 0.25rem; }
+.ai-section .ai-option {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 400;
+  cursor: pointer;
+}
+.ai-section .ai-option input { margin-top: 0.15rem; flex-shrink: 0; }
+.ai-section .ai-toggle { font-weight: 600; }
+.ai-fieldset {
+  border: 0;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.ai-fieldset legend { padding: 0; margin-bottom: 0.35rem; }
+.ai-hint { color: var(--ink-400); font-size: 0.78rem; font-weight: 400; margin: 0; }
+.ai-pending, .ai-summary { margin: 0; font-size: 0.82rem; color: var(--ink-700); }
+.ai-section > button { align-self: flex-start; }
+/* Le regole generiche dei campi del drawer (width 100%, padding) non devono
+   valere per caselle e radio della gestione AI. */
+.drawer .ai-section input[type="checkbox"],
+.drawer .ai-section input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  margin: 0.1rem 0 0;
+  accent-color: var(--accent-500);
+  box-shadow: none;
+}
+.ai-section .ai-option > span { color: var(--ink-800); font-size: 0.86rem; min-width: 0; }

@@ -1,5 +1,9 @@
 import {
+  AI_NOTIFY_MODES,
   ApiErrorException,
+  normalizeAiSteps,
+  type TaskAi,
+  type TaskAiInput,
   emptySubtaskStatusCounts,
   FIBONACCI_COMPLEXITY,
   isBaseStatus,
@@ -54,6 +58,7 @@ const TASK_INCLUDE = {
   // card); il data URL dell'immagine non viene mai caricato qui.
   assignee: { select: { firstName: true, lastName: true, email: true, avatarUpdatedAt: true } },
   owner: USER_NAME_SELECT,
+  aiWatcher: USER_NAME_SELECT,
 } as const;
 
 /** Filtri per persona comuni a lista e board (es. "assegnati a me"). */
@@ -72,9 +77,22 @@ export function userDisplayName(user: { firstName: string; lastName: string; ema
   return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
 }
 
+/** Campi AI grezzi del DB -> oggetto `ai` dell'API (vedi TaskAi in core). */
+function serializeAi(task: any): TaskAi {
+  return {
+    enabled: Boolean(task.aiEnabled),
+    steps: normalizeAiSteps(String(task.aiSteps ?? "").split(",")),
+    notify: (AI_NOTIFY_MODES as readonly string[]).includes(task.aiNotify) ? task.aiNotify : "end",
+    watcherId: task.aiWatcherId ?? null,
+    watcherName: userDisplayName(task.aiWatcher),
+  };
+}
+
 function serializeTask(task: any): any {
-  const { tags, assignee, owner, ...rest } = task;
+  const { tags, assignee, owner, aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, ...rest } = task;
+  void aiEnabled; void aiSteps; void aiNotify; void aiWatcherId; void aiWatcher;
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
+  out.ai = serializeAi(task);
   out.assigneeId = task.assigneeId ?? null;
   out.assigneeName = userDisplayName(assignee);
   out.assigneeAvatarVersion = assignee?.avatarUpdatedAt ? new Date(assignee.avatarUpdatedAt).getTime() : null;
@@ -472,6 +490,47 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
       actor,
       recipientId: notifyAssignee(task.assigneeId, actor),
       data: { title: task.title, parentId: task.parentId, assigneeName: userDisplayName(task.assignee) },
+    });
+  }
+
+  return serializeTask(task);
+}
+
+/** Riassunto leggibile della configurazione AI per il log attivita' (null = spenta). */
+function aiSummary(ai: TaskAi): string | null {
+  return ai.enabled ? `${ai.steps.join(",")}|${ai.notify}` : null;
+}
+
+/**
+ * Attiva, modifica o spegne la gestione AI di un task. L'autorizzazione
+ * (solo admin) e' nelle route; qui `watcherId` e' l'admin che salva, che
+ * diventa il destinatario degli avvisi. Spegnendo si conservano passi e
+ * modalita', cosi' riattivare ripropone l'ultima configurazione.
+ */
+export async function setTaskAi(taskId: string, input: TaskAiInput, watcherId: string, actor: Actor = SYSTEM_ACTOR) {
+  const existing = await prisma.task.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
+  if (!existing) throw new ApiErrorException("NOT_FOUND", "Task non trovato");
+
+  const steps = input.steps !== undefined ? normalizeAiSteps(input.steps) : serializeAi(existing).steps;
+  if (input.enabled && steps.length === 0) {
+    throw new ApiErrorException("VALIDATION_ERROR", "Scegli almeno un passo AI (triage, coder, reviewer)");
+  }
+
+  const data: any = { aiEnabled: input.enabled, aiSteps: steps.join(",") };
+  if (input.notify !== undefined) data.aiNotify = input.notify;
+  if (input.enabled) data.aiWatcherId = watcherId;
+
+  const task = await prisma.task.update({ where: { id: taskId }, data, include: TASK_INCLUDE });
+
+  const from = aiSummary(serializeAi(existing));
+  const to = aiSummary(serializeAi(task));
+  if (from !== to) {
+    await emitEvent({
+      projectId: task.projectId,
+      taskId: task.id,
+      type: "task.updated",
+      actor,
+      data: { title: task.title, parentId: task.parentId, changes: [{ field: "ai", from, to }] },
     });
   }
 
