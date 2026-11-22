@@ -204,6 +204,9 @@ model Task {
   @@index([assigneeId])
   @@index([ownerId])
   @@index([aiEnabled])
+  @@index([projectId, status, position])
+  @@index([parentId])
+  @@index([status, updatedAt])
 }
 
 model TaskDependency {
@@ -214,6 +217,7 @@ model TaskDependency {
   blockedByTask   Task   @relation("BlockerTask", fields: [blockedByTaskId], references: [id])
 
   @@unique([taskId, blockedByTaskId])
+  @@index([blockedByTaskId])
 }
 
 model Comment {

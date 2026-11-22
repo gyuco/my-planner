@@ -67,4 +67,34 @@ test.describe("T14 - revisione in Testing e archivio completati", () => {
     await expect(table).toHaveCount(0);
     await expect(page.locator(".drawer input").first()).toHaveValue("Task approvato");
   });
+
+  test("i completati non arrivano con la board: badge dal conteggio, archivio a pagine con ricerca", async ({ page }) => {
+    const project = await createProjectViaApi(`T14 Archivio ${Date.now()}`);
+    await createTaskViaApi(project.id, { title: "Ancora aperto" });
+    for (let i = 0; i < 53; i += 1) {
+      const task = await createTaskViaApi(project.id, { title: i === 7 ? "Fattura speciale" : `Chiuso ${i}` });
+      await api(`/tasks/${task.id}/move`, { method: "POST", body: JSON.stringify({ status: "done" }) });
+    }
+
+    const boardResponse = page.waitForResponse((r) => r.url().includes(`/projects/${project.id}/board`));
+    await loginViaUi(page);
+    await selectProjectInSidebar(page, project.name);
+    const board = await (await boardResponse).json();
+    expect(board.done).toEqual([]);
+    expect(board.draft.map((t: { title: string }) => t.title)).toEqual(["Ancora aperto"]);
+
+    const doneToggle = page.locator(".done-toggle");
+    await expect(doneToggle).toContainText("53");
+    await doneToggle.click();
+    const table = page.getByRole("dialog", { name: /Completed tasks/ });
+    await expect(table.locator("tbody tr")).toHaveCount(50);
+    await table.getByRole("button", { name: "More (3)" }).click();
+    await expect(table.locator("tbody tr")).toHaveCount(53);
+    await expect(table.getByRole("button", { name: /More/ })).toHaveCount(0);
+
+    await table.getByRole("searchbox").fill("fattura");
+    await expect(table.locator("tbody tr")).toHaveCount(1);
+    await expect(table.locator("tbody tr")).toContainText("Fattura speciale");
+    await expect(table.locator(".done-modal-count")).toHaveText("1");
+  });
 });

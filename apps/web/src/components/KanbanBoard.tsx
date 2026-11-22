@@ -15,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
-import { ApiRequestError, moveTask, runAiRoutine, sendBackTask as sendBackTaskRequest } from "../api";
+import { ApiRequestError, moveTask, runAiRoutine, type DoneTasksQuery, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
 import { ArchiveCheckIcon, RefreshIcon } from "./Icons";
@@ -83,6 +83,10 @@ interface KanbanBoardProps {
   onTaskClick?: (task: BoardTask) => void;
   /** Ricarica la board (pulsante Aggiorna della toolbar). */
   onRefresh?: () => Promise<void> | void;
+  /** Task completati che rispettano i filtri (null = in caricamento). */
+  doneCount?: number | null;
+  /** Filtri per l'archivio dei completati (pulsante Done). */
+  doneQuery: DoneTasksQuery;
   /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
   aiQueueProjectId?: string | null;
 }
@@ -274,6 +278,8 @@ export function KanbanBoard({
   onTaskClick,
   onRefresh,
   aiQueueProjectId,
+  doneCount = null,
+  doneQuery,
 }: KanbanBoardProps) {
   const { t } = useI18n();
   const toast = useToast();
@@ -330,6 +336,11 @@ export function KanbanBoard({
   // ancora cambiato) e poi salta in avanti quando arriva la risposta del
   // server — l'effetto "va e torna indietro" segnalato.
   const [localBoard, setLocalBoard] = useState<Board>(board);
+  // Completati da questa board in attesa del nuovo conteggio dal server.
+  const [pendingDone, setPendingDone] = useState(0);
+  useEffect(() => {
+    setPendingDone(0);
+  }, [doneCount]);
 
   useEffect(() => {
     setLocalBoard(board);
@@ -423,6 +434,7 @@ export function KanbanBoard({
         new Promise((resolve) => setTimeout(resolve, LEAVE_ANIMATION_MS)),
       ]);
       setLocalBoard((b) => reorderBoard(b, task.id, "done", (b.done as BoardTask[]).length));
+      setPendingDone((n) => n + 1);
       setLeavingIds(withoutLeaving);
       onBoardChange();
     } catch (err) {
@@ -522,7 +534,7 @@ export function KanbanBoard({
         )}
         {showDone && (
           <DoneTasksModal
-            tasks={localBoard.done as BoardTask[]}
+            query={doneQuery}
             showProject={showProject}
             onClose={() => setShowDone(false)}
             onTaskClick={onTaskClick}
@@ -563,7 +575,9 @@ export function KanbanBoard({
           disabled={loading}
         >
           <ArchiveCheckIcon /> {t.board.doneButton}
-          <span className="done-toggle-count">{loading ? "–" : (localBoard.done as BoardTask[]).length}</span>
+          <span className="done-toggle-count">
+            {loading || doneCount === null ? "–" : doneCount + pendingDone}
+          </span>
         </button>
         <div className="column-picker" ref={pickerRef}>
           <button

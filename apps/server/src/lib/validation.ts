@@ -36,6 +36,31 @@ export const boardFiltersQuerySchema = z.object({
   search: z.string().optional(),
   assigneeId: z.string().min(1).optional(),
   ownerId: z.string().min(1).optional(),
+  /** "false": la board non carica i task completati (vedi GET /tasks/done). */
+  includeDone: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v !== "false"),
+});
+
+/** Filtri di GET /tasks/done (archivio dei completati, a pagine). */
+export const doneTasksQuerySchema = z.object({
+  projectIds: z.string().optional(),
+  search: z.string().max(200).optional(),
+  q: z.string().max(200).optional(),
+  tag: z.string().max(100).optional(),
+  assigneeId: z.string().min(1).optional(),
+  priorities: z
+    .string()
+    .optional()
+    .transform((v) => (v ? v.split(",").filter(Boolean) : undefined))
+    .pipe(z.array(taskPrioritySchema).optional()),
+  includeSubtasks: z
+    .enum(["true", "false"])
+    .optional()
+    .transform((v) => v === "true"),
+  limit: z.coerce.number().int().min(0).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
 
 export const aggregatedBoardQuerySchema = boardFiltersQuerySchema.extend({
