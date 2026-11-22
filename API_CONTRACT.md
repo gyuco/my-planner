@@ -665,6 +665,11 @@ Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
 - `ai_fail { taskId, reason }` → `Task`: commento, il task resta dov'è, percorso fermato. Evento `ai.failed` (notificabile: campanella, email, push) al destinatario della gestione AI, salvo `notify = none` o se è l'autore.
 - Nuovi tipi di evento: `ai.step_started` (solo log), `ai.failed` (log + notifica). Gli item di notifiche e log hanno `aiStep`.
 
+### Prompt MCP `work_ai_queue`
+- Prompt MCP (server di progetto e globale; in Claude Code compare come comando slash del connector) con le istruzioni per lavorare la coda AI: flusso con i tool `ai_*`, regole (niente `move_task`, niente push su main o merge), guida dei passi triage / coder / reviewer.
+- Argomenti: `step?` (`triage` | `coder` | `reviewer`), `projectId?` (solo globale, con verifica di accesso) per includere nome e repository del progetto.
+- Stessa fonte del prompt della routine (`services/aiInstructions.ts`): istruzioni sempre allineate.
+
 ### Avvio automatico dei passi AI (routine Claude Code, solo admin)
 - `GET /projects/:projectId/ai-routine` → `{ configured, routineId, lastFiredAt, lastError, lastSessionUrl, prompt }`. `prompt` è il testo da incollare nella routine (istruzioni per lavorare la coda con i tool `ai_*`).
 - `PUT /projects/:projectId/ai-routine` body `{ routineId: "trig_…", token? }`: il token del trigger API della routine è salvato cifrato (secretBox) e non viene mai restituito; omesso = resta quello salvato.
