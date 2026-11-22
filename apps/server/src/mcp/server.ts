@@ -160,6 +160,7 @@ export function createGlobalMcpServer(userId: string) {
               id: p.id,
               name: p.name,
               repoUrl: p.repoUrl ?? null,
+              groupName: p.groupName ?? null,
               archived: p.archived,
               createdAt: p.createdAt.toISOString(),
             }));

@@ -123,6 +123,8 @@ export interface Project {
   createdAt: string;
   /** Repository GitHub (https://github.com/owner/repo) dove lavorano gli agenti AI. */
   repoUrl?: string | null;
+  /** Gruppo (solo visuale): i progetti con lo stesso gruppo stanno insieme nella sidebar. */
+  groupName?: string | null;
   /** true se e' configurata la routine Claude Code per l'avvio automatico dei passi AI. */
   aiRoutineConfigured?: boolean;
 }

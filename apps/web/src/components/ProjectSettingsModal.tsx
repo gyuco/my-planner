@@ -6,6 +6,7 @@ import {
   createProjectToken,
   listProjectTokens,
   renameProject,
+  setProjectGroup,
   setProjectRepo,
   revokeProjectToken,
 } from "../api";
@@ -22,13 +23,26 @@ interface ProjectSettingsModalProps {
   onStatusesChanged?: () => void;
   /** La sezione dell'avvio automatico AI (routine) e' solo per gli admin. */
   isAdmin?: boolean;
+  /** Gruppi gia' usati dagli altri progetti, proposti come suggerimenti. */
+  existingGroups?: string[];
 }
 
-export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesChanged, isAdmin = false }: ProjectSettingsModalProps) {
+export function ProjectSettingsModal({
+  project,
+  onClose,
+  onChanged,
+  onStatusesChanged,
+  isAdmin = false,
+  existingGroups = [],
+}: ProjectSettingsModalProps) {
   const { t, formatDate } = useI18n();
   const [name, setName] = useState(project.name);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [groupName, setGroupName] = useState(project.groupName ?? "");
+  const [savingGroup, setSavingGroup] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
+  const [groupSaved, setGroupSaved] = useState(false);
   const [repoUrl, setRepoUrl] = useState(project.repoUrl ?? "");
   const [savingRepo, setSavingRepo] = useState(false);
   const [repoError, setRepoError] = useState<string | null>(null);
@@ -73,6 +87,23 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
       setRenameError(err instanceof ApiRequestError ? err.message : t.projectSettings.renameError);
     } finally {
       setRenaming(false);
+    }
+  }
+
+  async function handleSaveGroup(e: React.FormEvent) {
+    e.preventDefault();
+    setGroupError(null);
+    setGroupSaved(false);
+    setSavingGroup(true);
+    try {
+      const updated = await setProjectGroup(project.id, groupName.trim() || null);
+      setGroupName(updated.groupName ?? "");
+      setGroupSaved(true);
+      onChanged();
+    } catch (err) {
+      setGroupError(err instanceof ApiRequestError ? err.message : t.projectSettings.groupError);
+    } finally {
+      setSavingGroup(false);
     }
   }
 
@@ -193,6 +224,35 @@ export function ProjectSettingsModal({ project, onClose, onChanged, onStatusesCh
             </button>
           </form>
           {renameError && <p className="login-error">{renameError}</p>}
+
+          <label htmlFor="project-group" className="field-label repo-label">
+            {t.projectSettings.group}
+          </label>
+          <form className="drawer-inline-form" onSubmit={handleSaveGroup}>
+            <input
+              id="project-group"
+              value={groupName}
+              onChange={(e) => {
+                setGroupName(e.target.value);
+                setGroupSaved(false);
+              }}
+              placeholder={t.projectSettings.groupPlaceholder}
+              maxLength={60}
+              list="project-group-options"
+              autoComplete="off"
+            />
+            <datalist id="project-group-options">
+              {existingGroups.map((g) => (
+                <option key={g} value={g} />
+              ))}
+            </datalist>
+            <button type="submit" disabled={savingGroup || groupName.trim() === (project.groupName ?? "")}>
+              {savingGroup ? t.projectSettings.saving : t.projectSettings.groupSave}
+            </button>
+          </form>
+          <p className="ai-hint">{t.projectSettings.groupHint}</p>
+          {groupSaved && <p className="profile-saved">{t.projectSettings.groupSaved}</p>}
+          {groupError && <p className="login-error">{groupError}</p>}
 
           <label htmlFor="project-repo" className="field-label repo-label">
             {t.projectSettings.repo}

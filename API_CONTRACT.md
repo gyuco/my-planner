@@ -679,7 +679,7 @@ Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
 - I progetti esposti da REST e MCP non includono mai le colonne della routine: solo `aiRoutineConfigured: boolean`.
 
 ### Repository GitHub del progetto
-- `PATCH /projects/:projectId` accetta `{ name?, repoUrl? }` (almeno uno). `repoUrl` accetta `owner/repo`, `github.com/owner/repo`, URL https anche con `.git`; viene salvato come `https://github.com/owner/repo`. `null`/`""` lo toglie. `Project.repoUrl` è esposto da REST, `list_projects` e `list_ai_tasks`.
+- `PATCH /projects/:projectId` accetta `{ name?, repoUrl?, groupName? }` (almeno uno). `groupName` (max 60, spazi compattati, `null`/`""` lo toglie) è solo visuale: nella sidebar i progetti con lo stesso gruppo stanno in un contenitore apribile; lo stato aperto/chiuso è salvato nel browser. `repoUrl` accetta `owner/repo`, `github.com/owner/repo`, URL https anche con `.git`; viene salvato come `https://github.com/owner/repo`. `null`/`""` lo toglie. `Project.repoUrl` è esposto da REST, `list_projects` e `list_ai_tasks`.
 
 ## 8. Modifiche allo schema Prisma
 
