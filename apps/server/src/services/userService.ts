@@ -507,3 +507,18 @@ export async function deleteUser(userId: string, actorId: string): Promise<{ id:
   await prisma.user.delete({ where: { id: userId } });
   return { id: userId, deleted: true };
 }
+
+/**
+ * Progetti dell'archivio dei completati: quelli richiesti e accessibili. Un
+ * progetto esplicito puo' essere anche archiviato (come la sua board);
+ * senza elenco, i progetti attivi dell'utente (come la board aggregata).
+ */
+export async function doneProjectScope(user: AuthUser, projectIds: string | undefined) {
+  const requested = projectIds ? projectIds.split(",").filter(Boolean) : undefined;
+  let allowed = restrictProjectIds(user, requested);
+  if (!isAdmin(user) && !requested) {
+    const active = new Set((await listProjectsForUser(user, false)).map((p) => p.id));
+    allowed = (allowed ?? []).filter((id) => active.has(id));
+  }
+  return allowed;
+}

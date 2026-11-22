@@ -14,6 +14,7 @@ import {
   changeOwnPassword,
   createUser,
   deleteUser,
+  doneProjectScope,
   getAuthUser,
   getOwnAvatar,
   getUserAvatar,
@@ -47,6 +48,7 @@ import {
   listComments,
   getBoard,
   getAggregatedBoard,
+  listDoneTasks,
 } from "../services/taskService.js";
 import {
   createAttachment,
@@ -84,6 +86,7 @@ import {
   projectStatusInputSchema,
   boardFiltersQuerySchema,
   aggregatedBoardQuerySchema,
+  doneTasksQuerySchema,
   storageSettingsInputSchema,
   emailSettingsInputSchema,
   emailTestInputSchema,
@@ -423,6 +426,13 @@ export function buildRestApp() {
     await assertProjectAccess(c.get("user"), projectId);
     const body = taskInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await createTask(projectId, body, userActor(c.get("user"))), 201);
+  });
+
+  // Prima di /tasks/:taskId: in Hono l'ordine di registrazione conta.
+  app.get("/tasks/done", async (c) => {
+    const { projectIds, ...query } = doneTasksQuerySchema.parse(c.req.query());
+    const allowed = await doneProjectScope(c.get("user"), projectIds);
+    return c.json(await listDoneTasks({ ...query, projectIds: allowed }));
   });
 
   app.get("/tasks/:taskId", async (c) => {

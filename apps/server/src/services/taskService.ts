@@ -761,13 +761,17 @@ export async function sendBackTask(taskId: string, message: string, actor: Actor
   return result;
 }
 
-export async function getBoard(
-  projectId: string,
-  filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
-) {
-  await getProjectOrThrow(projectId);
-  const customKeys = await listCustomStatusKeys([projectId]);
-  const where: any = { projectId };
+type BoardFilters = { priority?: TaskPriority; tag?: string; search?: string; includeDone?: boolean } & PeopleFilters;
+
+/** Condizione Prisma per "il task ha esattamente questo tag" (tags e' CSV senza spazi). */
+function tagWhere(tag: string) {
+  return {
+    OR: [{ tags: tag }, { tags: { startsWith: `${tag},` } }, { tags: { endsWith: `,${tag}` } }, { tags: { contains: `,${tag},` } }],
+  };
+}
+
+function boardWhere(base: any, filters: BoardFilters) {
+  const where: any = { ...base };
   if (filters.priority) where.priority = filters.priority;
   applyPeopleFilters(where, filters);
   if (filters.search) {
@@ -776,18 +780,27 @@ export async function getBoard(
       { description: { contains: filters.search } },
     ];
   }
+  return where;
+}
 
+/**
+ * Costruisce la board. Con `includeDone: false` i task completati non vengono
+ * caricati (crescono senza limite col tempo): la colonna done resta vuota e
+ * l'archivio si legge a pagine con listDoneTasks.
+ */
+async function buildBoard(where: any, include: any, customKeys: string[], filters: BoardFilters) {
+  const includeDone = filters.includeDone !== false;
   let tasks = await prisma.task.findMany({
-    where,
+    where: includeDone ? where : { ...where, status: { not: "done" } },
     orderBy: [{ status: "asc" }, { position: "asc" }],
-    include: TASK_INCLUDE,
+    include,
   });
-  if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
+  if (filters.tag) tasks = tasks.filter((t: any) => tagsToArray(t.tags).includes(filters.tag as string));
 
-  const [blockedMap, subtaskMap] = await Promise.all([
-    computeBlockedByOpenCount(tasks.map((t) => t.id)),
-    computeSubtaskCounts(tasks.map((t) => t.id)),
-  ]);
+  const ids = tasks.map((t: any) => t.id);
+  // In serie: su D1 le query passano comunque una alla volta.
+  const blockedMap = await computeBlockedByOpenCount(ids);
+  const subtaskMap = await computeSubtaskCounts(ids);
 
   const board = emptyBoard(customKeys);
   for (const t of tasks) {
@@ -799,43 +812,70 @@ export async function getBoard(
   return board;
 }
 
-export async function getAggregatedBoard(
-  projectIds: string[] | undefined,
-  filters: { priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters = {}
-) {
+export async function getBoard(projectId: string, filters: BoardFilters = {}) {
+  await getProjectOrThrow(projectId);
+  const customKeys = await listCustomStatusKeys([projectId]);
+  return buildBoard(boardWhere({ projectId }, filters), TASK_INCLUDE, customKeys, filters);
+}
+
+export async function getAggregatedBoard(projectIds: string[] | undefined, filters: BoardFilters = {}) {
   const customKeys = await listCustomStatusKeys(projectIds);
+  const where = boardWhere({ project: projectIds ? { id: { in: projectIds } } : { archived: false } }, filters);
+  return buildBoard(where, { project: true, ...TASK_INCLUDE }, customKeys, filters);
+}
+
+export interface DoneTasksQuery {
+  /** Progetti consentiti; undefined = tutti i progetti attivi (solo admin). */
+  projectIds?: string[];
+  /** Ricerca del filtro della board (titolo o descrizione). */
+  search?: string;
+  /** Ricerca dell'archivio (titolo o nome del progetto). */
+  q?: string;
+  tag?: string;
+  /** Id assegnatario, oppure "none" per i non assegnati. */
+  assigneeId?: string;
+  priorities?: TaskPriority[];
+  /** Senza, solo i task di primo livello (come sulla board). */
+  includeSubtasks?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Archivio dei task completati, dal piu' recente, a pagine. `total` conta
+ * tutti i task che rispettano i filtri (badge del pulsante Done).
+ */
+export async function listDoneTasks(query: DoneTasksQuery) {
+  const and: any[] = [];
   const where: any = {
-    project: projectIds ? { id: { in: projectIds } } : { archived: false },
+    status: "done",
+    project: query.projectIds ? { id: { in: query.projectIds } } : { archived: false },
+    AND: and,
   };
-  if (filters.priority) where.priority = filters.priority;
-  applyPeopleFilters(where, filters);
-  if (filters.search) {
-    where.OR = [
-      { title: { contains: filters.search } },
-      { description: { contains: filters.search } },
-    ];
+  if (!query.includeSubtasks) where.parentId = null;
+  if (query.assigneeId) where.assigneeId = query.assigneeId === "none" ? null : query.assigneeId;
+  if (query.priorities && query.priorities.length > 0) where.priority = { in: query.priorities };
+  if (query.tag) and.push(tagWhere(query.tag));
+  if (query.search) {
+    and.push({ OR: [{ title: { contains: query.search } }, { description: { contains: query.search } }] });
+  }
+  if (query.q) {
+    and.push({ OR: [{ title: { contains: query.q } }, { project: { name: { contains: query.q } } }] });
   }
 
-  let tasks = await prisma.task.findMany({
-    where,
-    orderBy: [{ status: "asc" }, { position: "asc" }],
-    include: { project: true, ...TASK_INCLUDE },
-  });
-  if (filters.tag) tasks = tasks.filter((t) => tagsToArray(t.tags).includes(filters.tag as string));
-
-  const [blockedMap, subtaskMap] = await Promise.all([
-    computeBlockedByOpenCount(tasks.map((t) => t.id)),
-    computeSubtaskCounts(tasks.map((t) => t.id)),
-  ]);
-
-  const board = emptyBoard(customKeys);
-  for (const t of tasks) {
-    const serialized = serializeTask(t);
-    serialized.blockedByOpenCount = blockedMap.get(t.id) ?? 0;
-    applySubtaskCounts(serialized, subtaskMap.get(t.id));
-    board[t.status]?.push(serialized);
-  }
-  return board;
+  const limit = Math.min(Math.max(query.limit ?? 50, 0), 200);
+  const total = await prisma.task.count({ where });
+  const rows =
+    limit === 0
+      ? []
+      : await prisma.task.findMany({
+          where,
+          orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+          include: { project: true, ...TASK_INCLUDE },
+          skip: Math.max(query.offset ?? 0, 0),
+          take: limit,
+        });
+  return { total, tasks: rows.map((t) => serializeTask(t)) };
 }
 
 /**
