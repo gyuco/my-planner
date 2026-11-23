@@ -1356,6 +1356,10 @@ body.dnd-dragging * {
 
 @keyframes fade-in { from { opacity: 0; } }
 
+/* Modal aperto dal drawer del task: deve stare sopra .drawer-overlay (20)
+   e la sidebar mobile (30), sotto i toast. */
+.modal-overlay.modal-overlay-above-drawer { z-index: 40; }
+
 .modal {
   background: var(--surface);
   border: 1px solid var(--line);
