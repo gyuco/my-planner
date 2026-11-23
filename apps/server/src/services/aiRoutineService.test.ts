@@ -263,5 +263,13 @@ describe("sessione interattiva", () => {
       prompt.indexOf("Flusso (connector My Planner):"),
     );
     expect(prompt).toContain("Flusso (connector My Planner):");
+
+    // L'introduzione descrive i due tipi di avvio, riconosciuti dalla prima riga del payload.
+    const intro = prompt.slice(0, prompt.indexOf("Sessione interattiva:"));
+    expect(intro).toContain("due tipi di avvio");
+    expect(intro).toContain('"My Planner: sessione interattiva."');
+    expect(intro).toContain('"My Planner: task AI in attesa."');
+    expect(intro).toContain("Richiesta:");
+    expect(intro).not.toContain("Ogni avvio contiene");
   });
 });
