@@ -18,10 +18,28 @@ function repoSlug(repoUrl: string): string {
   return m ? `${m[1]}/${m[2]}` : "<owner>/<repo>";
 }
 
+const MAX_PROMPT_NAME_LENGTH = 100;
+
+/**
+ * Nome del progetto ridotto a una riga (max 100 caratteri, senza virgolette)
+ * da mettere tra virgolette nel system prompt: qualsiasi membro puo'
+ * rinominare il progetto, quindi il nome non deve poter aggiungere righe o
+ * chiudere le virgolette per iniettare istruzioni.
+ */
+export function promptProjectName(name: string): string {
+  return name
+    .replace(/["\u201C\u201D\u201E\u201F]/g, "")
+    .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_PROMPT_NAME_LENGTH)
+    .trim();
+}
+
 export function agentSystemPrompt(project: AgentInstructionsProject): string {
   const slug = repoSlug(project.repoUrl);
   return [
-    `Sei l'agente AI di My Planner per il progetto "${project.name}" (projectId ${project.id}).`,
+    `Sei l'agente AI di My Planner per il progetto "${promptProjectName(project.name)}" (projectId ${project.id}).`,
     `Repository del codice: ${project.repoUrl}, gia' clonato in /workspace/repo.`,
     "",
     "Regole:",

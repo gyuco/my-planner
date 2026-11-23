@@ -14,8 +14,10 @@ import { agentSystemPrompt } from "./agentInstructions.js";
  *    (token di progetto dedicato) e la variabile d'ambiente GITHUB_TOKEN
  *    (il sandbox vede un segnaposto, il valore reale e' sostituito in uscita);
  *  - l'agente, con system prompt da agentInstructions.ts.
- * A ogni salvataggio crea risorse nuove e sostituisce gli id (le vecchie non
- * vengono archiviate). Usato da REST Node e Cloudflare.
+ * A ogni salvataggio crea risorse nuove e sostituisce gli id; le risorse
+ * precedenti (e quelle create da un tentativo fallito) vengono archiviate in
+ * best effort: archiviare il vault ne cancella i segreti su Anthropic.
+ * Usato da REST Node e Cloudflare.
  */
 
 export const AGENT_MODEL = "claude-opus-5-5";
@@ -24,14 +26,27 @@ export const AGENT_TOKEN_LABEL = "Agente AI (chat)";
 export const DEFAULT_AGENT_BUDGET_CENTS = 500;
 const GITHUB_API_HOST = "api.github.com";
 
+/** Tool MCP di My Planner in sola lettura: l'agente li usa senza chiedere conferma. */
+export const AGENT_READ_ONLY_MCP_TOOLS = [
+  "get_task",
+  "list_tasks",
+  "list_comments",
+  "list_attachments",
+  "get_attachment_url",
+  "get_board",
+  "list_statuses",
+  "list_assignees",
+  "list_blockers",
+] as const;
+
 /** Sottoinsieme del client Anthropic usato qui (iniettabile nei test). */
 export interface AgentProvisioningClient {
   beta: {
-    environments: Pick<Anthropic["beta"]["environments"], "create">;
-    vaults: Pick<Anthropic["beta"]["vaults"], "create"> & {
+    environments: Pick<Anthropic["beta"]["environments"], "create" | "archive">;
+    vaults: Pick<Anthropic["beta"]["vaults"], "create" | "archive"> & {
       credentials: Pick<Anthropic["beta"]["vaults"]["credentials"], "create">;
     };
-    agents: Pick<Anthropic["beta"]["agents"], "create">;
+    agents: Pick<Anthropic["beta"]["agents"], "create" | "archive">;
   };
 }
 
@@ -116,6 +131,51 @@ function describeError(err: unknown, secrets: string[]): string {
   return message.slice(0, 500);
 }
 
+interface AgentResourceIds {
+  environmentId?: string | null;
+  vaultId?: string | null;
+  agentId?: string | null;
+}
+
+/**
+ * Archivia agente, vault ed environment su Anthropic (best effort): ogni
+ * errore e' loggato senza segreti e non interrompe il chiamante.
+ */
+async function archiveResources(apiKey: string, ids: AgentResourceIds, secrets: string[]): Promise<void> {
+  if (!ids.agentId && !ids.vaultId && !ids.environmentId) return;
+  const allSecrets = [apiKey, ...secrets];
+  let client: AgentProvisioningClient;
+  try {
+    client = clientFactory(apiKey);
+  } catch (err) {
+    console.warn(`[agent-config] archiviazione risorse non eseguita: ${describeError(err, allSecrets)}`);
+    return;
+  }
+  const steps: Array<[string, string | null | undefined, (id: string) => Promise<unknown>]> = [
+    ["agente", ids.agentId, (id) => client.beta.agents.archive(id)],
+    ["vault", ids.vaultId, (id) => client.beta.vaults.archive(id)],
+    ["environment", ids.environmentId, (id) => client.beta.environments.archive(id)],
+  ];
+  for (const [kind, id, archive] of steps) {
+    if (!id) continue;
+    try {
+      await archive(id);
+    } catch (err) {
+      console.warn(`[agent-config] archiviazione ${kind} ${id} fallita: ${describeError(err, allSecrets)}`);
+    }
+  }
+}
+
+/** Chiave API salvata in chiaro, oppure null se assente o non decifrabile. */
+async function storedApiKey(project: ProjectRow): Promise<string | null> {
+  if (!project.agentApiKeyEncrypted) return null;
+  try {
+    return await decryptSecret(project.agentApiKeyEncrypted);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Salva la configurazione e crea le risorse Anthropic. `apiKey` e
  * `githubToken` sono facoltativi solo se gia' salvati.
@@ -165,15 +225,23 @@ export async function setAgentConfig(projectId: string, input: AgentConfigInput)
   }
 
   const mcpToken = await createProjectToken(projectId, AGENT_TOKEN_LABEL);
+  const created: AgentResourceIds = {};
   let ids: { environmentId: string; vaultId: string; agentId: string };
   try {
-    ids = await provision(clientFactory(apiKey), {
-      project: { id: project.id, name: project.name, repoUrl: project.repoUrl },
-      mcpUrl,
-      mcpToken: mcpToken.token,
-      githubToken,
-    });
+    ids = await provision(
+      clientFactory(apiKey),
+      {
+        project: { id: project.id, name: project.name, repoUrl: project.repoUrl },
+        mcpUrl,
+        mcpToken: mcpToken.token,
+        githubToken,
+      },
+      created,
+    );
   } catch (err) {
+    // Le risorse create in questo tentativo non servono piu': il vault
+    // conterrebbe ancora il token GitHub e il token MCP.
+    await archiveResources(apiKey, created, [githubToken, mcpToken.token]);
     await revokeToken(mcpToken.id);
     const reason = describeError(err, [apiKey, githubToken, mcpToken.token]);
     await prisma.project.update({ where: { id: projectId }, data: { agentLastError: reason } });
@@ -194,6 +262,13 @@ export async function setAgentConfig(projectId: string, input: AgentConfigInput)
     },
   });
   if (project.agentMcpTokenId && project.agentMcpTokenId !== mcpToken.id) await revokeToken(project.agentMcpTokenId);
+  // Risorse precedenti: archiviate con la chiave con cui erano state create.
+  const previousKey = (await storedApiKey(project)) ?? apiKey;
+  await archiveResources(
+    previousKey,
+    { agentId: project.agentId, vaultId: project.agentVaultId, environmentId: project.agentEnvironmentId },
+    [apiKey, githubToken, mcpToken.token],
+  );
   return toView(updated);
 }
 
@@ -205,6 +280,8 @@ async function provision(
     mcpToken: string;
     githubToken: string;
   },
+  /** Riempito man mano che le risorse vengono create (per archiviarle se il provisioning fallisce). */
+  created: AgentResourceIds,
 ) {
   const label = `My Planner - ${args.project.name}`.slice(0, 200);
   const environment = await client.beta.environments.create({
@@ -219,7 +296,9 @@ async function provision(
       },
     },
   });
+  created.environmentId = environment.id;
   const vault = await client.beta.vaults.create({ display_name: label });
+  created.vaultId = vault.id;
   await client.beta.vaults.credentials.create(vault.id, {
     display_name: "My Planner MCP",
     auth: { type: "static_bearer", mcp_server_url: args.mcpUrl, token: args.mcpToken },
@@ -248,15 +327,32 @@ async function provision(
           { name: "web_search", enabled: false },
         ],
       },
-      { type: "mcp_toolset", mcp_server_name: AGENT_MCP_SERVER_NAME },
+      {
+        type: "mcp_toolset",
+        mcp_server_name: AGENT_MCP_SERVER_NAME,
+        // Le scritture chiedono conferma all'utente; le letture no.
+        default_config: { permission_policy: { type: "always_ask" } },
+        configs: AGENT_READ_ONLY_MCP_TOOLS.map((name) => ({ name, permission_policy: { type: "always_allow" as const } })),
+      },
     ],
   });
+  created.agentId = agent.id;
   return { environmentId: environment.id, vaultId: vault.id, agentId: agent.id };
 }
 
-/** Rimuove la configurazione (budget di nuovo a 500) e revoca il token MCP dell'agente. */
+/**
+ * Rimuove la configurazione (budget di nuovo a 500), archivia su Anthropic
+ * agente, vault ed environment salvati (best effort, con la chiave salvata) e
+ * revoca il token MCP dell'agente.
+ */
 export async function clearAgentConfig(projectId: string): Promise<AgentConfigView> {
   const project = await getProject(projectId);
+  const ids = { agentId: project.agentId, vaultId: project.agentVaultId, environmentId: project.agentEnvironmentId };
+  if (ids.agentId || ids.vaultId || ids.environmentId) {
+    const apiKey = await storedApiKey(project);
+    if (apiKey) await archiveResources(apiKey, ids, []);
+    else console.warn("[agent-config] chiave API non leggibile: risorse Anthropic non archiviate");
+  }
   await revokeToken(project.agentMcpTokenId);
   const updated = await prisma.project.update({
     where: { id: projectId },
