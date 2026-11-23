@@ -42,6 +42,19 @@ function randomHex(bytes = 32): string {
 }
 
 /**
+ * Crea un token MCP di progetto (64 hex, come POST /projects/:id/tokens) e
+ * restituisce il valore in chiaro una sola volta; in DB resta l'hash. Web
+ * Crypto: funziona sia su Node sia sui Workers.
+ */
+export async function createProjectToken(projectId: string, label: string | null): Promise<{ id: string; token: string }> {
+  const token = randomHex();
+  const created = await prisma.projectToken.create({
+    data: { projectId, tokenHash: await hashToken(token), label },
+  });
+  return { id: created.id, token };
+}
+
+/**
  * Emette un token MCP globale per l'utente. Chiamato solo dal flusso OAuth
  * (/token, dopo il login web in /authorize): non esiste un endpoint REST che
  * lo generi, cosi' l'unico modo di ottenerlo e' autorizzarlo dal browser.

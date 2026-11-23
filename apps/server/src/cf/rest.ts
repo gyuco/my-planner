@@ -77,6 +77,7 @@ import {
   sendBackTaskInputSchema,
   taskAiInputSchema,
   pushSubscriptionInputSchema,
+  aiAgentInputSchema,
   aiRoutineInputSchema,
   dependencyInputSchema,
   commentInputSchema,
@@ -104,6 +105,7 @@ import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 import { getVapidPublicKey, listDevices, removeDevice, sendTestPush, subscribeDevice } from "../services/pushService.js";
 import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
+import { clearAgentConfig, getAgentConfig, setAgentConfig } from "../services/agentConfigService.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -321,6 +323,21 @@ export function buildRestApp() {
   app.post("/projects/:projectId/ai-routine/run", async (c) => {
     assertAdmin(c.get("user"));
     return c.json(await dispatchProject(c.req.param("projectId"), { force: true }));
+  });
+
+  // Agente Claude Managed Agents per la chat (solo admin). I segreti non escono mai.
+  app.get("/projects/:projectId/ai-agent", async (c) => {
+    assertAdmin(c.get("user"));
+    return c.json(await getAgentConfig(c.req.param("projectId")));
+  });
+  app.put("/projects/:projectId/ai-agent", async (c) => {
+    assertAdmin(c.get("user"));
+    const body = aiAgentInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await setAgentConfig(c.req.param("projectId"), body));
+  });
+  app.delete("/projects/:projectId/ai-agent", async (c) => {
+    assertAdmin(c.get("user"));
+    return c.json(await clearAgentConfig(c.req.param("projectId")));
   });
 
   app.post("/projects/:projectId/archive", async (c) => {
