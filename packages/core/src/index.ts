@@ -127,62 +127,6 @@ export interface Project {
   groupName?: string | null;
   /** true se e' configurata la routine Claude Code per l'avvio automatico dei passi AI. */
   aiRoutineConfigured?: boolean;
-  /** true se l'agente Claude Managed Agents per la chat e' configurato (chiave API, token GitHub e agente). */
-  aiAgentConfigured?: boolean;
-}
-
-/** Configurazione dell'agente per la chat (GET/PUT/DELETE /projects/:id/ai-agent, solo admin). I segreti non escono mai. */
-export interface AgentConfigView {
-  configured: boolean;
-  hasApiKey: boolean;
-  hasGithubToken: boolean;
-  /** Budget per sessione in dollari (default 5). */
-  budgetUsd: number;
-  lastError: string | null;
-  agentId: string | null;
-}
-
-export type AgentChatStatus = "idle" | "running" | "rescheduling" | "terminated";
-
-/** Chat con l'agente del progetto (sessione Claude Managed Agents), facoltativamente legata a un task. */
-export interface AgentChat {
-  id: string;
-  projectId: string;
-  taskId: string | null;
-  title: string;
-  status: AgentChatStatus;
-  createdAt: string;
-  updatedAt: string;
-  createdByName: string | null;
-  /** Link alla sessione nella console Anthropic. */
-  consoleUrl: string;
-}
-
-export type AgentChatEventType =
-  | "user_message"
-  | "agent_message"
-  | "agent_delta_start"
-  | "agent_delta"
-  | "tool_use"
-  | "tool_result"
-  | "status"
-  | "error"
-  | "usage";
-
-/** Evento della chat normalizzato per la UI (messaggi, tool, stato, costo). */
-export interface AgentChatEvent {
-  id: string;
-  type: AgentChatEventType;
-  at: string | null;
-  text?: string;
-  messageId?: string;
-  toolName?: string;
-  toolInput?: string;
-  needsApproval?: boolean;
-  isError?: boolean;
-  status?: AgentChat["status"];
-  stopReason?: string;
-  costCents?: number;
 }
 
 /** Configurazione della routine di un progetto (GET /projects/:id/ai-routine, solo admin). */
@@ -589,7 +533,6 @@ export type ErrorCode =
   | "ATTACHMENT_TYPE_NOT_ALLOWED"
   | "CONFLICT"
   | "EMAIL_SEND_FAILED"
-  | "AGENT_API_ERROR"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -634,7 +577,6 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   ATTACHMENT_TYPE_NOT_ALLOWED: 415,
   CONFLICT: 409,
   EMAIL_SEND_FAILED: 502,
-  AGENT_API_ERROR: 502,
   INTERNAL_ERROR: 500,
 };
 
