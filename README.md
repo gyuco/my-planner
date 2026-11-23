@@ -201,26 +201,6 @@ Nessun token da copiare: il permesso si concede solo dal link web (OAuth con PKC
 e ogni connessione si revoca da **Profilo → MCP globale**. Su Cloudflare serve la
 migrazione D1 `0014_add_user_mcp_tokens.sql` (applicata dal deploy CI, oppure `npm run --workspace apps/server d1:migrate:remote`).
 
-## Vista "In corso" (sessioni di Claude Code)
-
-La pagina **In corso** mostra le sessioni di Claude Code aperte, divise per
-progetto e task, con quelle che aspettano una tua risposta in cima. Le sessioni
-si segnalano da sole con gli hook di Claude Code: script eseguiti da Claude Code
-senza passare dal modello, quindi senza consumo di token.
-
-1. **Profilo → Hook di Claude Code**: crea un token (`mph_...`).
-2. Dove gira Claude Code imposta `MY_PLANNER_URL` (la REST API, es.
-   `https://<host-web>/api`) e `MY_PLANNER_HOOK_TOKEN`.
-3. Registra `tools/claude-hooks/my-planner-hook.mjs` negli hook
-   (`SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Notification`, `Stop`,
-   `SessionEnd`): questo repository lo fa già in `.claude/settings.json`; per gli
-   altri copia lo script e la stessa configurazione in `~/.claude/settings.json`.
-
-Progetto e task si ricavano da `repoUrl` del progetto e dal branch
-(`feat/{taskId}-slug`). Senza le due variabili lo script non fa nulla. Nelle
-sessioni cloud l'host di My Planner deve essere tra gli host consentiti
-dell'ambiente. Su Cloudflare serve la migrazione D1 `0023_add_claude_sessions.sql`.
-
 ## Standup giornaliero (Cron Trigger + Gmail)
 
 Il Worker CF invia ogni giorno alle 06:00 UTC (`apps/server/wrangler.toml`
