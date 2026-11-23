@@ -252,7 +252,8 @@ describe("provisioning", () => {
     expect(second.configured).toBe(true);
     expect(second.agentId).not.toBe(first.agentId);
     expect(second.budgetUsd).toBe(5);
-    expect(usedApiKeys).toEqual([API_KEY, API_KEY]);
+    // Due provisioning + archiviazione delle risorse precedenti, sempre con la chiave salvata.
+    expect(usedApiKeys).toEqual([API_KEY, API_KEY, API_KEY]);
 
     const after = await prisma.project.findUniqueOrThrow({ where: { id: project.id } });
     expect(after.agentMcpTokenId).not.toBe(before.agentMcpTokenId);
