@@ -53,7 +53,7 @@ export function ClaudeSessionModal({ projectId, taskId, taskTitle, onClose }: Cl
 
   // Portale sul body: il dialog si apre anche dal drawer del task, che ha un proprio contesto di impilamento.
   return createPortal(
-    <div className="modal-overlay" onClick={busy ? undefined : onClose}>
+    <div className="modal-overlay modal-overlay-above-drawer" onClick={busy ? undefined : onClose}>
       <form
         className="modal"
         role="dialog"
