@@ -4,7 +4,6 @@ import { ApiRequestError, changeMyPassword, deleteMyAvatar, updateMyProfile, upl
 import { OwnAvatarContent, primeAvatarCache } from "../lib/avatar";
 import { AvatarCropModal } from "../components/AvatarCropModal";
 import { GlobalMcpSection } from "../components/GlobalMcpSection";
-import { HookTokensSection } from "../components/HookTokensSection";
 import { PushSection } from "../components/PushSection";
 import { useI18n } from "../i18n";
 import { displayName } from "../lib/user";
@@ -338,8 +337,6 @@ export function ProfilePage({ user, projects, onBack, onUserUpdated }: ProfilePa
         <PushSection />
 
         <GlobalMcpSection />
-
-        <HookTokensSection />
       </div>
     </div>
   );

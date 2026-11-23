@@ -9,9 +9,6 @@ import type {
   PushDevice,
   TaskAiInput,
   UserMcpToken,
-  ClaudeSession,
-  SessionHookToken,
-  CreatedSessionHookToken,
   Task,
   TaskPriority,
   TaskStatusKey,
@@ -280,30 +277,6 @@ export function listMyMcpTokens(): Promise<UserMcpToken[]> {
 
 export function revokeMyMcpToken(tokenId: string): Promise<UserMcpToken> {
   return apiFetch(`/auth/me/mcp-tokens/${tokenId}`, { method: "DELETE" });
-}
-
-// --- Sessioni di Claude Code (vista "In corso") ------------------------------
-
-export function listClaudeSessions(): Promise<ClaudeSession[]> {
-  return apiFetch(`/claude-sessions`);
-}
-
-/** Toglie dalla vista una sessione caduta. */
-export function dismissClaudeSession(id: string): Promise<{ id: string; dismissed: true }> {
-  return apiFetch(`/claude-sessions/${encodeURIComponent(id)}`, { method: "DELETE" });
-}
-
-/** Token degli hook di Claude Code: servono solo a segnalare le sessioni. */
-export function listMyHookTokens(): Promise<SessionHookToken[]> {
-  return apiFetch(`/auth/me/hook-tokens`);
-}
-
-export function createMyHookToken(label: string | null): Promise<CreatedSessionHookToken> {
-  return apiFetch(`/auth/me/hook-tokens`, { method: "POST", body: JSON.stringify({ label }) });
-}
-
-export function revokeMyHookToken(tokenId: string): Promise<SessionHookToken> {
-  return apiFetch(`/auth/me/hook-tokens/${encodeURIComponent(tokenId)}`, { method: "DELETE" });
 }
 
 export interface ProjectTokenWithSecret extends ProjectToken {

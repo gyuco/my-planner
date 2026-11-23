@@ -111,17 +111,6 @@ import {
   setRoutineConfig,
   startInteractiveSession,
 } from "../services/aiRoutineService.js";
-import {
-  bearerToken,
-  createSessionHookToken,
-  dismissClaudeSession,
-  listClaudeSessions,
-  listSessionHookTokens,
-  recordHookEvent,
-  resolveUserFromHookToken,
-  revokeSessionHookToken,
-} from "../services/claudeSessionService.js";
-import { claudeHookInputSchema, sessionHookTokenInputSchema } from "../lib/validation.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -160,18 +149,6 @@ export function buildRestApp() {
     return c.json(await loginUser(c.env, body));
   });
 
-  // Hook di Claude Code: autenticato col token hook (mph_...), non col JWT.
-  // /hooks/* non e' tra le protectedPaths qui sotto.
-  app.post("/hooks/claude-session", async (c) => {
-    const userId = await resolveUserFromHookToken(bearerToken(c.req.header("Authorization")));
-    if (!userId) {
-      return c.json({ error: { code: "UNAUTHORIZED", message: "Token hook non valido o revocato" } }, 401);
-    }
-    const input = claudeHookInputSchema.parse(await c.req.json().catch(() => ({})));
-    const result = await recordHookEvent(userId, input);
-    return c.json({ ok: true, status: result?.status ?? null });
-  });
-
   const auth = async (c: Context<AppEnv>): Promise<Response | void> => {
     const payload = await verifyAccessToken(c.env, c.req.header("Authorization"));
     if (!payload) {
@@ -208,8 +185,6 @@ export function buildRestApp() {
     "/users/*",
     "/avatars/*",
     "/push/*",
-    "/claude-sessions",
-    "/claude-sessions/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -268,22 +243,6 @@ export function buildRestApp() {
     if (!revoked) throw new ApiErrorException("NOT_FOUND", "Token non trovato");
     return c.json(revoked);
   });
-
-  // Token degli hook di Claude Code (vista "In corso").
-  app.get("/auth/me/hook-tokens", async (c) => c.json(await listSessionHookTokens(c.get("user").id)));
-  app.post("/auth/me/hook-tokens", async (c) => {
-    const { label } = sessionHookTokenInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await createSessionHookToken(c.get("user").id, label), 201);
-  });
-  app.delete("/auth/me/hook-tokens/:tokenId", async (c) =>
-    c.json(await revokeSessionHookToken(c.get("user").id, c.req.param("tokenId"))),
-  );
-
-  // Sessioni di Claude Code aperte (vista "In corso").
-  app.get("/claude-sessions", async (c) => c.json(await listClaudeSessions(c.get("user"))));
-  app.delete("/claude-sessions/:sessionId", async (c) =>
-    c.json(await dismissClaudeSession(c.get("user"), c.req.param("sessionId"))),
-  );
 
   // Notifiche push: chiave VAPID e dispositivi dell'utente (stesse route del runtime Node).
   app.get("/push/public-key", async (c) => c.json({ publicKey: await getVapidPublicKey() }));
