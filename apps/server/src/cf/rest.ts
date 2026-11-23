@@ -306,6 +306,7 @@ export function buildRestApp() {
   });
 
   app.patch("/projects/:projectId", async (c) => {
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
     const body = projectUpdateInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await updateProject(c.req.param("projectId"), body));
@@ -336,11 +337,13 @@ export function buildRestApp() {
   });
 
   app.post("/projects/:projectId/archive", async (c) => {
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
     return c.json(await archiveProject(c.req.param("projectId")));
   });
 
   app.post("/projects/:projectId/unarchive", async (c) => {
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), c.req.param("projectId"));
     return c.json(await unarchiveProject(c.req.param("projectId")));
   });
@@ -354,6 +357,7 @@ export function buildRestApp() {
 
   app.post("/projects/:projectId/statuses", async (c) => {
     const { projectId } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     const { label } = projectStatusInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await createProjectStatus(projectId, label), 201);
@@ -361,6 +365,7 @@ export function buildRestApp() {
 
   app.patch("/projects/:projectId/statuses/:key", async (c) => {
     const { projectId, key } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     const { label } = projectStatusInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await renameProjectStatus(projectId, key, label));
@@ -368,6 +373,7 @@ export function buildRestApp() {
 
   app.delete("/projects/:projectId/statuses/:key", async (c) => {
     const { projectId, key } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     return c.json(await deleteProjectStatus(projectId, key));
   });
@@ -375,6 +381,7 @@ export function buildRestApp() {
   // --- Token MCP -----------------------------------------------------------
   app.post("/projects/:projectId/tokens", async (c) => {
     const { projectId } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     const { label } = projectTokenInputSchema.parse(await c.req.json().catch(() => ({})));
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -397,6 +404,7 @@ export function buildRestApp() {
 
   app.get("/projects/:projectId/tokens", async (c) => {
     const { projectId } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     const tokens = await prisma.projectToken.findMany({ where: { projectId } });
     return c.json(
@@ -412,6 +420,7 @@ export function buildRestApp() {
 
   app.delete("/projects/:projectId/tokens/:tokenId", async (c) => {
     const { projectId, tokenId } = c.req.param();
+    assertAdmin(c.get("user"));
     await assertProjectAccess(c.get("user"), projectId);
     const token = await prisma.projectToken.findUnique({ where: { id: tokenId } });
     if (!token || token.projectId !== projectId) throw new ApiErrorException("NOT_FOUND", "Token non trovato");

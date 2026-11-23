@@ -756,7 +756,7 @@ export function App() {
         />
       )}
 
-      {settingsProject && (
+      {settingsProject && isAdmin && (
         <ProjectSettingsModal
           project={settingsProject}
           isAdmin={isAdmin}
