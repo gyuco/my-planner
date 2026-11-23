@@ -36,7 +36,7 @@ const it: GuideContent = {
       title: "1. Come funziona",
       bullets: [
         "**Triage** lavora i task in **Draft**: li analizza, arricchisce la descrizione (obiettivo, file coinvolti, criteri di accettazione, priorità, complessità) e li sposta in **TODO**.",
-        "**Coder** lavora i task in **TODO**: implementa su un branch `claude/<taskId>`, esegue i test, apre una pull request e sposta il task in **Testing**.",
+        "**Coder** lavora i task in **TODO**: implementa su un branch `claude/<taskId>` creato da `develop` aggiornato, esegue i test, apre una pull request verso `develop` e sposta il task in **Testing**.",
         "**Reviewer** lavora i task in **Testing**: rivede la pull request e sposta il task in **Done**, oppure lo rimanda in **TODO** con le modifiche richieste (al massimo 3 volte, poi si ferma).",
         "Le colonne le sposta **il server**, non l'agente. Sulla card vedi il badge **AI** con il passo in attesa, in corso (giallo) o fermato (rosso).",
         "Se un passo non si può completare, il task resta dov'è con il motivo e il pulsante **Riprendi** nella scheda.",
@@ -122,7 +122,7 @@ const en: GuideContent = {
       title: "1. How it works",
       bullets: [
         "**Triage** works tasks in **Draft**: it analyzes them, enriches the description (goal, files involved, acceptance criteria, priority, complexity) and moves them to **TODO**.",
-        "**Coder** works tasks in **TODO**: it implements on a `claude/<taskId>` branch, runs the tests, opens a pull request and moves the task to **Testing**.",
+        "**Coder** works tasks in **TODO**: it implements on a `claude/<taskId>` branch created from an up-to-date `develop`, runs the tests, opens a pull request against `develop` and moves the task to **Testing**.",
         "**Reviewer** works tasks in **Testing**: it reviews the pull request and moves the task to **Done**, or sends it back to **TODO** with the requested changes (at most 3 times, then it stops).",
         "**The server** moves the columns, not the agent. On the card the **AI** badge shows the step waiting, running (yellow) or stopped (red).",
         "If a step can't be completed, the task stays where it is with the reason and a **Resume** button in the task.",
@@ -208,7 +208,7 @@ const es: GuideContent = {
       title: "1. Cómo funciona",
       bullets: [
         "**Triage** trabaja las tareas en **Draft**: las analiza, enriquece la descripción (objetivo, archivos implicados, criterios de aceptación, prioridad, complejidad) y las mueve a **TODO**.",
-        "**Coder** trabaja las tareas en **TODO**: implementa en una rama `claude/<taskId>`, ejecuta los tests, abre una pull request y mueve la tarea a **Testing**.",
+        "**Coder** trabaja las tareas en **TODO**: implementa en una rama `claude/<taskId>` creada desde `develop` actualizado, ejecuta los tests, abre una pull request hacia `develop` y mueve la tarea a **Testing**.",
         "**Reviewer** trabaja las tareas en **Testing**: revisa la pull request y mueve la tarea a **Done**, o la devuelve a **TODO** con los cambios pedidos (como máximo 3 veces, luego se detiene).",
         "Las columnas las mueve **el servidor**, no el agente. En la tarjeta el distintivo **IA** muestra el paso pendiente, en curso (amarillo) o detenido (rojo).",
         "Si un paso no se puede completar, la tarea se queda donde está con el motivo y el botón **Reanudar** en la ficha.",
