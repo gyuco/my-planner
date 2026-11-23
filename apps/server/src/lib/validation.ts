@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AI_NOTIFY_MODES, AI_STEPS, TASK_EVENT_TYPES } from "@my-planner/core";
+import { AI_NOTIFY_MODES, AI_STEPS, CLAUDE_HOOK_EVENTS, TASK_EVENT_TYPES } from "@my-planner/core";
 
 /**
  * Schemi zod condivisi tra le route REST, allineati agli enum e ai formati
@@ -301,4 +301,29 @@ export const emailSettingsInputSchema = z.object({
 
 export const emailTestInputSchema = z.object({
   to: z.string().trim().max(255).optional(),
+});
+
+/**
+ * Evento inviato dallo script hook di Claude Code (POST /hooks/claude-session).
+ * Solo metadati: mai prompt, transcript o path completi. L'URL della sessione
+ * e' accettato solo se punta a claude.ai.
+ */
+export const claudeHookInputSchema = z.object({
+  event: z.enum(CLAUDE_HOOK_EVENTS),
+  sessionId: z.string().trim().min(1).max(200),
+  origin: z.enum(["cli", "cloud"]).optional(),
+  url: z
+    .string()
+    .trim()
+    .max(300)
+    .regex(/^https:\/\/claude\.ai\/code\/[\w-]+$/, "URL di sessione non valido")
+    .nullish(),
+  repo: z.string().trim().max(300).nullish(),
+  branch: z.string().trim().max(250).nullish(),
+  workdir: z.string().trim().max(120).nullish(),
+  message: z.string().max(2000).nullish(),
+});
+
+export const sessionHookTokenInputSchema = z.object({
+  label: z.string().trim().max(100).nullish(),
 });

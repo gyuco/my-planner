@@ -48,6 +48,8 @@ model User {
   assignedTasks Task[] @relation("TaskAssignee")
   ownedTasks    Task[] @relation("TaskOwner")
   mcpTokens     UserMcpToken[]
+  hookTokens    SessionHookToken[]
+  claudeSessions ClaudeSession[]
   aiWatchedTasks Task[] @relation("TaskAiWatcher")
   pushSubscriptions PushSubscription[]
 }
@@ -89,6 +91,7 @@ model Project {
   members  UserProject[]
   events   TaskEvent[]
   statuses ProjectStatus[]
+  claudeSessions ClaudeSession[]
 }
 
 // Stato personalizzato di un progetto (es. "bloqueante"), in aggiunta ai 5
@@ -207,6 +210,7 @@ model Task {
   @@index([projectId, status, position])
   @@index([parentId])
   @@index([status, updatedAt])
+  claudeSessions ClaudeSession[]
 }
 
 model TaskDependency {
@@ -343,4 +347,49 @@ model PushSettings {
   publicKey           String
   privateKeyEncrypted String
   createdAt           DateTime @default(now())
+}
+
+// Token degli hook di Claude Code: lo script hook lo usa SOLO per segnalare
+// lo stato delle sessioni (POST /hooks/claude-session). Non apre MCP ne' REST.
+// Si genera dal profilo; in DB resta solo l'hash.
+model SessionHookToken {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  label      String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([userId])
+}
+
+// Sessione di Claude Code segnalata dagli hook (vista "In corso").
+// Progetto e task sono ricavati da repository e branch (feat/{taskId}-slug).
+model ClaudeSession {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionId   String
+  // working | waiting_input | idle | ended
+  status      String
+  // cli | cloud
+  origin      String    @default("cli")
+  url         String?
+  repo        String?
+  branch      String?
+  workdir     String?
+  lastMessage String?
+  projectId   String?
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  taskId      String?
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  startedAt   DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  endedAt     DateTime?
+
+  @@unique([userId, sessionId])
+  @@index([lastSeenAt])
+  @@index([projectId])
 }

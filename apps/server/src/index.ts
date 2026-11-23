@@ -19,6 +19,7 @@ import { activityRoutes } from "./routes/activity.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { settingsRoutes } from "./routes/settings.js";
 import { pushRoutes } from "./routes/push.js";
+import { claudeSessionRoutes } from "./routes/claudeSessions.js";
 import { getAuthUser } from "./services/userService.js";
 import { MAX_UPLOAD_SIZE_BYTES } from "./services/attachmentService.js";
 
@@ -104,6 +105,7 @@ app.register(activityRoutes);
 app.register(attachmentRoutes);
 app.register(settingsRoutes);
 app.register(pushRoutes);
+app.register(claudeSessionRoutes);
 
 const port = Number(process.env.PORT ?? 3000);
 
