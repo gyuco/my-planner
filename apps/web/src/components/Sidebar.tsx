@@ -119,14 +119,16 @@ export function Sidebar({
         >
           <LinkIcon />
         </button>
-        <button
-          className="icon-button sidebar-project-settings"
-          onClick={() => onOpenSettings(p.id)}
-          title={t.sidebar.projectSettingsTitle}
-          aria-label={`${t.sidebar.projectSettingsTitle} ${p.name}`}
-        >
-          <SettingsIcon />
-        </button>
+        {isAdmin && (
+          <button
+            className="icon-button sidebar-project-settings"
+            onClick={() => onOpenSettings(p.id)}
+            title={t.sidebar.projectSettingsTitle}
+            aria-label={`${t.sidebar.projectSettingsTitle} ${p.name}`}
+          >
+            <SettingsIcon />
+          </button>
+        )}
       </div>
     );
   }

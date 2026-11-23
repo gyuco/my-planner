@@ -756,7 +756,7 @@ export function App() {
         />
       )}
 
-      {settingsProject && (
+      {settingsProject && isAdmin && (
         <ProjectSettingsModal
           project={settingsProject}
           isAdmin={isAdmin}
@@ -773,7 +773,7 @@ export function App() {
       )}
 
       {showArchived && (
-        <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} />
+        <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} isAdmin={isAdmin} />
       )}
 
       {showStorageSettings && isAdmin && (
