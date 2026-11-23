@@ -173,6 +173,12 @@ export const aiRoutineInputSchema = z.object({
   token: z.string().max(500).nullable().optional(),
 });
 
+/** Sessione interattiva di Claude Code avviata con la routine del progetto (solo admin). */
+export const aiRoutineSessionInputSchema = z.object({
+  message: z.string().trim().min(1).max(4000),
+  taskId: z.string().min(1).optional(),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),

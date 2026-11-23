@@ -78,6 +78,7 @@ import {
   taskAiInputSchema,
   pushSubscriptionInputSchema,
   aiRoutineInputSchema,
+  aiRoutineSessionInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -103,7 +104,13 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 import { getVapidPublicKey, listDevices, removeDevice, sendTestPush, subscribeDevice } from "../services/pushService.js";
-import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
+import {
+  clearRoutineConfig,
+  dispatchProject,
+  getRoutineConfig,
+  setRoutineConfig,
+  startInteractiveSession,
+} from "../services/aiRoutineService.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -321,6 +328,11 @@ export function buildRestApp() {
   app.post("/projects/:projectId/ai-routine/run", async (c) => {
     assertAdmin(c.get("user"));
     return c.json(await dispatchProject(c.req.param("projectId"), { force: true }));
+  });
+  app.post("/projects/:projectId/ai-routine/session", async (c) => {
+    assertAdmin(c.get("user"));
+    const body = aiRoutineSessionInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await startInteractiveSession(c.req.param("projectId"), body));
   });
 
   app.post("/projects/:projectId/archive", async (c) => {

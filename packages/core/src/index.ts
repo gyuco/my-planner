@@ -148,6 +148,12 @@ export interface AiDispatchResult {
   reason: string | null;
 }
 
+/** Sessione interattiva di Claude Code avviata con la routine (POST /projects/:id/ai-routine/session). */
+export interface AiRoutineSessionResult {
+  /** Link alla sessione su claude.ai; null se la risposta della routine non lo riporta. */
+  sessionUrl: string | null;
+}
+
 /** Riepilogo di una sotto-task, presente solo nell'array `subtasks` del dettaglio (GET /tasks/:taskId). */
 export interface SubtaskSummary {
   id: string;

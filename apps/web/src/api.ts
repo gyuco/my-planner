@@ -5,6 +5,7 @@ import type {
   ProjectToken,
   AiRoutineConfig,
   AiDispatchResult,
+  AiRoutineSessionResult,
   PushDevice,
   TaskAiInput,
   UserMcpToken,
@@ -212,6 +213,14 @@ export function removeAiRoutine(projectId: string): Promise<AiRoutineConfig> {
 
 export function runAiRoutine(projectId: string): Promise<AiDispatchResult> {
   return apiFetch(`/projects/${projectId}/ai-routine/run`, { method: "POST" });
+}
+
+/** Avvia una sessione interattiva di Claude Code con la routine del progetto (solo admin). */
+export function startClaudeSession(
+  projectId: string,
+  input: { message: string; taskId?: string },
+): Promise<AiRoutineSessionResult> {
+  return apiFetch(`/projects/${projectId}/ai-routine/session`, { method: "POST", body: JSON.stringify(input) });
 }
 
 /** Gruppo del progetto nella sidebar (null o "" per toglierlo). */

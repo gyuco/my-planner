@@ -15,6 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
+import { ClaudeSessionModal } from "./ClaudeSessionModal";
 import { ApiRequestError, moveTask, runAiRoutine, type DoneTasksQuery, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
@@ -87,7 +88,7 @@ interface KanbanBoardProps {
   doneCount?: number | null;
   /** Filtri per l'archivio dei completati (pulsante Done). */
   doneQuery: DoneTasksQuery;
-  /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
+  /** Progetto con routine AI configurata: mostra "Avvia coda AI" e "Apri sessione Claude" (solo admin). */
   aiQueueProjectId?: string | null;
 }
 
@@ -285,6 +286,7 @@ export function KanbanBoard({
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
   const [aiQueueBusy, setAiQueueBusy] = useState(false);
+  const [claudeSessionOpen, setClaudeSessionOpen] = useState(false);
 
   async function handleRefresh() {
     if (!onRefresh || refreshing) return;
@@ -556,6 +558,20 @@ export function KanbanBoard({
           >
             {aiQueueBusy ? t.aiRoutine.running : t.board.runAiQueue}
           </button>
+        )}
+        {aiQueueProjectId && (
+          <button
+            type="button"
+            className="filter-chip ai-queue-button"
+            onClick={() => setClaudeSessionOpen(true)}
+            disabled={loading}
+            title={t.claudeSession.openTitle}
+          >
+            {t.claudeSession.open}
+          </button>
+        )}
+        {claudeSessionOpen && aiQueueProjectId && (
+          <ClaudeSessionModal projectId={aiQueueProjectId} onClose={() => setClaudeSessionOpen(false)} />
         )}
         {onRefresh && (
           <button
