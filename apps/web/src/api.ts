@@ -5,6 +5,9 @@ import type {
   ProjectToken,
   AiRoutineConfig,
   AiDispatchResult,
+  AgentConfigView,
+  AgentChat,
+  AgentChatEvent,
   PushDevice,
   TaskAiInput,
   UserMcpToken,
@@ -212,6 +215,139 @@ export function removeAiRoutine(projectId: string): Promise<AiRoutineConfig> {
 
 export function runAiRoutine(projectId: string): Promise<AiDispatchResult> {
   return apiFetch(`/projects/${projectId}/ai-routine/run`, { method: "POST" });
+}
+
+// --- Agente per la chat (Claude Managed Agents, solo admin) -----------------
+
+export interface SaveAgentConfigInput {
+  /** Vuoto/assente = mantiene la chiave salvata. */
+  apiKey?: string;
+  /** Vuoto/assente = mantiene il token salvato. */
+  githubToken?: string;
+  budgetUsd?: number;
+  mcpUrl: string;
+}
+
+export function getAgentConfig(projectId: string): Promise<AgentConfigView> {
+  return apiFetch(`/projects/${projectId}/ai-agent`);
+}
+
+export function saveAgentConfig(projectId: string, input: SaveAgentConfigInput): Promise<AgentConfigView> {
+  return apiFetch(`/projects/${projectId}/ai-agent`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function removeAgentConfig(projectId: string): Promise<AgentConfigView> {
+  return apiFetch(`/projects/${projectId}/ai-agent`, { method: "DELETE" });
+}
+
+/** Chat di un task (`{ taskId }`) o quelle di progetto non legate a task (`{ scope: "project" }`). */
+export function listAgentChats(
+  projectId: string,
+  query: { taskId: string } | { scope: "project" },
+): Promise<AgentChat[]> {
+  const params = new URLSearchParams("taskId" in query ? { taskId: query.taskId } : { scope: query.scope });
+  return apiFetch(`/projects/${projectId}/agent-chats?${params.toString()}`);
+}
+
+export function createAgentChat(projectId: string, input: { taskId?: string; text: string }): Promise<AgentChat> {
+  return apiFetch(`/projects/${projectId}/agent-chats`, { method: "POST", body: JSON.stringify(input) });
+}
+
+export function getAgentChat(chatId: string): Promise<AgentChat> {
+  return apiFetch(`/agent-chats/${encodeURIComponent(chatId)}`);
+}
+
+export function listAgentChatEvents(chatId: string): Promise<AgentChatEvent[]> {
+  return apiFetch(`/agent-chats/${encodeURIComponent(chatId)}/events`);
+}
+
+export async function sendAgentChatMessage(chatId: string, text: string): Promise<void> {
+  await apiFetch(`/agent-chats/${encodeURIComponent(chatId)}/messages`, {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function interruptAgentChat(chatId: string): Promise<void> {
+  await apiFetch(`/agent-chats/${encodeURIComponent(chatId)}/interrupt`, { method: "POST" });
+}
+
+export async function confirmAgentChatTool(
+  chatId: string,
+  input: { toolUseId: string; result: "allow" | "deny" },
+): Promise<void> {
+  await apiFetch(`/agent-chats/${encodeURIComponent(chatId)}/tool-confirmation`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * Apre lo stream SSE della chat. Usa fetch (non EventSource) perche' serve
+ * l'header Authorization. Chiama onEvent per ogni riga `data:` e si risolve
+ * quando lo stream termina (chiusura dal server o abort del signal); rigetta
+ * se la richiesta fallisce o la connessione cade.
+ */
+export async function streamAgentChat(
+  chatId: string,
+  onEvent: (event: AgentChatEvent) => void,
+  signal: AbortSignal,
+): Promise<void> {
+  const token = getToken();
+  const headers = new Headers({ Accept: "text/event-stream" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const res = await fetch(`/api/agent-chats/${encodeURIComponent(chatId)}/stream`, { headers, signal });
+  if (res.status === 401) {
+    clearToken();
+    onUnauthorized?.();
+    throw new ApiRequestError(apiSessionExpiredMessage(), 401, "UNAUTHORIZED");
+  }
+  if (!res.ok || !res.body) {
+    let message = apiErrorMessage(res.status);
+    let code: string | undefined;
+    try {
+      const data = await res.json();
+      message = data?.error?.message ?? message;
+      code = data?.error?.code;
+    } catch {
+      /* ignore */
+    }
+    throw new ApiRequestError(message, res.status, code);
+  }
+
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  let dataLines: string[] = [];
+
+  function dispatch() {
+    if (dataLines.length === 0) return;
+    const payload = dataLines.join("\n");
+    dataLines = [];
+    try {
+      onEvent(JSON.parse(payload) as AgentChatEvent);
+    } catch {
+      /* evento malformato: ignorato */
+    }
+  }
+
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += value;
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline).replace(/\r$/, "");
+        buffer = buffer.slice(newline + 1);
+        if (line === "") dispatch();
+        else if (line.startsWith(":")) continue; // commento (es. ping)
+        else if (line.startsWith("data:")) dataLines.push(line.slice(5).replace(/^ /, ""));
+      }
+    }
+    dispatch();
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 /** Gruppo del progetto nella sidebar (null o "" per toglierlo). */
