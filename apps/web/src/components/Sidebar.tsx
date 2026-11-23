@@ -59,6 +59,9 @@ interface SidebarProps {
   selectedProjectId: string | "all" | null;
   /** Evidenzia la voce "Log attivita'" quando la pagina e' aperta. */
   activityActive: boolean;
+  /** Evidenzia la voce "In corso" (sessioni di Claude Code). */
+  sessionsActive?: boolean;
+  onOpenSessions?: () => void;
   guideActive?: boolean;
   onOpenGuide?: () => void;
   isAdmin: boolean;
@@ -76,6 +79,8 @@ export function Sidebar({
   projects,
   selectedProjectId,
   activityActive,
+  sessionsActive = false,
+  onOpenSessions,
   guideActive = false,
   onOpenGuide,
   isAdmin,
@@ -176,6 +181,11 @@ export function Sidebar({
         )}
       </nav>
       <div className="sidebar-footer">
+        {onOpenSessions && (
+          <button className={`sidebar-item${sessionsActive ? " active" : ""}`} onClick={onOpenSessions}>
+            {t.sessions.sidebar}
+          </button>
+        )}
         <button className={`sidebar-item${activityActive ? " active" : ""}`} onClick={onOpenActivity}>
           {t.sidebar.activityLog}
         </button>

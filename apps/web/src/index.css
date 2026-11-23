@@ -4075,3 +4075,80 @@ body.dnd-dragging * {
   display: block;
   margin: 0.75rem auto 0.25rem;
 }
+
+/* --- Vista "In corso" (sessioni di Claude Code) --- */
+.sessions-group-title {
+  margin: 0.25rem 0.6rem 0.25rem;
+  font-size: 0.95rem;
+}
+.session-item { align-items: center; }
+.session-status {
+  flex: 0 0 auto;
+  min-width: 7.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  background: var(--surface-sunken);
+  color: var(--ink-500);
+}
+.session-status-working { background: var(--success-bg); color: var(--success); }
+.session-status-waiting_input { background: var(--warning-bg); color: var(--warning); }
+.session-status-stale { background: var(--surface-sunken); color: var(--danger); }
+.session-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.session-title { font-weight: 600; overflow-wrap: anywhere; }
+.session-message { margin: 0; font-size: 0.85rem; color: var(--warning); }
+.session-stale { color: var(--danger); }
+.session-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink-500);
+  overflow-wrap: anywhere;
+}
+.session-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.session-open-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.8rem;
+  border-radius: var(--r-sm);
+  background: var(--accent-500);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.session-open-link:hover { background: var(--accent-600); }
+.hook-env {
+  margin: 0.25rem 0 0.5rem;
+  overflow-x: auto;
+  white-space: pre;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.55rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.hook-env code { white-space: pre; }
+.hook-token-create input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink-800);
+  background: var(--surface);
+}
+@media (max-width: 640px) {
+  .sessions-page { padding: 1rem 1rem 2.5rem; }
+  .session-item { flex-wrap: wrap; align-items: flex-start; }
+  .session-status { min-width: 0; }
+  .session-body { flex-basis: 100%; }
+  .session-meta code { overflow-wrap: anywhere; }
+}
