@@ -24,6 +24,7 @@ import type { BoardTask } from "./components/TaskCard";
 import { LoginPage } from "./pages/LoginPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ActivityPage } from "./pages/ActivityPage";
+import { SessionsPage } from "./pages/SessionsPage";
 import { GuidePage } from "./pages/GuidePage";
 
 // Recharts pesa: caricato solo quando si apre la tab Statistiche.
@@ -260,6 +261,10 @@ export function App() {
       document.title = `${t.guide.sidebar} · My Planner`;
       return;
     }
+    if (view === "sessions") {
+      document.title = `${t.sessions.title} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (view === "stats" && currentProject) {
       document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
@@ -439,7 +444,7 @@ export function App() {
   // (primo progetto, altrimenti vista aggregata) mantenendo l'eventuale ?task=.
   useEffect(() => {
     if (!loggedIn || !projectsLoaded) return;
-    if (view === "profile" || view === "activity" || view === "guide") return;
+    if (view === "profile" || view === "activity" || view === "guide" || view === "sessions") return;
     if (selectedProjectId) return;
     const target = projects[0]?.id ?? "all";
     const unknownProject = route.projectId !== null && route.projectId !== "all";
@@ -536,8 +541,14 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={view === "activity" || view === "guide" ? null : selectedProjectId}
+        selectedProjectId={view === "activity" || view === "guide" || view === "sessions" ? null : selectedProjectId}
         activityActive={view === "activity"}
+        sessionsActive={view === "sessions"}
+        onOpenSessions={() => {
+          setRouteNotice(null);
+          navigate("/sessions");
+          setSidebarOpen(false);
+        }}
         guideActive={view === "guide"}
         onOpenGuide={() => {
           navigate("/guide");
@@ -580,7 +591,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "sessions" ? t.sessions.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -640,6 +651,13 @@ export function App() {
 
         {view === "guide" ? (
           <GuidePage />
+        ) : view === "sessions" ? (
+          <SessionsPage
+            currentUser={currentUser}
+            onOpenTask={(taskId, projectId) => {
+              openTask(taskId, projectId);
+            }}
+          />
         ) : view === "activity" ? (
           <ActivityPage
             projects={projects}
