@@ -173,6 +173,23 @@ export const aiRoutineInputSchema = z.object({
   token: z.string().max(500).nullable().optional(),
 });
 
+/**
+ * Agente Claude Managed Agents del progetto (solo admin). `mcpUrl` e' l'URL
+ * completo dell'endpoint MCP HTTP (es. https://host/mcp): https, oppure http
+ * solo verso localhost. Chiave e token facoltativi se gia' salvati.
+ */
+export const aiAgentInputSchema = z.object({
+  apiKey: z.string().max(500).nullable().optional(),
+  githubToken: z.string().max(500).nullable().optional(),
+  budgetUsd: z.number().min(1).max(100).nullable().optional(),
+  mcpUrl: z
+    .string()
+    .max(500)
+    .refine((v) => /^https:\/\/\S+$/i.test(v) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/\S*)?$/i.test(v), {
+      message: "URL MCP non valido: usa https (http solo per localhost)",
+    }),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
