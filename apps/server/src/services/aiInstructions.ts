@@ -28,10 +28,12 @@ const STEP_GUIDE: Record<AiStep, string[]> = {
   ],
   coder: [
     "CODER (il task e' in TODO, passera' in Testing):",
-    "- Lavora nel repository del progetto su un branch claude/<taskId>, mai su main.",
+    "- Prima di iniziare esegui git fetch e crea il branch claude/<taskId> da origin/develop aggiornato;",
+    "  se il repository non ha un branch develop, parti dal branch di default. Mai lavorare su main o develop.",
     "- Implementa solo quanto richiesto dai criteri di accettazione; aggiungi o aggiorna i test.",
     "- Esegui test, lint e typecheck del repository e correggi finche' sono verdi.",
-    "- Apri una pull request con titolo chiaro, link al task e sezioni Cosa cambia / Test.",
+    "- Apri una pull request con base develop (o il branch di default se develop non esiste), mai verso main,",
+    "  con titolo chiaro, link al task e sezioni Cosa cambia / Test.",
     "- Chiudi con ai_complete_step: branch, link alla PR, test eseguiti con esito, eventuali limiti.",
   ],
   reviewer: [
@@ -72,7 +74,7 @@ export function aiWorkerInstructions(scope: AiInstructionsScope = {}): string {
     "",
     "Regole:",
     "- Non usare move_task sui task gestiti da AI e non modificare task diversi da quello in lavorazione.",
-    "- Mai push su main ne' merge delle pull request: solo branch claude/<taskId> e PR.",
+    "- Mai push su main o develop ne' merge delle pull request: solo branch claude/<taskId> e PR verso develop.",
     "- Se un tool risponde CONFLICT (task gia' in lavorazione o spostato), passa al task successivo.",
     "",
     "Guida dei passi:",
