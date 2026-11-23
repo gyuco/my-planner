@@ -1,22 +1,18 @@
-import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
-
-// rest.ts importa l'invio email del Worker (cloudflare:sockets), non disponibile su Node.
-vi.mock("../cf/email.js", () => ({ sendStandupEmail: vi.fn() }));
-
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import jwt from "@fastify/jwt";
 import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-planner/core";
 import { ZodError } from "zod";
 import { agentChatRoutes } from "./agentChats.js";
-import { buildRestApp } from "../cf/rest.js";
-import { signAccessToken } from "../cf/jwt.js";
 import { createProject } from "../services/taskService.js";
 import { createUser, getAuthUser } from "../services/userService.js";
 
-/** Le route della chat agente sono solo per admin: un manager riceve 403 anche sui suoi progetti. */
+/**
+ * Le route della chat agente sono solo per admin: un manager riceve 403 anche
+ * sui suoi progetti (variante Cloudflare in src/cf/agentChats.test.ts).
+ */
 
 const SECRET = process.env.JWT_SECRET!;
-const env = { JWT_SECRET: SECRET } as any;
 
 let fastify: FastifyInstance;
 
@@ -53,8 +49,8 @@ async function managerOnProject() {
     password: "password123",
     role: "manager",
     projectIds: [project.id],
-  } as any);
-  const token = await signAccessToken(env, { sub: manager.id, email: manager.email });
+  });
+  const token = fastify.jwt.sign({ sub: manager.id, email: manager.email });
   return { project, token };
 }
 
@@ -75,26 +71,15 @@ describe("chat agente: solo admin", () => {
     });
     expect(create.statusCode).toBe(403);
     expect(create.json().error.code).toBe("FORBIDDEN");
+
+    const stream = await fastify.inject({ method: "GET", url: `/agent-chats/whatever/stream`, headers });
+    expect(stream.statusCode).toBe(403);
   });
 
-  it("Cloudflare: un manager riceve 403 FORBIDDEN su lista e creazione", async () => {
-    const { project, token } = await managerOnProject();
-    const app = buildRestApp();
-    const headers = { Authorization: `Bearer ${token}`, "content-type": "application/json" };
-
-    const list = await app.request(`/projects/${project.id}/agent-chats?scope=project`, { headers }, env);
-    expect(list.status).toBe(403);
-    expect((await list.json()).error.code).toBe("FORBIDDEN");
-
-    const create = await app.request(
-      `/projects/${project.id}/agent-chats`,
-      { method: "POST", headers, body: JSON.stringify({ text: "Ciao" }) },
-      env,
-    );
-    expect(create.status).toBe(403);
-    expect((await create.json()).error.code).toBe("FORBIDDEN");
-
-    const stream = await app.request(`/agent-chats/whatever/stream`, { headers }, env);
-    expect(stream.status).toBe(403);
+  it("Node: un admin su progetto inesistente riceve 404", async () => {
+    const admin = await createUser({ email: "admin@example.com", password: "password123", role: "admin" });
+    const headers = { authorization: `Bearer ${fastify.jwt.sign({ sub: admin.id, email: admin.email })}` };
+    const list = await fastify.inject({ method: "GET", url: `/projects/nope/agent-chats`, headers });
+    expect(list.statusCode).toBe(404);
   });
 });

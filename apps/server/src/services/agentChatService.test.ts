@@ -13,6 +13,8 @@ import {
   sendAgentChatMessage,
   confirmAgentChatTool,
   setAgentChatClientFactory,
+  openAgentChatStream,
+  agentChatSseBody,
 } from "./agentChatService.js";
 
 /** Chat con l'agente Claude Managed Agents (client Anthropic simulato). */
@@ -382,5 +384,56 @@ describe("lettura e invio", () => {
     const err: any = await sendAgentChatMessage(chat.id, "Ehi").catch((e) => e);
     expect(err.code).toBe("AGENT_API_ERROR");
     expect(err.message).not.toContain(API_KEY);
+  });
+});
+
+describe("stream SSE", () => {
+  it("inoltra gli eventi come data: <json>, numera i delta, aggiorna lo stato e chiude lo stream Anthropic", async () => {
+    const project = await configuredProject();
+    const user = await admin();
+    const chat = await createAgentChat(project.id, { text: "Vai" }, user.id);
+
+    const controller = new AbortController();
+    const upstream = [
+      { type: "event_start", event: { type: "agent.message", id: "m1" } },
+      { type: "event_delta", event_id: "m1", delta: { type: "content_delta", content: { type: "text", text: "Ci" } } },
+      { type: "event_delta", event_id: "m1", delta: { type: "content_delta", content: { type: "text", text: "ao" } } },
+      { type: "agent.thinking", id: "th", processed_at: "t" },
+      { type: "session.status_idle", id: "s1", processed_at: "t", stop_reason: { type: "end_turn" } },
+    ];
+    setAgentChatClientFactory(() => ({
+      beta: {
+        sessions: {
+          events: {
+            stream: async (...args: any[]) => {
+              calls.push({ method: "events.stream", args });
+              return Object.assign(
+                (async function* () {
+                  for (const e of upstream) yield e;
+                })(),
+                { controller },
+              );
+            },
+          },
+        },
+      },
+    }) as any);
+
+    const stream = await openAgentChatStream(chat.id);
+    const text = await new Response(agentChatSseBody(stream)).text();
+    const data = text
+      .split("\n\n")
+      .filter((chunk) => chunk.startsWith("data: "))
+      .map((chunk) => JSON.parse(chunk.slice(6)));
+
+    expect(calls.at(-1)!.args).toEqual(["sesn_1", { event_deltas: ["agent.message"] }]);
+    expect(data.map((e) => [e.type, e.id])).toEqual([
+      ["agent_delta_start", "m1:start"],
+      ["agent_delta", "m1:d1"],
+      ["agent_delta", "m1:d2"],
+      ["status", "s1"],
+    ]);
+    expect((await prisma.agentChat.findUnique({ where: { id: chat.id } }))!.status).toBe("idle");
+    expect(controller.signal.aborted).toBe(true);
   });
 });

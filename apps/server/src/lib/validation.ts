@@ -190,6 +190,29 @@ export const aiAgentInputSchema = z.object({
     }),
 });
 
+/** Chat con l'agente (Claude Managed Agents): elenco per task o solo progetto. */
+export const agentChatListQuerySchema = z.object({
+  taskId: z.string().min(1).optional(),
+  scope: z.literal("project").optional(),
+});
+
+const agentChatTextSchema = z.string().trim().min(1).max(20000);
+
+/** Nuova chat: facoltativamente legata a un task del progetto. */
+export const agentChatCreateInputSchema = z.object({
+  taskId: z.string().min(1).nullable().optional(),
+  text: agentChatTextSchema,
+});
+
+export const agentChatMessageInputSchema = z.object({
+  text: agentChatTextSchema,
+});
+
+export const agentChatToolConfirmationInputSchema = z.object({
+  toolUseId: z.string().min(1).max(200),
+  result: z.enum(["allow", "deny"]),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
