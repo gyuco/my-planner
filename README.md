@@ -239,24 +239,6 @@ locale in ora legale (CEST, mar-ott); in ora solare (CET, nov-mar) diventa
 07:00 locale — se serve l'orario locale esatto tutto l'anno, l'espressione
 cron va aggiornata a mano ai cambi d'ora.
 
-## Chat agente (Managed Agents)
-
-Gli admin possono aprire una chat con un agente Claude (Claude Managed Agents)
-su un task o sull'intero progetto: l'agente lavora in un container cloud
-Anthropic con il repository GitHub del progetto montato e usa i tool MCP di
-My Planner per leggere e aggiornare i task. La chat è **solo per admin** (anche
-i manager assegnati al progetto ricevono 403). Si configura per progetto in
-`PUT /projects/:id/ai-agent` (chiave API Anthropic, token GitHub, budget, URL MCP);
-le route sono in `API_CONTRACT.md` ("Chat con l'agente").
-
-- Costi: si paga sulla chiave API Anthropic del progetto, a token e a tempo di
-  sessione attiva. Ogni sessione ha un budget massimo (default 5 USD,
-  configurabile 1..100): raggiunto il budget la sessione accetta solo
-  interruzione o approvazioni.
-- I tool MCP sono chiamati da Anthropic, non dal browser: il server MCP di
-  My Planner deve essere raggiungibile da internet (https), un'istanza solo
-  locale non funziona.
-
 ## Agenti
 
 Definiti in `.claude/agents/`: `analyst`, `architect`, `planner`, `coder`, `reviewer`, `dev-ops`.

@@ -18,7 +18,6 @@ import { TaskCard } from "./TaskCard";
 import { ApiRequestError, moveTask, runAiRoutine, type DoneTasksQuery, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
-import { AgentChatPanel } from "./AgentChatPanel";
 import { ArchiveCheckIcon, RefreshIcon } from "./Icons";
 import { useToast } from "../lib/toast";
 import { useTouchBoard } from "../lib/useTouchBoard";
@@ -90,8 +89,6 @@ interface KanbanBoardProps {
   doneQuery: DoneTasksQuery;
   /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
   aiQueueProjectId?: string | null;
-  /** Progetto con agente per la chat configurato: mostra "Chat agente" (solo admin). */
-  agentChatProjectId?: string | null;
 }
 
 interface SortableTaskCardProps {
@@ -281,7 +278,6 @@ export function KanbanBoard({
   onTaskClick,
   onRefresh,
   aiQueueProjectId,
-  agentChatProjectId = null,
   doneCount = null,
   doneQuery,
 }: KanbanBoardProps) {
@@ -334,7 +330,6 @@ export function KanbanBoard({
   const [sendBackBusy, setSendBackBusy] = useState(false);
   const [sendBackError, setSendBackError] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
-  const [showAgentChat, setShowAgentChat] = useState(false);
   const touchBoard = useTouchBoard();
   // Copia locale per l'update ottimistico: senza questa, la card torna alla
   // posizione originale non appena dnd-kit rilascia (perché `board` non è
@@ -561,19 +556,6 @@ export function KanbanBoard({
           >
             {aiQueueBusy ? t.aiRoutine.running : t.board.runAiQueue}
           </button>
-        )}
-        {agentChatProjectId && (
-          <button
-            type="button"
-            className="filter-chip agent-chat-button"
-            onClick={() => setShowAgentChat(true)}
-            title={t.agentChat.buttonTitle}
-          >
-            {t.agentChat.button}
-          </button>
-        )}
-        {showAgentChat && agentChatProjectId && (
-          <AgentChatPanel projectId={agentChatProjectId} onClose={() => setShowAgentChat(false)} />
         )}
         {onRefresh && (
           <button

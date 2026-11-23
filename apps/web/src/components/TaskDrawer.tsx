@@ -33,7 +33,6 @@ import { previewKind } from "../lib/attachmentPreview";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { TaskAiSection } from "./TaskAiSection";
-import { TaskAgentChatSection } from "./TaskAgentChatSection";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const ACTIVITY_POLL_INTERVAL_MS = 10_000;
@@ -48,8 +47,6 @@ interface TaskDrawerProps {
   onOpenTask: (taskId: string) => void;
   /** Solo gli admin modificano la gestione AI (gli altri la vedono in sola lettura). */
   isAdmin?: boolean;
-  /** Admin con agente per la chat configurato nel progetto: mostra la sezione "Chat agente". */
-  agentChatEnabled?: boolean;
 }
 
 interface CollapsibleSectionProps {
@@ -102,7 +99,6 @@ export function TaskDrawer({
   onChanged,
   onOpenTask,
   isAdmin = false,
-  agentChatEnabled = false,
 }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
@@ -837,15 +833,6 @@ export function TaskDrawer({
                 </button>
               )}
             </CollapsibleSection>
-          </div>
-        )}
-
-        {/* Fuori dal corpo: load() smonta il corpo a ogni refresh e la chat
-            perderebbe stream e testo in scrittura. Durante il refresh resta
-            montata ma nascosta. */}
-        {isAdmin && agentChatEnabled && task && (
-          <div className="drawer-body" style={loading ? { display: "none" } : undefined}>
-            <TaskAgentChatSection projectId={projectId} taskId={taskId} />
           </div>
         )}
       </aside>

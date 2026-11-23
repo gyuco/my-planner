@@ -77,12 +77,7 @@ import {
   sendBackTaskInputSchema,
   taskAiInputSchema,
   pushSubscriptionInputSchema,
-  aiAgentInputSchema,
   aiRoutineInputSchema,
-  agentChatCreateInputSchema,
-  agentChatListQuerySchema,
-  agentChatMessageInputSchema,
-  agentChatToolConfirmationInputSchema,
   dependencyInputSchema,
   commentInputSchema,
   projectNameInputSchema,
@@ -109,19 +104,6 @@ import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
 import { getVapidPublicKey, listDevices, removeDevice, sendTestPush, subscribeDevice } from "../services/pushService.js";
 import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
-import { clearAgentConfig, getAgentConfig, setAgentConfig } from "../services/agentConfigService.js";
-import {
-  AGENT_CHAT_SSE_HEADERS,
-  agentChatSseBody,
-  confirmAgentChatTool,
-  createAgentChat,
-  getAgentChat,
-  interruptAgentChat,
-  listAgentChatEvents,
-  listAgentChats,
-  openAgentChatStream,
-  sendAgentChatMessage,
-} from "../services/agentChatService.js";
 
 /**
  * REST API su Hono (CF3/CF5/CF8): porting 1:1 delle route Fastify
@@ -196,7 +178,6 @@ export function buildRestApp() {
     "/users/*",
     "/avatars/*",
     "/push/*",
-    "/agent-chats/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -340,66 +321,6 @@ export function buildRestApp() {
   app.post("/projects/:projectId/ai-routine/run", async (c) => {
     assertAdmin(c.get("user"));
     return c.json(await dispatchProject(c.req.param("projectId"), { force: true }));
-  });
-
-  // Agente Claude Managed Agents per la chat (solo admin). I segreti non escono mai.
-  app.get("/projects/:projectId/ai-agent", async (c) => {
-    assertAdmin(c.get("user"));
-    return c.json(await getAgentConfig(c.req.param("projectId")));
-  });
-  app.put("/projects/:projectId/ai-agent", async (c) => {
-    assertAdmin(c.get("user"));
-    const body = aiAgentInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await setAgentConfig(c.req.param("projectId"), body));
-  });
-  app.delete("/projects/:projectId/ai-agent", async (c) => {
-    assertAdmin(c.get("user"));
-    return c.json(await clearAgentConfig(c.req.param("projectId")));
-  });
-
-  // Chat con l'agente Claude Managed Agents (solo admin, stesse regole del runtime Node).
-  app.get("/projects/:projectId/agent-chats", async (c) => {
-    assertAdmin(c.get("user"));
-    const query = agentChatListQuerySchema.parse(c.req.query());
-    return c.json(await listAgentChats(c.req.param("projectId"), query));
-  });
-  app.post("/projects/:projectId/agent-chats", async (c) => {
-    const user = c.get("user");
-    assertAdmin(user);
-    const body = agentChatCreateInputSchema.parse(await c.req.json().catch(() => ({})));
-    return c.json(await createAgentChat(c.req.param("projectId"), body, user.id), 201);
-  });
-  app.get("/agent-chats/:chatId", async (c) => {
-    assertAdmin(c.get("user"));
-    return c.json(await getAgentChat(c.req.param("chatId")));
-  });
-  app.get("/agent-chats/:chatId/events", async (c) => {
-    assertAdmin(c.get("user"));
-    return c.json(await listAgentChatEvents(c.req.param("chatId")));
-  });
-  app.post("/agent-chats/:chatId/messages", async (c) => {
-    assertAdmin(c.get("user"));
-    const { text } = agentChatMessageInputSchema.parse(await c.req.json().catch(() => ({})));
-    await sendAgentChatMessage(c.req.param("chatId"), text);
-    return c.json({ ok: true }, 202);
-  });
-  app.post("/agent-chats/:chatId/interrupt", async (c) => {
-    assertAdmin(c.get("user"));
-    await interruptAgentChat(c.req.param("chatId"));
-    return c.json({ ok: true }, 202);
-  });
-  app.post("/agent-chats/:chatId/tool-confirmation", async (c) => {
-    assertAdmin(c.get("user"));
-    const { toolUseId, result } = agentChatToolConfirmationInputSchema.parse(await c.req.json().catch(() => ({})));
-    await confirmAgentChatTool(c.req.param("chatId"), toolUseId, result);
-    return c.json({ ok: true }, 202);
-  });
-  // SSE letto dalla web app con fetch; la cancellazione del body (client
-  // disconnesso) chiude lo stream Anthropic.
-  app.get("/agent-chats/:chatId/stream", async (c) => {
-    assertAdmin(c.get("user"));
-    const stream = await openAgentChatStream(c.req.param("chatId"));
-    return new Response(agentChatSseBody(stream), { status: 200, headers: AGENT_CHAT_SSE_HEADERS });
   });
 
   app.post("/projects/:projectId/archive", async (c) => {
