@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify, { type FastifyInstance } from "fastify";
 import jwt from "@fastify/jwt";
 import { ZodError } from "zod";
@@ -6,16 +6,16 @@ import { ApiErrorException, apiError, HTTP_STATUS_BY_ERROR_CODE } from "@my-plan
 import { projectRoutes } from "./projects.js";
 import { createUser, getAuthUser } from "../services/userService.js";
 import { createProject, updateProject } from "../services/taskService.js";
-import { setAgentClientFactory } from "../services/agentConfigService.js";
+import { setRoutineConfig } from "../services/aiRoutineService.js";
 
 /**
- * Route REST Node /projects/:projectId/ai-agent: solo admin. L'app replica
- * l'autenticazione e l'error handler di src/index.ts (che avvia il server e
- * non e' importabile nei test).
+ * Route REST Node POST /projects/:projectId/ai-routine/session: solo admin.
+ * L'app replica l'autenticazione e l'error handler di src/index.ts (che avvia
+ * il server e non e' importabile nei test). La routine e' simulata con fetch.
  */
 
 let app: FastifyInstance;
-let anthropicCalls = 0;
+let fires: { url: string; body: any }[] = [];
 
 async function buildApp() {
   const instance = Fastify();
@@ -46,22 +46,23 @@ async function buildApp() {
 }
 
 beforeEach(async () => {
-  anthropicCalls = 0;
-  setAgentClientFactory(() => {
-    anthropicCalls++;
-    throw new Error("il client Anthropic non deve essere usato");
+  fires = [];
+  vi.stubGlobal("fetch", async (url: string, init: RequestInit) => {
+    fires.push({ url, body: JSON.parse(String(init.body)) });
+    return Response.json({ type: "routine_fire", claude_code_session_url: "https://claude.ai/code/session_1" });
   });
   app = await buildApp();
 });
 
 afterEach(async () => {
-  setAgentClientFactory(null);
+  vi.unstubAllGlobals();
   await app.close();
 });
 
 async function setup() {
   const project = await createProject("Clinica");
   await updateProject(project.id, { repoUrl: "gyuco/clinica" });
+  await setRoutineConfig(project.id, { routineId: "trig_01ABCDEFGHJK", token: "sk-ant-oat01-test-token-0123456789" });
   const manager = await createUser({
     email: "manager@example.com",
     password: "password-123",
@@ -73,41 +74,43 @@ async function setup() {
   return { project, managerToken: tokenFor(manager), adminToken: tokenFor(admin) };
 }
 
-describe("REST Node /projects/:projectId/ai-agent", () => {
-  it("un manager assegnato al progetto riceve 403 su GET, PUT e DELETE", async () => {
+describe("REST Node POST /projects/:projectId/ai-routine/session", () => {
+  it("un manager assegnato al progetto riceve 403 e la routine non parte", async () => {
     const { project, managerToken } = await setup();
-    const url = `/projects/${project.id}/ai-agent`;
-    const headers = { authorization: `Bearer ${managerToken}` };
-
-    for (const method of ["GET", "PUT", "DELETE"] as const) {
-      const res = await app.inject({
-        method,
-        url,
-        headers,
-        ...(method === "PUT"
-          ? { payload: { apiKey: "sk-ant-api03-x", githubToken: "ghp_x", mcpUrl: "https://planner.example.com/mcp" } }
-          : {}),
-      });
-      expect(res.statusCode, method).toBe(403);
-      expect(res.json().error.code, method).toBe("FORBIDDEN");
-    }
-    expect(anthropicCalls).toBe(0);
+    const res = await app.inject({
+      method: "POST",
+      url: `/projects/${project.id}/ai-routine/session`,
+      headers: { authorization: `Bearer ${managerToken}` },
+      payload: { message: "Ciao" },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json().error.code).toBe("FORBIDDEN");
+    expect(fires).toHaveLength(0);
   });
 
-  it("l'admin legge la configurazione (200)", async () => {
+  it("l'admin avvia la sessione (200) e riceve il link", async () => {
     const { project, adminToken } = await setup();
     const res = await app.inject({
-      method: "GET",
-      url: `/projects/${project.id}/ai-agent`,
+      method: "POST",
+      url: `/projects/${project.id}/ai-routine/session`,
       headers: { authorization: `Bearer ${adminToken}` },
+      payload: { message: "  Aggiorna il README  " },
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ configured: false });
+    expect(res.json()).toEqual({ sessionUrl: "https://claude.ai/code/session_1" });
+    expect(fires).toHaveLength(1);
+    expect(fires[0].body.text.endsWith("Richiesta:\nAggiorna il README")).toBe(true);
   });
 
-  it("senza token risponde 401", async () => {
-    const { project } = await setup();
-    const res = await app.inject({ method: "GET", url: `/projects/${project.id}/ai-agent` });
-    expect(res.statusCode).toBe(401);
+  it("messaggio vuoto: 400 senza avvio", async () => {
+    const { project, adminToken } = await setup();
+    const res = await app.inject({
+      method: "POST",
+      url: `/projects/${project.id}/ai-routine/session`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { message: "   " },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(fires).toHaveLength(0);
   });
 });

@@ -1,13 +1,18 @@
 import type { FastifyInstance } from "fastify";
-import { clearAgentConfig, getAgentConfig, setAgentConfig } from "../services/agentConfigService.js";
-import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
+import {
+  clearRoutineConfig,
+  dispatchProject,
+  getRoutineConfig,
+  setRoutineConfig,
+  startInteractiveSession,
+} from "../services/aiRoutineService.js";
 import { apiError } from "@my-planner/core";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
 import { createProject, renameProject, updateProject, archiveProject, unarchiveProject } from "../services/taskService.js";
 import { assertAdmin, assertProjectAccess, listProjectsForUser } from "../services/userService.js";
-import { aiAgentInputSchema, aiRoutineInputSchema, projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import { aiRoutineInputSchema, aiRoutineSessionInputSchema, projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 import {
   createProjectStatus,
   deleteProjectStatus,
@@ -147,22 +152,10 @@ export async function projectRoutes(app: FastifyInstance) {
     return dispatchProject(projectId, { force: true });
   });
 
-  // Agente Claude Managed Agents per la chat (solo admin). I segreti non escono mai.
-  app.get("/projects/:projectId/ai-agent", { onRequest: [app.authenticate] }, async (req) => {
+  // Sessione interattiva di Claude Code (la conversazione prosegue su claude.ai).
+  app.post("/projects/:projectId/ai-routine/session", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
     assertAdmin((req as any).authUser);
-    return getAgentConfig(projectId);
-  });
-
-  app.put("/projects/:projectId/ai-agent", { onRequest: [app.authenticate] }, async (req) => {
-    const { projectId } = req.params as { projectId: string };
-    assertAdmin((req as any).authUser);
-    return setAgentConfig(projectId, aiAgentInputSchema.parse(req.body ?? {}));
-  });
-
-  app.delete("/projects/:projectId/ai-agent", { onRequest: [app.authenticate] }, async (req) => {
-    const { projectId } = req.params as { projectId: string };
-    assertAdmin((req as any).authUser);
-    return clearAgentConfig(projectId);
+    return startInteractiveSession(projectId, aiRoutineSessionInputSchema.parse(req.body ?? {}));
   });
 }

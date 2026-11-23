@@ -15,10 +15,10 @@ import { CSS } from "@dnd-kit/utilities";
 import { TASK_STATUSES, isBaseStatus, type Board, type TaskStatusKey } from "@my-planner/core";
 import type { BoardTask } from "./TaskCard";
 import { TaskCard } from "./TaskCard";
+import { ClaudeSessionModal } from "./ClaudeSessionModal";
 import { ApiRequestError, moveTask, runAiRoutine, type DoneTasksQuery, sendBackTask as sendBackTaskRequest } from "../api";
 import { SendBackModal } from "./SendBackModal";
 import { DoneTasksModal } from "./DoneTasksModal";
-import { AgentChatPanel } from "./AgentChatPanel";
 import { ArchiveCheckIcon, RefreshIcon } from "./Icons";
 import { useToast } from "../lib/toast";
 import { useTouchBoard } from "../lib/useTouchBoard";
@@ -88,10 +88,8 @@ interface KanbanBoardProps {
   doneCount?: number | null;
   /** Filtri per l'archivio dei completati (pulsante Done). */
   doneQuery: DoneTasksQuery;
-  /** Progetto con routine AI configurata: mostra "Avvia coda AI" (solo admin). */
+  /** Progetto con routine AI configurata: mostra "Avvia coda AI" e "Apri sessione Claude" (solo admin). */
   aiQueueProjectId?: string | null;
-  /** Progetto con agente per la chat configurato: mostra "Chat agente" (solo admin). */
-  agentChatProjectId?: string | null;
 }
 
 interface SortableTaskCardProps {
@@ -281,7 +279,6 @@ export function KanbanBoard({
   onTaskClick,
   onRefresh,
   aiQueueProjectId,
-  agentChatProjectId = null,
   doneCount = null,
   doneQuery,
 }: KanbanBoardProps) {
@@ -289,6 +286,7 @@ export function KanbanBoard({
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
   const [aiQueueBusy, setAiQueueBusy] = useState(false);
+  const [claudeSessionOpen, setClaudeSessionOpen] = useState(false);
 
   async function handleRefresh() {
     if (!onRefresh || refreshing) return;
@@ -334,7 +332,6 @@ export function KanbanBoard({
   const [sendBackBusy, setSendBackBusy] = useState(false);
   const [sendBackError, setSendBackError] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
-  const [showAgentChat, setShowAgentChat] = useState(false);
   const touchBoard = useTouchBoard();
   // Copia locale per l'update ottimistico: senza questa, la card torna alla
   // posizione originale non appena dnd-kit rilascia (perché `board` non è
@@ -562,18 +559,19 @@ export function KanbanBoard({
             {aiQueueBusy ? t.aiRoutine.running : t.board.runAiQueue}
           </button>
         )}
-        {agentChatProjectId && (
+        {aiQueueProjectId && (
           <button
             type="button"
-            className="filter-chip agent-chat-button"
-            onClick={() => setShowAgentChat(true)}
-            title={t.agentChat.buttonTitle}
+            className="filter-chip ai-queue-button"
+            onClick={() => setClaudeSessionOpen(true)}
+            disabled={loading}
+            title={t.claudeSession.openTitle}
           >
-            {t.agentChat.button}
+            {t.claudeSession.open}
           </button>
         )}
-        {showAgentChat && agentChatProjectId && (
-          <AgentChatPanel projectId={agentChatProjectId} onClose={() => setShowAgentChat(false)} />
+        {claudeSessionOpen && aiQueueProjectId && (
+          <ClaudeSessionModal projectId={aiQueueProjectId} onClose={() => setClaudeSessionOpen(false)} />
         )}
         {onRefresh && (
           <button

@@ -720,9 +720,6 @@ export function App() {
                   aiQueueProjectId={
                     isAdmin && currentProject?.aiRoutineConfigured ? currentProject.id : null
                   }
-                  agentChatProjectId={
-                    isAdmin && currentProject?.aiAgentConfigured ? currentProject.id : null
-                  }
                 />
               </>
             )}
@@ -753,8 +750,8 @@ export function App() {
           onChanged={loadBoard}
           onOpenTask={handleOpenTask}
           isAdmin={isAdmin}
-          agentChatEnabled={
-            isAdmin && Boolean(projects.find((p) => p.id === openTaskProjectId)?.aiAgentConfigured)
+          claudeSessionProjectId={
+            isAdmin && projects.find((p) => p.id === openTaskProjectId)?.aiRoutineConfigured ? openTaskProjectId : null
           }
         />
       )}

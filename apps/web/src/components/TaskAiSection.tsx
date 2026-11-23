@@ -5,10 +5,13 @@ import { ApiRequestError, setTaskAi } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { Link } from "react-router-dom";
+import { ClaudeSessionModal } from "./ClaudeSessionModal";
 
 interface TaskAiSectionProps {
   task: Task;
   isAdmin: boolean;
+  /** Progetto con routine configurata: l'admin puo' aprire una sessione Claude su questo task. */
+  claudeSessionProjectId?: string | null;
   onSaved: (task: Task) => void;
 }
 
@@ -18,7 +21,7 @@ interface TaskAiSectionProps {
  * Done) e quando essere avvisato. Gli altri utenti vedono solo lo stato,
  * e solo se la gestione AI e' attiva.
  */
-export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
+export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, onSaved }: TaskAiSectionProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
   const ai = task.ai;
@@ -27,6 +30,7 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
   const [notify, setNotify] = useState<AiNotifyMode>(ai?.notify ?? "end");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [claudeSessionOpen, setClaudeSessionOpen] = useState(false);
 
   useEffect(() => {
     setEnabled(task.ai?.enabled ?? false);
@@ -199,6 +203,27 @@ export function TaskAiSection({ task, isAdmin, onSaved }: TaskAiSectionProps) {
       <button type="button" onClick={handleSave} disabled={saving || unchanged} aria-busy={saving}>
         {saving ? t.taskAi.saving : t.taskAi.save}
       </button>
+
+      {claudeSessionProjectId && (
+        <>
+          <button
+            type="button"
+            className="ai-session-button"
+            onClick={() => setClaudeSessionOpen(true)}
+            title={t.claudeSession.openTitle}
+          >
+            {t.claudeSession.openForTask}
+          </button>
+          {claudeSessionOpen && (
+            <ClaudeSessionModal
+              projectId={claudeSessionProjectId}
+              taskId={task.id}
+              taskTitle={task.title}
+              onClose={() => setClaudeSessionOpen(false)}
+            />
+          )}
+        </>
+      )}
     </section>
   );
 }

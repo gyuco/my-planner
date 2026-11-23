@@ -59,7 +59,6 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `ATTACHMENT_TYPE_NOT_ALLOWED` | 415 | Tipo file non ammesso |
 | `CONFLICT` | 409 | Altri conflitti generici (es. nome progetto duplicato, se applicabile) |
 | `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
-| `AGENT_API_ERROR` | 502 | L'API Anthropic (Claude Managed Agents) ha rifiutato o non ha completato la richiesta; `message` riporta status e messaggio, mai la chiave |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
 `message` è sempre una stringa human-readable in italiano (coerente col resto del codebase), pensata per essere mostrata sia in UI sia restituita a un agente AI via MCP.
@@ -676,53 +675,9 @@ Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
 - `PUT /projects/:projectId/ai-routine` body `{ routineId: "trig_…", token? }`: il token del trigger API della routine è salvato cifrato (secretBox) e non viene mai restituito; omesso = resta quello salvato.
 - `DELETE /projects/:projectId/ai-routine`: rimuove la configurazione.
 - `POST /projects/:projectId/ai-routine/run` → `{ fired, taskIds, sessionUrl, reason }`: avvia subito la routine per tutti i task in attesa (anche se già avviati di recente).
+- `POST /projects/:projectId/ai-routine/session` body `{ message, taskId? }` → `{ sessionUrl }`: avvia una sessione interattiva di Claude Code con la routine (l'utente continua la conversazione su claude.ai). `message` stringa trim 1..4000; `taskId` facoltativo, deve appartenere al progetto (altrimenti `404 NOT_FOUND`). Il payload inviato alla routine è `My Planner: sessione interattiva.` seguito da `projectId: <id>`, `taskId: <id>` (solo se indicato), `Richiesta:` e il messaggio; il prompt della routine in questo caso non lavora la coda AI. Non modifica `Task.ai.dispatch`. Routine non configurata o avvio fallito (token rifiutato, 429, rete) → `400 VALIDATION_ERROR` con il motivo, salvato anche in `lastError`. Solo admin (`403 FORBIDDEN` per gli altri ruoli).
 - Avvio automatico: dopo un cambio di stato o una modifica della gestione AI fatti da un utente (non dagli agenti MCP), se il progetto ha la routine configurata, il server chiama `POST https://api.anthropic.com/v1/claude_code/routines/{id}/fire` con `{ text }` che contiene solo `projectId` e `taskId (step)` dei task in attesa. Una chiamata per progetto; lo stesso passo non viene riavviato prima di 30 minuti. Errori (token rifiutato, 429 con `Retry-After`, rete) salvati in `lastError`. Ogni `Task.ai.dispatch` riporta `{ step, at, sessionUrl }` dell'ultimo avvio.
 - I progetti esposti da REST e MCP non includono mai le colonne della routine: solo `aiRoutineConfigured: boolean`.
-
-### Agente AI per la chat (Claude Managed Agents, solo admin)
-- `GET /projects/:projectId/ai-agent` → `AgentConfigView` `{ configured, hasApiKey, hasGithubToken, budgetUsd, lastError, agentId }`. I segreti (chiave API, token GitHub) non compaiono mai in risposte o log.
-- `PUT /projects/:projectId/ai-agent` body `{ apiKey?, githubToken?, budgetUsd? (1..100, default 5), mcpUrl }` → `AgentConfigView`.
-  - `apiKey` deve iniziare con `sk-ant-`; `githubToken` non vuoto e senza spazi; ciascuno è facoltativo solo se già salvato (cifrato con secretBox). `mcpUrl` è l'URL completo dell'endpoint MCP HTTP di My Planner (es. `https://host/mcp`): https, oppure http solo verso localhost.
-  - 400 `VALIDATION_ERROR` "Imposta prima il repository GitHub del progetto" se il progetto non ha `repoUrl`.
-  - Crea un nuovo token MCP di progetto (label "Agente AI (chat)") e revoca il precedente token dell'agente; crea su Anthropic un environment cloud (rete limitata: `api.github.com`, package manager, server MCP), un vault con due credenziali (bearer statico per l'MCP; variabile d'ambiente `GITHUB_TOKEN` sostituita solo verso `api.github.com`) e l'agente (`claude-opus-5-5`, toolset agente senza web_fetch/web_search, toolset MCP `my-planner`). A ogni salvataggio crea risorse nuove e sostituisce gli id (le vecchie non vengono archiviate).
-  - Errore Anthropic: 502 `AGENT_API_ERROR`, messaggio salvato in `lastError`; la configurazione precedente resta e il nuovo token viene revocato.
-- `DELETE /projects/:projectId/ai-agent` → `AgentConfigView`: azzera la configurazione (budget di nuovo a 5 USD) e revoca il token MCP dell'agente.
-- I progetti esposti da REST e MCP includono solo `aiAgentConfigured: boolean` (chiave API, token GitHub e agente presenti).
-
-### Chat con l'agente (Claude Managed Agents, solo admin)
-Ogni chat è una sessione Claude Managed Agents, legata a un task o al solo progetto. Tutte le route richiedono un utente **admin** (`Authorization: Bearer <jwt>`): un manager riceve 403 `FORBIDDEN` anche sui progetti a cui è assegnato. Progetto o chat inesistenti → 404 `NOT_FOUND`. Agente non configurato → 400 `VALIDATION_ERROR` "Agente AI non configurato". Errori Anthropic → 502 `AGENT_API_ERROR` con messaggio leggibile (mai la chiave).
-
-`AgentChat`: `{ id, projectId, taskId: string | null, title, status: "idle" | "running" | "rescheduling" | "terminated", createdAt, updatedAt, createdByName: string | null (nome e cognome, altrimenti email), consoleUrl }` con `consoleUrl = https://platform.claude.com/workspaces/default/sessions/<sessionId>`.
-
-- `GET /projects/:projectId/agent-chats?taskId=<id>` → `AgentChat[]` del task; `?scope=project` → solo le chat senza task; senza parametri → tutte le chat del progetto. Più recenti prima.
-- `POST /projects/:projectId/agent-chats` body `{ taskId?: string, text: string (1..20000) }` → 201 `AgentChat`.
-  - Il task deve appartenere al progetto (404 altrimenti). Se il task ha già una chat con stato diverso da `terminated` → 409 `CONFLICT`.
-  - Titolo: titolo del task, oppure i primi 60 caratteri del testo per le chat di progetto.
-  - Per un task il primo messaggio è preceduto da una riga: `Task <id> "<titolo>" del progetto <projectId>: leggi descrizione e commenti con get_task e list_comments.`
-  - La sessione monta il repository del progetto in `/workspace/repo` (token GitHub salvato), usa il vault dell'agente, ha `metadata { projectId, taskId? }` e il budget del progetto (`budget.max_list_cost` in centesimi USD). Parte subito in `running`.
-- `GET /agent-chats/:chatId` → `AgentChat` con lo stato letto dalla sessione Anthropic (e salvato).
-- `GET /agent-chats/:chatId/events` → `AgentChatEvent[]` dalla cronologia completa (senza delta).
-- `POST /agent-chats/:chatId/messages` body `{ text: string (1..20000) }` → 202 `{ ok: true }`.
-- `POST /agent-chats/:chatId/interrupt` → 202 `{ ok: true }`.
-- `POST /agent-chats/:chatId/tool-confirmation` body `{ toolUseId, result: "allow" | "deny" }` → 202 `{ ok: true }`. `toolUseId` è l'`id` dell'evento `tool_use` (id evento Anthropic `sevt_...`).
-- Se la sessione attende un'approvazione o ha raggiunto il budget, Anthropic rifiuta i messaggi (400): la risposta è 409 `CONFLICT` con un messaggio in italiano che dice quale dei due casi.
-- `GET /agent-chats/:chatId/stream` → `text/event-stream` (letto con `fetch`, header `Authorization` normale). Solo eventi successivi all'apertura: ogni evento è `data: <AgentChatEvent JSON>\n\n`, più un commento `: ping` ogni 20 s. Gli eventi `status` aggiornano anche `AgentChat.status`. Lo stream Anthropic si chiude quando il client si disconnette. Errori prima dell'apertura (404, 403, `AGENT_API_ERROR`) escono come JSON normale; un errore a stream aperto arriva come evento `error`.
-
-`AgentChatEvent`: `{ id, type, at: string | null, text?, messageId?, toolName?, toolInput?, needsApproval?, isError?, status?, stopReason?, costCents? }`.
-
-| `type` | Origine Anthropic | Campi |
-|---|---|---|
-| `user_message` | `user.message` | `text` (blocchi di testo uniti) |
-| `agent_message` | `agent.message` | `text` |
-| `agent_delta_start` | `event_start` di un `agent.message` (solo stream) | `messageId`; `id = <messageId>:start` |
-| `agent_delta` | `event_delta` (solo stream) | `messageId`, `text`; `id = <messageId>:d<n>` |
-| `tool_use` | `agent.tool_use` / `agent.mcp_tool_use` | `toolName` (`<server>.<nome>` per MCP), `toolInput` (JSON troncato a 500 caratteri), `needsApproval` (`evaluated_permission === "ask"`) |
-| `tool_result` | `agent.tool_result` / `agent.mcp_tool_result` | `isError` |
-| `status` | `session.status_running` / `_idle` / `_rescheduled` / `_terminated` | `status`; per idle `stopReason` = `stop_reason.type` (`end_turn`, `requires_action`, `retries_exhausted`, `budget_reached`, ...) |
-| `error` | `session.error` | `text` |
-| `usage` | `session.usage` | `costCents` (costo di listino cumulativo, intero) |
-
-`id` è l'id dell'evento Anthropic, `at` il suo `processed_at`. Gli altri eventi (thinking, span, interrupt, ...) non vengono esposti.
 
 ### Repository GitHub del progetto
 - `PATCH /projects/:projectId` accetta `{ name?, repoUrl?, groupName? }` (almeno uno). `groupName` (max 60, spazi compattati, `null`/`""` lo toglie) è solo visuale: nella sidebar i progetti con lo stesso gruppo stanno in un contenitore apribile; lo stato aperto/chiuso è salvato nel browser. `repoUrl` accetta `owner/repo`, `github.com/owner/repo`, URL https anche con `.git`; viene salvato come `https://github.com/owner/repo`. `null`/`""` lo toglie. `Project.repoUrl` è esposto da REST, `list_projects` e `list_ai_tasks`.

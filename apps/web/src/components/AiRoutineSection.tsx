@@ -92,6 +92,7 @@ export function AiRoutineSection({ project, onChanged }: { project: Project; onC
         <li>{t.aiRoutine.step2}</li>
         <li>{t.aiRoutine.step3}</li>
       </ol>
+      {config?.configured && <p className="ai-hint">{t.aiRoutine.promptUpdated}</p>}
 
       {config && (
         <div className="mcp-config-block">
