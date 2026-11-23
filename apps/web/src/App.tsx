@@ -750,6 +750,9 @@ export function App() {
           onChanged={loadBoard}
           onOpenTask={handleOpenTask}
           isAdmin={isAdmin}
+          claudeSessionProjectId={
+            isAdmin && projects.find((p) => p.id === openTaskProjectId)?.aiRoutineConfigured ? openTaskProjectId : null
+          }
         />
       )}
 

@@ -4,7 +4,14 @@ import { setBackgroundRunner } from "../lib/email/provider.js";
 import { createProject, createTask, getTask, listProjects, moveTask, setTaskAi, updateProject } from "./taskService.js";
 import { createUser, listProjectsForUser, getAuthUser } from "./userService.js";
 import { completeAiStep } from "./aiService.js";
-import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "./aiRoutineService.js";
+import {
+  buildRoutinePrompt,
+  clearRoutineConfig,
+  dispatchProject,
+  getRoutineConfig,
+  setRoutineConfig,
+  startInteractiveSession,
+} from "./aiRoutineService.js";
 
 /** Avvio automatico dei passi AI con la routine Claude Code (fetch simulato). */
 
@@ -166,5 +173,103 @@ describe("avvio automatico sugli eventi", () => {
     await setTaskAi(t.id, { enabled: true, steps: ["triage"] }, admin.id, { type: "user", id: admin.id });
     await flush();
     expect(fires).toHaveLength(0);
+  });
+});
+
+describe("sessione interattiva", () => {
+  it("senza routine configurata: VALIDATION_ERROR e nessuna chiamata", async () => {
+    const { project } = await setup();
+    await expect(startInteractiveSession(project.id, { message: "Ciao" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Routine non configurata",
+    });
+    expect(fires).toHaveLength(0);
+  });
+
+  it("senza task: un solo avvio con il testo atteso, restituisce il link della sessione", async () => {
+    const { project } = await setup();
+    await setRoutineConfig(project.id, { routineId: ROUTINE, token: TOKEN });
+
+    const res = await startInteractiveSession(project.id, { message: "Aggiorna il README" });
+    expect(res).toEqual({ sessionUrl: "https://claude.ai/code/session_1" });
+    expect(fires).toHaveLength(1);
+    expect(fires[0].url).toBe(`https://api.anthropic.com/v1/claude_code/routines/${ROUTINE}/fire`);
+    expect(fires[0].headers.Authorization).toBe(`Bearer ${TOKEN}`);
+    expect(fires[0].body.text).toBe(
+      ["My Planner: sessione interattiva.", `projectId: ${project.id}`, "Richiesta:", "Aggiorna il README"].join("\n"),
+    );
+    const cfg = await getRoutineConfig(project.id);
+    expect(cfg.lastSessionUrl).toBe("https://claude.ai/code/session_1");
+    expect(cfg.lastFiredAt).not.toBeNull();
+  });
+
+  it("con task: taskId nel testo; i campi di avvio della coda del task restano invariati", async () => {
+    const { project, admin } = await setup();
+    const t = await createTask(project.id, { title: "A" });
+    await setTaskAi(t.id, { enabled: true, steps: ["triage"] }, admin.id);
+    await flush();
+    // Routine configurata dopo: nessun avvio automatico della coda finora.
+    await setRoutineConfig(project.id, { routineId: ROUTINE, token: TOKEN });
+    const before = await prisma.task.findUniqueOrThrow({ where: { id: t.id } });
+
+    const res = await startInteractiveSession(project.id, { message: "Spiegami il bug", taskId: t.id });
+    expect(res.sessionUrl).toBe("https://claude.ai/code/session_1");
+    expect(fires).toHaveLength(1);
+    expect(fires[0].body.text.split("\n")).toEqual([
+      "My Planner: sessione interattiva.",
+      `projectId: ${project.id}`,
+      `taskId: ${t.id}`,
+      "Richiesta:",
+      "Spiegami il bug",
+    ]);
+
+    const after = await prisma.task.findUniqueOrThrow({ where: { id: t.id } });
+    expect(after.aiDispatchedStep).toBe(before.aiDispatchedStep);
+    expect(after.aiDispatchedAt).toEqual(before.aiDispatchedAt);
+    expect(after.aiSessionUrl).toBe(before.aiSessionUrl);
+    // Non e' un passo della coda: il triage resta da avviare.
+    expect((await dispatchProject(project.id)).fired).toBe(true);
+  });
+
+  it("task di un altro progetto o inesistente: NOT_FOUND senza chiamate", async () => {
+    const { project } = await setup();
+    await setRoutineConfig(project.id, { routineId: ROUTINE, token: TOKEN });
+    const other = await createProject("Altro");
+    const foreign = await createTask(other.id, { title: "X" });
+    await expect(startInteractiveSession(project.id, { message: "Ciao", taskId: foreign.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(startInteractiveSession(project.id, { message: "Ciao", taskId: "nope" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(fires).toHaveLength(0);
+  });
+
+  it("errore HTTP della routine (429): eccezione con il motivo, salvato come ultimo errore", async () => {
+    const { project } = await setup();
+    await setRoutineConfig(project.id, { routineId: ROUTINE, token: TOKEN });
+    nextStatus = 429;
+    await expect(startInteractiveSession(project.id, { message: "Ciao" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Limite di avvii raggiunto, riprova tra 120s",
+    });
+    expect((await getRoutineConfig(project.id)).lastError).toBe("Limite di avvii raggiunto, riprova tra 120s");
+  });
+
+  it("il prompt della routine contiene la sezione della sessione interattiva prima della coda", () => {
+    const prompt = buildRoutinePrompt({ id: "p1", name: "Clinica", repoUrl: "https://github.com/gyuco/clinica" });
+    expect(prompt).toContain("My Planner: sessione interattiva.");
+    expect(prompt.indexOf("My Planner: sessione interattiva.")).toBeLessThan(
+      prompt.indexOf("Flusso (connector My Planner):"),
+    );
+    expect(prompt).toContain("Flusso (connector My Planner):");
+
+    // L'introduzione descrive i due tipi di avvio, riconosciuti dalla prima riga del payload.
+    const intro = prompt.slice(0, prompt.indexOf("Sessione interattiva:"));
+    expect(intro).toContain("due tipi di avvio");
+    expect(intro).toContain('"My Planner: sessione interattiva."');
+    expect(intro).toContain('"My Planner: task AI in attesa."');
+    expect(intro).toContain("Richiesta:");
+    expect(intro).not.toContain("Ogni avvio contiene");
   });
 });

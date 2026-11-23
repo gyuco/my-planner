@@ -1,12 +1,18 @@
 import type { FastifyInstance } from "fastify";
-import { clearRoutineConfig, dispatchProject, getRoutineConfig, setRoutineConfig } from "../services/aiRoutineService.js";
+import {
+  clearRoutineConfig,
+  dispatchProject,
+  getRoutineConfig,
+  setRoutineConfig,
+  startInteractiveSession,
+} from "../services/aiRoutineService.js";
 import { apiError } from "@my-planner/core";
 import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { hashToken } from "../mcp/auth.js";
 import { createProject, renameProject, updateProject, archiveProject, unarchiveProject } from "../services/taskService.js";
 import { assertAdmin, assertProjectAccess, listProjectsForUser } from "../services/userService.js";
-import { aiRoutineInputSchema, projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
+import { aiRoutineInputSchema, aiRoutineSessionInputSchema, projectNameInputSchema, projectUpdateInputSchema, projectStatusInputSchema, projectTokenInputSchema } from "../lib/validation.js";
 import {
   createProjectStatus,
   deleteProjectStatus,
@@ -144,5 +150,12 @@ export async function projectRoutes(app: FastifyInstance) {
     const { projectId } = req.params as { projectId: string };
     assertAdmin((req as any).authUser);
     return dispatchProject(projectId, { force: true });
+  });
+
+  // Sessione interattiva di Claude Code (la conversazione prosegue su claude.ai).
+  app.post("/projects/:projectId/ai-routine/session", { onRequest: [app.authenticate] }, async (req) => {
+    const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
+    return startInteractiveSession(projectId, aiRoutineSessionInputSchema.parse(req.body ?? {}));
   });
 }

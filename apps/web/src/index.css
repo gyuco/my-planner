@@ -1594,6 +1594,22 @@ body.dnd-dragging * {
   background: var(--accent-600);
 }
 
+/* Link principale nelle azioni del dialog (es. "Apri la sessione" di Claude). */
+.modal-actions .modal-primary-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--r-sm);
+  background: var(--accent-500);
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.modal-actions .modal-primary-link:hover {
+  background: var(--accent-600);
+}
+
 /* --- Parametri avanzati (chiusi di default) ------------------------------ */
 
 .advanced-section {

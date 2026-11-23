@@ -47,6 +47,8 @@ interface TaskDrawerProps {
   onOpenTask: (taskId: string) => void;
   /** Solo gli admin modificano la gestione AI (gli altri la vedono in sola lettura). */
   isAdmin?: boolean;
+  /** Progetto del task con routine AI configurata: mostra "Apri sessione Claude su questa task" (solo admin). */
+  claudeSessionProjectId?: string | null;
 }
 
 interface CollapsibleSectionProps {
@@ -99,6 +101,7 @@ export function TaskDrawer({
   onChanged,
   onOpenTask,
   isAdmin = false,
+  claudeSessionProjectId = null,
 }: TaskDrawerProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
@@ -677,6 +680,7 @@ export function TaskDrawer({
             <TaskAiSection
               task={task}
               isAdmin={isAdmin}
+              claudeSessionProjectId={claudeSessionProjectId}
               onSaved={(updated) => {
                 setTask((prev) => (prev ? { ...prev, ai: updated.ai } : prev));
                 onChanged();
