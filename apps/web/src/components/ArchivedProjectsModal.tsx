@@ -6,9 +6,11 @@ import { useI18n } from "../i18n";
 interface ArchivedProjectsModalProps {
   onClose: () => void;
   onChanged: () => void;
+  /** Solo l'admin puo' ripristinare un progetto; il manager vede la lista in sola lettura. */
+  isAdmin: boolean;
 }
 
-export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsModalProps) {
+export function ArchivedProjectsModal({ onClose, onChanged, isAdmin }: ArchivedProjectsModalProps) {
   const { t } = useI18n();
   const [archived, setArchived] = useState<Project[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -53,11 +55,13 @@ export function ArchivedProjectsModal({ onClose, onChanged }: ArchivedProjectsMo
             {archived.map((p) => (
               <li key={p.id}>
                 <span>{p.name}</span>
-                <div className="drawer-list-actions">
-                  <button type="button" onClick={() => handleRestore(p.id)} disabled={restoringId === p.id}>
-                    {restoringId === p.id ? t.archived.restoring : t.archived.restore}
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="drawer-list-actions">
+                    <button type="button" onClick={() => handleRestore(p.id)} disabled={restoringId === p.id}>
+                      {restoringId === p.id ? t.archived.restoring : t.archived.restore}
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
