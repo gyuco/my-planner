@@ -163,7 +163,7 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 ### `GET /projects/:projectId/assignees`
 - Auth: JWT, accesso al progetto
 - 200: `[{ id, email, name }]` — admin e manager del progetto (`name` = nome e cognome, oppure email)
-- `POST /projects`, `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
+- `POST /projects`, le impostazioni di progetto (`PATCH /projects/:projectId`, archive/unarchive, `POST/PATCH/DELETE /projects/:projectId/statuses*`, `/projects/:projectId/tokens*`), `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
 ### Notifiche push (Web Push)
 - `GET /push/public-key` → `{ publicKey }`: chiave pubblica VAPID (base64url, P-256 non compressa) da passare a `pushManager.subscribe` come `applicationServerKey`. Le chiavi sono generate al primo uso e salvate in `PushSettings` (privata cifrata con secretBox).
@@ -210,20 +210,20 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 - 400 `VALIDATION_ERROR` se `name` mancante/vuoto
 
 ### `PATCH /projects/:projectId`
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - Body: `{ "name"?: string }` (rinomina; unico campo modificabile oltre archive)
 - 200: `Project` aggiornato
 - 404 `NOT_FOUND`
 
 ### `POST /projects/:projectId/archive`
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - Body: nessuno
 - 200: `Project` con `archived: true`
 - Non cancella task/token associati
 - 404 `NOT_FOUND`
 
 ### `POST /projects/:projectId/unarchive`
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - Body: nessuno
 - 200: `Project` con `archived: false`
 - 404 `NOT_FOUND`
@@ -232,6 +232,8 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 ### Stati personalizzati — sotto `/projects/:projectId/statuses`
 
 Ogni progetto ha i 5 stati di base (`draft`, `todo`, `in_progress`, `testing`, `done`: fissi, non rinominabili né cancellabili) più eventuali stati personalizzati (es. `bloqueante`, `pendiente-email`). Uno stato personalizzato ha una `key` stabile, generata dal nome alla creazione (minuscole, senza accenti, spazi → `-`), e un `label` modificabile: `Task.status` salva la `key`, quindi rinominare non tocca i task. Sulla board le colonne personalizzate stanno tra `in_progress` e `testing`.
+
+Auth: JWT. `GET` richiede l'accesso al progetto (la board usa le etichette); `POST`, `PATCH` e `DELETE` sono solo admin (manager → 403 `FORBIDDEN`).
 
 - `GET /projects/:projectId/statuses` → `ProjectStatus[]` (`{ key, label, builtIn }`) nell'ordine delle colonne; per gli stati di base `label === key`.
 - `POST /projects/:projectId/statuses` body `{ "label": string (1-50) }` → 201 `ProjectStatus`. 409 `CONFLICT` se il nome esiste già (o è uno stato di base), 400 `VALIDATION_ERROR` se non contiene lettere/numeri.
@@ -243,7 +245,7 @@ Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta un
 ### Token MCP (B12) — sotto `/projects/:projectId/tokens`
 
 `POST /projects/:projectId/tokens`
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - Body: `{}` (nessun parametro; opzionale `{ "label"?: string }` per riconoscerlo in UI)
 - 201:
 ```json
@@ -252,11 +254,11 @@ Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta un
   `token` è l'unico momento in cui il valore in chiaro è esposto.
 
 `GET /projects/:projectId/tokens`
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - 200: lista di `{ id, projectId, label, createdAt, revokedAt }` — **mai** `tokenHash` né il valore in chiaro.
 
 `DELETE /projects/:projectId/tokens/:tokenId` (revoca)
-- Auth: JWT
+- Auth: JWT, solo admin (manager anche con accesso al progetto → 403 `FORBIDDEN`)
 - 200: `{ id, revokedAt }`
 - 404 `NOT_FOUND` se token non esiste o non appartiene al progetto
 

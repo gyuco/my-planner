@@ -36,18 +36,21 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.patch("/projects/:projectId", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     return updateProject(projectId, projectUpdateInputSchema.parse(req.body ?? {}));
   });
 
   app.post("/projects/:projectId/archive", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     return archiveProject(projectId);
   });
 
   app.post("/projects/:projectId/unarchive", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     return unarchiveProject(projectId);
   });
@@ -62,6 +65,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/statuses", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     const { label } = projectStatusInputSchema.parse(req.body ?? {});
     return reply.code(201).send(await createProjectStatus(projectId, label));
@@ -69,6 +73,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.patch("/projects/:projectId/statuses/:key", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId, key } = req.params as { projectId: string; key: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     const { label } = projectStatusInputSchema.parse(req.body ?? {});
     return renameProjectStatus(projectId, key, label);
@@ -76,6 +81,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.delete("/projects/:projectId/statuses/:key", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId, key } = req.params as { projectId: string; key: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     return deleteProjectStatus(projectId, key);
   });
@@ -84,6 +90,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.post("/projects/:projectId/tokens", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     const { label } = projectTokenInputSchema.parse(req.body ?? {});
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -105,6 +112,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.get("/projects/:projectId/tokens", { onRequest: [app.authenticate] }, async (req) => {
     const { projectId } = req.params as { projectId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     const tokens = await prisma.projectToken.findMany({ where: { projectId } });
     return tokens.map((t) => ({
@@ -118,6 +126,7 @@ export async function projectRoutes(app: FastifyInstance) {
 
   app.delete("/projects/:projectId/tokens/:tokenId", { onRequest: [app.authenticate] }, async (req, reply) => {
     const { projectId, tokenId } = req.params as { projectId: string; tokenId: string };
+    assertAdmin((req as any).authUser);
     await assertProjectAccess((req as any).authUser, projectId);
     const token = await prisma.projectToken.findUnique({ where: { id: tokenId } });
     if (!token || token.projectId !== projectId) {
