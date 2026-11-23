@@ -173,6 +173,46 @@ export const aiRoutineInputSchema = z.object({
   token: z.string().max(500).nullable().optional(),
 });
 
+/**
+ * Agente Claude Managed Agents del progetto (solo admin). `mcpUrl` e' l'URL
+ * completo dell'endpoint MCP HTTP (es. https://host/mcp): https, oppure http
+ * solo verso localhost. Chiave e token facoltativi se gia' salvati.
+ */
+export const aiAgentInputSchema = z.object({
+  apiKey: z.string().max(500).nullable().optional(),
+  githubToken: z.string().max(500).nullable().optional(),
+  budgetUsd: z.number().min(1).max(100).nullable().optional(),
+  mcpUrl: z
+    .string()
+    .max(500)
+    .refine((v) => /^https:\/\/\S+$/i.test(v) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/\S*)?$/i.test(v), {
+      message: "URL MCP non valido: usa https (http solo per localhost)",
+    }),
+});
+
+/** Chat con l'agente (Claude Managed Agents): elenco per task o solo progetto. */
+export const agentChatListQuerySchema = z.object({
+  taskId: z.string().min(1).optional(),
+  scope: z.literal("project").optional(),
+});
+
+const agentChatTextSchema = z.string().trim().min(1).max(20000);
+
+/** Nuova chat: facoltativamente legata a un task del progetto. */
+export const agentChatCreateInputSchema = z.object({
+  taskId: z.string().min(1).nullable().optional(),
+  text: agentChatTextSchema,
+});
+
+export const agentChatMessageInputSchema = z.object({
+  text: agentChatTextSchema,
+});
+
+export const agentChatToolConfirmationInputSchema = z.object({
+  toolUseId: z.string().min(1).max(200),
+  result: z.enum(["allow", "deny"]),
+});
+
 /** Polling delle notifiche: limite massimo per non trascinare troppo payload. */
 export const notificationsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),

@@ -27,6 +27,7 @@ export async function cleanDatabase() {
   await prisma.notificationState.deleteMany();
   await prisma.taskEvent.deleteMany();
   await prisma.userProject.deleteMany();
+  await prisma.agentChat.deleteMany();
   await prisma.taskDependency.deleteMany();
   await prisma.comment.deleteMany();
   await prisma.attachment.deleteMany();

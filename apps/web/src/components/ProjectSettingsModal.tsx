@@ -13,6 +13,7 @@ import {
 import { useI18n } from "../i18n";
 import { ProjectStatusesSection } from "./ProjectStatusesSection";
 import { AiRoutineSection } from "./AiRoutineSection";
+import { AiAgentSection } from "./AiAgentSection";
 import { mcpBaseUrl } from "../lib/mcp";
 
 interface ProjectSettingsModalProps {
@@ -282,6 +283,8 @@ export function ProjectSettingsModal({
         <ProjectStatusesSection projectId={project.id} onChanged={() => onStatusesChanged?.()} />
 
         {isAdmin && <AiRoutineSection project={project} onChanged={onChanged} />}
+
+        {isAdmin && <AiAgentSection project={project} onChanged={onChanged} />}
 
         <section className="drawer-section">
           <h3>{t.projectSettings.mcpTokens}</h3>
