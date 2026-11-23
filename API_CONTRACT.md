@@ -532,29 +532,6 @@ Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_c
 - 200: `[{ id, name }]` per il filtro autore: admin vede tutti gli utenti, manager gli admin e i manager che condividono almeno un suo progetto.
 - **Nessun tool MCP** per il log (vista per utente).
 
-### Vista "In corso" (sessioni di Claude Code)
-
-Le sessioni di Claude Code si segnalano da sole con gli hook (`tools/claude-hooks/my-planner-hook.mjs`). My Planner non legge l'elenco sessioni di Claude: lega ogni sessione a progetto e task.
-
-- Stati: `working` (UserPromptSubmit, PostToolUse), `waiting_input` (Notification), `idle` (SessionStart, Stop), `ended` (SessionEnd).
-- Progetto: l'unico progetto non archiviato visibile all'utente il cui `repoUrl` coincide col remote git (confronto `owner/name`, minuscolo). Task: l'id nel branch `<tipo>/{taskId}-slug`, se visibile; se più progetti condividono il repo decide il task.
-- `stale`: sessione `working` senza segnali da più di 20 minuti. Le sessioni senza segnali da più di 24 ore non si mostrano.
-
-#### `POST /hooks/claude-session`
-- Auth: **token hook** (`Authorization: Bearer mph_...`), non il JWT. Il token hook non apre altre route né MCP.
-- Body: `{ event, sessionId, origin?: "cli"|"cloud", url?: "https://claude.ai/code/...", repo?, branch?, workdir?, message? }`. Solo metadati: mai prompt, transcript o path completi.
-- 200 `{ ok: true, status }` (`status` null se la sessione è sconosciuta e già chiusa). 401 token non valido, 400 input non valido.
-
-#### `GET /claude-sessions`
-- Auth: JWT. Visibilità: admin tutte; manager le proprie e quelle dei progetti assegnati.
-- 200: `ClaudeSession[]` ordinate: prima chi aspetta l'utente, poi chi lavora, poi inattive; le `stale` in fondo.
-
-#### `DELETE /claude-sessions/:id`
-- Auth: JWT; solo chi ha avviato la sessione o un admin (403 altrimenti, 404 se non visibile). Segna la sessione come chiusa.
-
-#### `GET|POST /auth/me/hook-tokens`, `DELETE /auth/me/hook-tokens/:tokenId`
-- Auth: JWT. Token hook dell'utente: `POST { label? }` → 201 con `token` in chiaro (unica volta); `DELETE` revoca.
-
 ---
 
 ## 7. Tool MCP (B14/B15)

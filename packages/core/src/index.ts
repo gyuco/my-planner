@@ -391,65 +391,6 @@ export interface UserMcpToken {
   revokedAt: string | null;
 }
 
-/**
- * Sessione di Claude Code segnalata dagli hook (vista "In corso").
- * Stati: working = sta lavorando; waiting_input = aspetta l'utente (permesso
- * o risposta); idle = turno finito; ended = sessione chiusa.
- */
-export const CLAUDE_SESSION_STATUSES = ["working", "waiting_input", "idle", "ended"] as const;
-export type ClaudeSessionStatus = (typeof CLAUDE_SESSION_STATUSES)[number];
-
-/** Eventi hook di Claude Code accettati da POST /hooks/claude-session. */
-export const CLAUDE_HOOK_EVENTS = [
-  "SessionStart",
-  "UserPromptSubmit",
-  "PostToolUse",
-  "Notification",
-  "Stop",
-  "SessionEnd",
-] as const;
-export type ClaudeHookEvent = (typeof CLAUDE_HOOK_EVENTS)[number];
-
-export interface ClaudeSession {
-  id: string;
-  /** session_id di Claude Code. */
-  sessionId: string;
-  status: ClaudeSessionStatus;
-  /** true se la sessione "lavora" ma non da' segni di vita da troppo tempo (probabilmente caduta). */
-  stale: boolean;
-  origin: "cli" | "cloud";
-  /** Link alla sessione su claude.ai, se noto (sessioni cloud). */
-  url: string | null;
-  /** owner/name del repository, se noto. */
-  repo: string | null;
-  branch: string | null;
-  /** Nome della cartella di lavoro (solo l'ultimo segmento del path). */
-  workdir: string | null;
-  /** Ultimo messaggio di notifica (es. richiesta di permesso), troncato. */
-  lastMessage: string | null;
-  projectId: string | null;
-  projectName: string | null;
-  taskId: string | null;
-  taskTitle: string | null;
-  user: { id: string; name: string };
-  startedAt: string;
-  lastSeenAt: string;
-}
-
-/** Token degli hook di Claude Code (profilo utente): serve solo a segnalare le sessioni. */
-export interface SessionHookToken {
-  id: string;
-  label: string | null;
-  createdAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-}
-
-/** Risposta della creazione: il token in chiaro compare solo qui. */
-export interface CreatedSessionHookToken extends SessionHookToken {
-  token: string;
-}
-
 export interface ProjectToken {
   id: string;
   projectId: string;
