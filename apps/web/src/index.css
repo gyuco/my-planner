@@ -4504,3 +4504,39 @@ body.dnd-dragging * {
     max-width: 92%;
   }
 }
+
+/* --- Salvataggio assegnatario --- */
+/* Durante la PATCH il trigger e' disabilitato ma resta leggibile: mostra il
+   nuovo valore (ottimistico) con spinner + "Salvataggio...", poi una spunta. */
+.assignee-select-trigger[aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+  color: var(--ink-700);
+  background: var(--surface);
+}
+.assignee-select-status {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink-500);
+}
+.assignee-select-status .spinner { width: 12px; height: 12px; }
+.assignee-select-status.is-saved { color: var(--success); animation: assignee-saved-in 0.18s var(--ease); }
+.assignee-select-status.is-saved svg { width: 14px; height: 14px; }
+@keyframes assignee-saved-in { from { opacity: 0; transform: scale(0.9); } }
+.assignee-select-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .assignee-select-status.is-saved { animation: none; }
+}

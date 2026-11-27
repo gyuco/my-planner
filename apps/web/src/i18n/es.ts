@@ -116,6 +116,7 @@ export const es: Dictionary = {
     loadError: "No se pueden cargar los responsables",
     searchPlaceholder: "Buscar una persona...",
     noResults: "Sin resultados",
+    saved: "Guardado",
   },
   taskType: {
     label: "Tipo",

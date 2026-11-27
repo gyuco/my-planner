@@ -114,6 +114,7 @@ export const en = {
     loadError: "Cannot load assignees",
     searchPlaceholder: "Search people...",
     noResults: "No results",
+    saved: "Saved",
   },
   taskType: {
     label: "Type",
