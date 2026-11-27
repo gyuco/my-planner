@@ -89,6 +89,7 @@ const it: GuideContent = {
       steps: [
         "Apri un task (da admin) e nella sezione **Gestione AI** attiva **Gestisci con un modello AI**.",
         "Scegli i **passi** (uno, due o tutti e tre) e quando essere **avvisato**, poi **Salva gestione AI**.",
+        "Facoltativo: in **Note per l'agente** scrivi raccomandazioni o vincoli (es. «non toccare il modulo pagamenti»): l'agente li legge prima di iniziare e li segue in tutti i passi.",
         "Se la routine è configurata parte da sola: nella scheda compare il link **Sessione Claude** e sulla card il badge **in corso**.",
         "Quando il passo è chiuso il task cambia colonna, trovi un commento 🤖 con il riepilogo e ti arriva l'avviso.",
       ],
@@ -175,6 +176,7 @@ const en: GuideContent = {
       steps: [
         "Open a task (as admin) and in the **AI handling** section turn on **Handle with an AI model**.",
         "Pick the **steps** (one, two or all three) and when to be **notified**, then **Save AI handling**.",
+        "Optional: in **Notes for the agent** write recommendations or constraints (e.g. “don't touch the payments module”): the agent reads them before starting and follows them in every step.",
         "If the routine is set up it starts by itself: the task shows a **Claude session** link and the card a **running** badge.",
         "When the step is done the task changes column, you'll find a 🤖 comment with the summary and you get the alert.",
       ],
@@ -261,6 +263,7 @@ const es: GuideContent = {
       steps: [
         "Abre una tarea (como admin) y en la sección **Gestión IA** activa **Gestionar con un modelo de IA**.",
         "Elige los **pasos** (uno, dos o los tres) y cuándo recibir **avisos**, luego **Guardar gestión IA**.",
+        "Opcional: en **Notas para el agente** escribe recomendaciones o restricciones (p. ej. «no toques el módulo de pagos»): el agente las lee antes de empezar y las sigue en todos los pasos.",
         "Si la rutina está configurada arranca sola: la ficha muestra el enlace **Sesión de Claude** y la tarjeta el distintivo **en curso**.",
         "Cuando el paso termina la tarea cambia de columna, encontrarás un comentario 🤖 con el resumen y recibirás el aviso.",
       ],

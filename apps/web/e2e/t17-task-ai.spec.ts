@@ -37,11 +37,16 @@ test.describe("T17 - gestione AI del task", () => {
     await section.getByRole("checkbox", { name: /Triage/ }).check();
     await section.getByRole("checkbox", { name: /Reviewer/ }).check();
     await section.getByRole("radio", { name: "On every status change" }).check();
+    // Nota per l'agente: contatore aggiornato e inclusa nel salvataggio.
+    const note = "Don't touch the payments module.\nUse library X.";
+    await section.getByLabel("Notes for the agent").fill(note);
+    await expect(section.locator(".ai-note-count")).toHaveText(`${note.length}/4000`);
     await section.getByRole("button", { name: "Save AI handling" }).click();
     await expect(section).toContainText("Pending step: Triage");
+    await expect(section.getByRole("button", { name: "Save AI handling" })).toBeDisabled();
 
     const saved = await getTask(task.id);
-    expect(saved.ai).toMatchObject({ enabled: true, steps: ["triage", "reviewer"], notify: "each" });
+    expect(saved.ai).toMatchObject({ enabled: true, steps: ["triage", "reviewer"], notify: "each", note });
 
     // Badge sulla card con il passo in attesa (il task e' in Draft -> Triage).
     await modal.getByRole("button", { name: "Close" }).click();
@@ -52,6 +57,7 @@ test.describe("T17 - gestione AI del task", () => {
     await card.click();
     const drawer = page.locator(".drawer");
     await expect(drawer.locator(".drawer-body > .drawer-section").first()).toHaveClass(/drawer-ai-bar/);
+    await expect(drawer.locator(".drawer-ai-bar .ai-note-badge")).toContainText("note");
     await expect(drawer.locator(".drawer-body > .drawer-section").last()).toHaveClass(/drawer-danger-zone/);
     await expect(drawer.locator(".drawer-header").getByRole("button", { name: "Delete task" })).toHaveCount(0);
   });

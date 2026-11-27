@@ -544,6 +544,12 @@ export function TaskDrawer({
                     {task.ai?.enabled
                       ? `${task.ai.steps.map((s) => t.taskAi.step[s]).join(" → ")}${task.ai.failure ? ` · ${t.taskAi.failedBadge}` : ""}`
                       : t.taskAi.disabled}
+                    {task.ai?.note && (
+                      <span className="ai-note-badge" title={t.taskAi.noteBadgeTitle}>
+                        {" · 📝 "}
+                        {t.taskAi.noteBadge}
+                      </span>
+                    )}
                   </span>
                 </div>
                 <button type="button" className="ai-manage-button" onClick={() => setAiModalOpen(true)}>

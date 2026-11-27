@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AI_MAX_REJECTS, AI_NOTIFY_MODES, AI_STEPS, aiPendingStep, aiRunningStep, normalizeAiSteps } from "@my-planner/core";
+import { AI_MAX_REJECTS, AI_NOTE_MAX_LENGTH, AI_NOTIFY_MODES, AI_STEPS, aiPendingStep, aiRunningStep, normalizeAiSteps } from "@my-planner/core";
 import type { AiNotifyMode, AiStep, Task } from "@my-planner/core";
 import { ApiRequestError, setTaskAi } from "../api";
 import { useI18n } from "../i18n";
@@ -30,6 +30,9 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
   const [enabled, setEnabled] = useState(ai?.enabled ?? false);
   const [steps, setSteps] = useState<AiStep[]>(ai?.steps ?? []);
   const [notify, setNotify] = useState<AiNotifyMode>(ai?.notify ?? "end");
+  // Nota per l'agente: resta nello stato anche se si spegne la checkbox, e si
+  // salva comunque (pronta per quando la gestione AI si riattiva).
+  const [note, setNote] = useState(ai?.note ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [claudeSessionOpen, setClaudeSessionOpen] = useState(false);
@@ -38,8 +41,9 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
     setEnabled(task.ai?.enabled ?? false);
     setSteps(task.ai?.steps ?? []);
     setNotify(task.ai?.notify ?? "end");
+    setNote(task.ai?.note ?? "");
     setError(null);
-  }, [task.id, task.ai?.enabled, task.ai?.steps.join(","), task.ai?.notify]);
+  }, [task.id, task.ai?.enabled, task.ai?.steps.join(","), task.ai?.notify, task.ai?.note]);
 
   const pending = aiPendingStep(task);
   const pendingText = pending ? t.taskAi.pending.replace("{step}", t.taskAi.step[pending]) : t.taskAi.noPending;
@@ -78,6 +82,12 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
         </p>
         {!failure && !runningText && <p className="ai-pending">{pendingText}</p>}
         {runState}
+        {ai.note && (
+          <div className="ai-note-readonly">
+            <span className="field-label">{t.taskAi.noteLabel}</span>
+            <p className="ai-note-text">{ai.note}</p>
+          </div>
+        )}
         <p className="ai-hint">{t.taskAi.readOnly}</p>
       </section>
     );
@@ -86,7 +96,9 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
   const unchanged =
     enabled === (ai?.enabled ?? false) &&
     steps.join(",") === (ai?.steps ?? []).join(",") &&
-    notify === (ai?.notify ?? "end");
+    notify === (ai?.notify ?? "end") &&
+    note.trim() === (ai?.note ?? "");
+  const noteTooLong = note.trim().length > AI_NOTE_MAX_LENGTH;
 
   function toggleStep(step: AiStep, on: boolean) {
     setSteps((prev) => normalizeAiSteps(on ? [...prev, step] : prev.filter((s) => s !== step)));
@@ -114,10 +126,14 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
       setError(t.taskAi.needStep);
       return;
     }
+    if (noteTooLong) {
+      setError(t.taskAi.noteTooLong.replace("{max}", String(AI_NOTE_MAX_LENGTH)));
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const updated = await setTaskAi(task.id, { enabled, steps, notify });
+      const updated = await setTaskAi(task.id, { enabled, steps, notify, note: note.trim() || null });
       onSaved(updated);
       toast.success(t.taskAi.saved);
     } catch (err) {
@@ -182,6 +198,32 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hi
               </label>
             ))}
           </fieldset>
+
+          <div className="ai-note-field">
+            <label className="field-label" htmlFor={`ai-note-${task.id}`}>
+              {t.taskAi.noteLabel}
+            </label>
+            <textarea
+              id={`ai-note-${task.id}`}
+              value={note}
+              rows={5}
+              maxLength={AI_NOTE_MAX_LENGTH}
+              placeholder={t.taskAi.notePlaceholder}
+              aria-describedby={`ai-note-hint-${task.id}`}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setError(null);
+              }}
+            />
+            <span className="ai-note-meta">
+              <span id={`ai-note-hint-${task.id}`} className="ai-hint">
+                {t.taskAi.noteHint}
+              </span>
+              <span className={`ai-hint ai-note-count${noteTooLong ? " ai-note-count-over" : ""}`}>
+                {t.taskAi.noteCount.replace("{count}", String(note.length)).replace("{max}", String(AI_NOTE_MAX_LENGTH))}
+              </span>
+            </span>
+          </div>
         </>
       )}
 
