@@ -1,5 +1,5 @@
-import type { Task, TaskPriority, TaskType } from "@my-planner/core";
-import { FIBONACCI_COMPLEXITY, TASK_TYPES } from "@my-planner/core";
+import type { AiNotifyMode, AiStep, Task, TaskPriority, TaskType } from "@my-planner/core";
+import { AI_NOTIFY_MODES, AI_STEPS, FIBONACCI_COMPLEXITY, TASK_TYPES } from "@my-planner/core";
 import {
   addComment,
   createTask,
@@ -11,6 +11,7 @@ import {
   listProjectStatuses,
   listProjects,
   moveTask,
+  setTaskAi,
   updateTask,
   type UpdateTaskInput,
 } from "../../api";
@@ -141,6 +142,29 @@ export const VOICE_FUNCTION_DECLARATIONS = [
     },
   },
   {
+    name: "set_task_ai",
+    description:
+      "Gestione AI di un task: affida il task (o lo toglie) agli agenti AI. Passi possibili: " +
+      "triage (da Draft a To do: analizza e completa il task), coder (da To do a Testing: implementa), " +
+      "reviewer (da Testing a Done, o rimanda in To do). notify = quando avvisare l'admin: " +
+      "end (alla fine), each (a ogni cambio di stato), none (mai). Richiede conferma.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        taskId: str("Id del task"),
+        enabled: { type: "BOOLEAN", description: "true per far gestire il task dall'AI, false per spegnere" },
+        steps: {
+          type: "ARRAY",
+          items: { type: "STRING", enum: [...AI_STEPS] },
+          description: "Passi da affidare all'AI (obbligatori se enabled=true)",
+        },
+        notify: { type: "STRING", enum: [...AI_NOTIFY_MODES], description: "Quando avvisare, default end" },
+        confirmed: CONFIRMED,
+      },
+      required: ["taskId", "enabled", "confirmed"],
+    },
+  },
+  {
     name: "create_task",
     description: "Crea un nuovo task in un progetto (stato iniziale bozza). Richiede conferma.",
     parameters: {
@@ -160,7 +184,7 @@ export const VOICE_FUNCTION_DECLARATIONS = [
   },
 ];
 
-const MUTATING = new Set(["move_task", "update_task", "add_comment", "create_task"]);
+const MUTATING = new Set(["move_task", "update_task", "add_comment", "create_task", "set_task_ai"]);
 
 export function isMutatingTool(name: string): boolean {
   return MUTATING.has(name);
@@ -180,6 +204,18 @@ function summarize(task: Task, statusLabels?: Record<string, string>) {
     ...(task.parentId ? { parentId: task.parentId } : {}),
     ...(task.subtaskCount ? { subtasks: task.subtaskCount, openSubtasks: task.openSubtaskCount } : {}),
     ...(task.blockedByOpenCount ? { blockedBy: task.blockedByOpenCount } : {}),
+    ...(task.ai?.enabled ? { ai: summarizeAi(task) } : {}),
+  };
+}
+
+/** Stato della gestione AI (solo se attiva). */
+function summarizeAi(task: Task) {
+  const ai = task.ai!;
+  return {
+    steps: ai.steps,
+    notify: ai.notify,
+    ...(ai.running ? { running: ai.running.step } : {}),
+    ...(ai.failure ? { stopped: ai.failure.reason } : {}),
   };
 }
 
@@ -331,6 +367,28 @@ export async function executeVoiceTool(
       return { ok: true };
     }
 
+    case "set_task_ai": {
+      const taskId = requireString(args, "taskId");
+      const enabled = args.enabled === true;
+      const steps = Array.isArray(args.steps)
+        ? (args.steps.filter((s) => (AI_STEPS as readonly unknown[]).includes(s)) as AiStep[])
+        : undefined;
+      if (enabled && (!steps || steps.length === 0)) {
+        throw new Error("Indica almeno un passo: triage, coder o reviewer");
+      }
+      const notify =
+        typeof args.notify === "string" && (AI_NOTIFY_MODES as readonly string[]).includes(args.notify)
+          ? (args.notify as AiNotifyMode)
+          : undefined;
+      const task = await setTaskAi(taskId, {
+        enabled,
+        ...(steps ? { steps: AI_STEPS.filter((s) => steps.includes(s)) } : {}),
+        ...(notify ? { notify } : {}),
+      });
+      host.onDataChanged();
+      return { ok: true, ai: task.ai?.enabled ? summarizeAi(task) : { enabled: false } };
+    }
+
     case "create_task": {
       const projectId = requireString(args, "projectId");
       const task = await createTask(projectId, {
@@ -364,6 +422,7 @@ export function buildSystemInstruction(language: string, ctx: VoiceUiContext): s
     "Per trovare un task nominato dall'utente usa list_tasks (anche con search); se ci sono piu' corrispondenze, chiedi quale.",
     "Gli stati vanno indicati con il loro nome (statusLabel); per cambiarli usa la chiave da list_statuses.",
     "Prima di ogni modifica (move_task, update_task, add_comment, create_task) riepiloga in una frase cosa farai e chiedi conferma. Chiama lo strumento con confirmed=true solo dopo un si' esplicito; se l'utente dice no o cambia idea, non farlo.",
+    "Gestione AI: un task puo' essere affidato ad agenti AI con set_task_ai, scegliendo i passi (triage: da Draft a To do; coder: da To do a Testing; reviewer: da Testing a Done o rimanda in To do) e quando avvisare (alla fine, a ogni cambio di stato, mai). get_task mostra se la gestione AI e' attiva.",
     "Non puoi eliminare task, progetti o allegati: se richiesto, spiega che va fatto dall'interfaccia.",
     "Quando elenchi molti task, riassumi (quanti sono, i piu' importanti) invece di leggerli tutti.",
     "Se uno strumento restituisce un errore, spiegalo in parole semplici.",

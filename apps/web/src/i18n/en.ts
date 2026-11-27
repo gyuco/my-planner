@@ -275,6 +275,7 @@ export const en = {
       update_task: "Task updated",
       add_comment: "Comment added",
       create_task: "Task created",
+      set_task_ai: "AI management updated",
     },
   },
   voiceSettings: {
