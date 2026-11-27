@@ -170,6 +170,9 @@ model Task {
   aiNotify    String  @default("end")
   aiWatcherId String?
   aiWatcher   User?   @relation("TaskAiWatcher", fields: [aiWatcherId], references: [id], onDelete: SetNull)
+  // Nota libera dell'admin per l'agente (max 4000 caratteri, null = nessuna):
+  // passata all'agente in MCP, istruzioni e sessione Claude sul task.
+  aiNote      String?
   // Esecuzione (tool MCP ai_*): passo preso in carico da un agente (blocco
   // che scade dopo AI_RUN_TTL_MS), rimandi del reviewer nel giro corrente,
   // fallimento (il task si ferma finche' un admin non riprende o un utente

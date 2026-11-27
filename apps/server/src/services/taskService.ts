@@ -1,4 +1,5 @@
 import {
+  AI_NOTE_MAX_LENGTH,
   AI_NOTIFY_MODES,
   AI_STEPS,
   ApiErrorException,
@@ -87,6 +88,7 @@ function serializeAi(task: any): TaskAi {
     notify: (AI_NOTIFY_MODES as readonly string[]).includes(task.aiNotify) ? task.aiNotify : "end",
     watcherId: task.aiWatcherId ?? null,
     watcherName: userDisplayName(task.aiWatcher),
+    note: task.aiNote ?? null,
     running:
       task.aiRunStep && task.aiRunStartedAt && (AI_STEPS as readonly string[]).includes(task.aiRunStep)
         ? { step: task.aiRunStep, startedAt: new Date(task.aiRunStartedAt).toISOString() }
@@ -102,13 +104,13 @@ function serializeAi(task: any): TaskAi {
 function serializeTask(task: any): any {
   const {
     tags, assignee, owner,
-    aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher,
+    aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, aiNote,
     aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason,
     aiDispatchedStep, aiDispatchedAt, aiSessionUrl,
     ...rest
   } = task;
   void [aiEnabled, aiSteps, aiNotify, aiWatcherId, aiWatcher, aiRunStep, aiRunStartedAt, aiRejectCount, aiFailedAt, aiFailReason];
-  void [aiDispatchedStep, aiDispatchedAt, aiSessionUrl];
+  void [aiDispatchedStep, aiDispatchedAt, aiSessionUrl, aiNote];
   const out: any = { ...rest, tags: tagsToArray(tags ?? "") };
   out.ai = serializeAi(task);
   out.assigneeId = task.assigneeId ?? null;
@@ -557,11 +559,22 @@ function aiSummary(ai: TaskAi): string | null {
   return ai.enabled ? `${ai.steps.join(",")}|${ai.notify}` : null;
 }
 
+/** Nota per l'agente normalizzata: spazi ai bordi tolti, vuota = null. */
+export function normalizeAiNote(note: string | null | undefined): string | null {
+  const text = (note ?? "").trim();
+  if (!text) return null;
+  if (text.length > AI_NOTE_MAX_LENGTH) {
+    throw new ApiErrorException("VALIDATION_ERROR", `Nota per l'agente troppo lunga (max ${AI_NOTE_MAX_LENGTH} caratteri)`);
+  }
+  return text;
+}
+
 /**
  * Attiva, modifica o spegne la gestione AI di un task. L'autorizzazione
  * (solo admin) e' nelle route; qui `watcherId` e' l'admin che salva, che
  * diventa il destinatario degli avvisi. Spegnendo si conservano passi e
- * modalita', cosi' riattivare ripropone l'ultima configurazione.
+ * modalita', cosi' riattivare ripropone l'ultima configurazione. La nota per
+ * l'agente (`input.note`) si salva anche a gestione spenta; omessa = invariata.
  */
 export async function setTaskAi(taskId: string, input: TaskAiInput, watcherId: string, actor: Actor = SYSTEM_ACTOR) {
   const existing = await prisma.task.findUnique({ where: { id: taskId }, include: TASK_INCLUDE });
@@ -585,18 +598,26 @@ export async function setTaskAi(taskId: string, input: TaskAiInput, watcherId: s
   };
   if (input.notify !== undefined) data.aiNotify = input.notify;
   if (input.enabled) data.aiWatcherId = watcherId;
+  if (input.note !== undefined) data.aiNote = normalizeAiNote(input.note);
 
   const task = await prisma.task.update({ where: { id: taskId }, data, include: TASK_INCLUDE });
 
+  // Log attivita': per la nota si registra solo che e' cambiata (campo
+  // aiNote, from/to null come per la descrizione), mai il testo.
+  const changes: TaskFieldChange[] = [];
   const from = aiSummary(serializeAi(existing));
   const to = aiSummary(serializeAi(task));
-  if (from !== to) {
+  if (from !== to) changes.push({ field: "ai", from, to });
+  if ((existing.aiNote ?? null) !== (task.aiNote ?? null)) {
+    changes.push({ field: "aiNote", from: null, to: null });
+  }
+  if (changes.length > 0) {
     await emitEvent({
       projectId: task.projectId,
       taskId: task.id,
       type: "task.updated",
       actor,
-      data: { title: task.title, parentId: task.parentId, changes: [{ field: "ai", from, to }] },
+      data: { title: task.title, parentId: task.parentId, changes },
     });
   }
 
