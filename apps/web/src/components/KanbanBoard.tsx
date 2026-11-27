@@ -90,6 +90,8 @@ interface KanbanBoardProps {
   doneQuery: DoneTasksQuery;
   /** Progetto con routine AI configurata: mostra "Avvia coda AI" e "Apri sessione Claude" (solo admin). */
   aiQueueProjectId?: string | null;
+  /** Solo admin: pulsante sulla card che apre la gestione AI senza aprire il task. */
+  onTaskAi?: (task: BoardTask) => void;
 }
 
 interface SortableTaskCardProps {
@@ -104,6 +106,7 @@ interface SortableTaskCardProps {
   /** Mobile/touch: niente drag, spostamento dal menu della card. */
   moveTargets?: { status: TaskStatusKey; label: string }[];
   onMove?: (task: BoardTask, status: TaskStatusKey) => void;
+  onOpenAi?: (task: BoardTask) => void;
 }
 
 function SortableTaskCard({
@@ -117,6 +120,7 @@ function SortableTaskCard({
   leaving,
   moveTargets,
   onMove,
+  onOpenAi,
 }: SortableTaskCardProps) {
   const dragDisabled = Boolean(onMove);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -147,6 +151,7 @@ function SortableTaskCard({
       leaving={leaving}
       moveTargets={moveTargets}
       onMove={onMove ? (next) => onMove(task, next) : undefined}
+      onOpenAi={onOpenAi ? () => onOpenAi(task) : undefined}
     />
   );
 }
@@ -163,6 +168,7 @@ interface ColumnProps {
   leavingIds?: ReadonlySet<string>;
   moveTargets?: { status: TaskStatusKey; label: string }[];
   onMove?: (task: BoardTask, status: TaskStatusKey) => void;
+  onOpenAi?: (task: BoardTask) => void;
 }
 
 function Column({
@@ -177,6 +183,7 @@ function Column({
   leavingIds,
   moveTargets,
   onMove,
+  onOpenAi,
 }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: columnDroppableId(status), data: { status } });
   const items = tasks.map((t) => t.id);
@@ -203,6 +210,7 @@ function Column({
             leaving={leavingIds?.has(task.id)}
             moveTargets={moveTargets}
             onMove={onMove}
+            onOpenAi={onOpenAi}
           />
         ))}
       </SortableContext>
@@ -279,6 +287,7 @@ export function KanbanBoard({
   onTaskClick,
   onRefresh,
   aiQueueProjectId,
+  onTaskAi,
   doneCount = null,
   doneQuery,
 }: KanbanBoardProps) {
@@ -661,6 +670,7 @@ export function KanbanBoard({
               leavingIds={leavingIds}
               moveTargets={touchBoard ? COLUMNS.filter((c) => c.status !== col.status) : undefined}
               onMove={touchBoard ? handleAlignStatus : undefined}
+              onOpenAi={onTaskAi}
             />
               ))}
         </div>

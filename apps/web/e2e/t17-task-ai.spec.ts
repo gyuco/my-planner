@@ -27,8 +27,12 @@ test.describe("T17 - gestione AI del task", () => {
     const card = page.locator(".task-card", { hasText: "Ticket AI" });
     await expect(card.locator(".badge-ai")).toHaveCount(0);
 
-    await card.click();
-    const section = page.locator(".drawer .ai-section");
+    // Pulsante AI sulla card: apre la modal senza aprire il task.
+    await card.getByRole("button", { name: "Manage AI handling for this task" }).click();
+    const modal = page.locator(".task-ai-modal");
+    await expect(modal).toBeVisible();
+    await expect(page.locator(".drawer")).toHaveCount(0);
+    const section = modal.locator(".ai-section");
     await section.getByLabel("Handle with an AI model").check();
     await section.getByRole("checkbox", { name: /Triage/ }).check();
     await section.getByRole("checkbox", { name: /Reviewer/ }).check();
@@ -40,8 +44,16 @@ test.describe("T17 - gestione AI del task", () => {
     expect(saved.ai).toMatchObject({ enabled: true, steps: ["triage", "reviewer"], notify: "each" });
 
     // Badge sulla card con il passo in attesa (il task e' in Draft -> Triage).
-    await page.locator(".drawer").getByRole("button", { name: "Close" }).first().click();
+    await modal.getByRole("button", { name: "Close" }).click();
+    await expect(modal).toHaveCount(0);
     await expect(card.locator(".badge-ai")).toContainText("Triage");
+
+    // Nel drawer la gestione AI e' in cima e l'eliminazione in fondo.
+    await card.click();
+    const drawer = page.locator(".drawer");
+    await expect(drawer.locator(".drawer-body > .drawer-section").first()).toHaveClass(/drawer-ai-bar/);
+    await expect(drawer.locator(".drawer-body > .drawer-section").last()).toHaveClass(/drawer-danger-zone/);
+    await expect(drawer.locator(".drawer-header").getByRole("button", { name: "Delete task" })).toHaveCount(0);
   });
 
   test("un agente lavora la coda via MCP: presa in carico, passo completato, percorso fermato", async ({ page }) => {
@@ -81,7 +93,8 @@ test.describe("T17 - gestione AI del task", () => {
 
     // L'admin riprende il percorso dalla scheda.
     await page.locator(".task-card", { hasText: "Ticket B" }).click();
-    const section = page.locator(".drawer .ai-section");
+    await page.locator(".drawer").getByRole("button", { name: "Manage AI" }).click();
+    const section = page.locator(".task-ai-modal .ai-section");
     await expect(section).toContainText("Mancano i dettagli");
     await section.getByRole("button", { name: "Resume" }).click();
     await expect(section).toContainText("Pending step: Triage");
@@ -101,7 +114,48 @@ test.describe("T17 - gestione AI del task", () => {
 
     await selectProjectInSidebar(page, project.name);
     await page.locator(".task-card", { hasText: "Ticket guida" }).click();
-    await page.locator(".drawer .ai-section").getByRole("link", { name: "Guide" }).click();
+    await page.locator(".drawer").getByRole("button", { name: "Manage AI" }).click();
+    await page.locator(".task-ai-modal .ai-section").getByRole("link", { name: "Guide" }).click();
     await expect(page).toHaveURL(/\/guide#guide-use$/);
+  });
+
+  test("solo l'admin gestisce l'AI: il manager non vede il pulsante e il server rifiuta", async ({ page }) => {
+    const project = await createProjectViaApi(`T17 Manager ${Date.now()}`);
+    const task = await createTaskViaApi(project.id, { title: "Ticket manager" });
+    const adminToken = await getJwt();
+    const email = `manager-${Date.now()}@example.com`;
+    const password = "password-123";
+    const created = await fetch(`${API_BASE}/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${adminToken}` },
+      body: JSON.stringify({ email, password, role: "manager", projectIds: [project.id] }),
+    });
+    expect(created.status).toBe(201);
+    const login = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const { token } = await login.json();
+
+    const denied = await fetch(`${API_BASE}/tasks/${task.id}/ai`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ enabled: true, steps: ["triage"], notify: "end" }),
+    });
+    expect(denied.status).toBe(403);
+
+    await page.goto("/");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await page.locator(".sidebar-header").waitFor({ state: "attached" });
+    await selectProjectInSidebar(page, project.name);
+    const card = page.locator(".task-card", { hasText: "Ticket manager" });
+    await expect(card).toBeVisible();
+    await expect(card.locator(".task-card-ai")).toHaveCount(0);
+    await card.click();
+    await expect(page.locator(".drawer").getByRole("button", { name: "Manage AI" })).toHaveCount(0);
+    await expect(page.locator(".drawer .drawer-ai-bar")).toHaveCount(0);
   });
 });
