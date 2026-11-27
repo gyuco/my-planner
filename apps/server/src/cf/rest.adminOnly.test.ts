@@ -10,7 +10,7 @@ vi.mock("./smtpSocket.js", () => ({
 import { buildRestApp } from "./rest.js";
 import { signAccessToken } from "./jwt.js";
 import { createUser } from "../services/userService.js";
-import { createProject } from "../services/taskService.js";
+import { createProject, createTask } from "../services/taskService.js";
 
 /**
  * Route REST Cloudflare delle impostazioni di progetto: solo admin.
@@ -118,6 +118,62 @@ describe("REST Cloudflare assistente vocale", () => {
     const status = await call(app, "GET", "/voice/status", adminToken);
     expect(status.status).toBe(200);
     expect(await status.json()).toEqual({ available: true });
+  });
+
+  it("pre-triage: verifica solo admin, stato e lancio per chi ha accesso al task", async () => {
+    const app = buildRestApp();
+    const { project, managerToken, adminToken } = await setup();
+    const test = await call(app, "POST", "/settings/voice/pretriage-test", managerToken);
+    expect(test.status).toBe(403);
+
+    const off = await call(app, "GET", "/pretriage/status", managerToken);
+    expect(await off.json()).toEqual({ available: false });
+
+    const put = await call(app, "PUT", "/settings/voice", adminToken, {
+      enabled: false,
+      apiKey: "AIzaSyTEST-0123456789abcdefghijkl",
+      pretriageEnabled: true,
+    });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toMatchObject({ configured: false, pretriageEnabled: true });
+
+    const on = await call(app, "GET", "/pretriage/status", managerToken);
+    expect(await on.json()).toEqual({ available: true });
+
+    const task = await createTask(project.id, { title: "Login lento" });
+    const foreign = await createTask((await createProject("Altro")).id, { title: "Non mio" });
+    vi.stubGlobal("fetch", async () =>
+      Response.json({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify({
+                    ready: false,
+                    missing: ["Criteri di accettazione"],
+                    ambiguities: [],
+                    suggestedPriority: "high",
+                    suggestedComplexity: 2,
+                    possibleDuplicates: [],
+                    summary: "Da completare",
+                  }),
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    try {
+      const ok = await call(app, "POST", `/tasks/${task.id}/pretriage`, managerToken);
+      expect(ok.status).toBe(200);
+      expect(await ok.json()).toMatchObject({ result: { ready: false }, comment: { taskId: task.id } });
+      const forbidden = await call(app, "POST", `/tasks/${foreign.id}/pretriage`, managerToken);
+      expect(forbidden.status).toBe(403);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("/voice/session richiede l'autenticazione", async () => {

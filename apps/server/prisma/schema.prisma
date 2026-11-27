@@ -263,8 +263,9 @@ model EmailSettings {
   updatedAt   DateTime @updatedAt
 }
 
-// Assistente vocale (Gemini Live, singleton, admin-only). apiKeyEnc contiene la
-// chiave Google AI Studio cifrata (AES-GCM, vedi src/lib/secretBox.ts): non
+// Impostazioni Gemini (singleton, admin-only): assistente vocale Live e
+// pre-triage dei task. apiKeyEnc contiene la chiave Google AI Studio cifrata
+// (AES-GCM, vedi src/lib/secretBox.ts), condivisa dalle due funzioni: non
 // esce mai dalle API, il browser riceve solo token effimeri.
 model VoiceSettings {
   id        String   @id @default("singleton")
@@ -272,6 +273,10 @@ model VoiceSettings {
   apiKeyEnc String?
   model     String   @default("gemini-3.8-live")
   voiceName String?
+  // Pre-triage (Gemini testo, su richiesta di chi ha accesso al task):
+  // modello separato da quello Live, che e' un modello audio.
+  pretriageEnabled Boolean @default(false)
+  pretriageModel   String  @default("gemini-flash-lite-latest")
   updatedAt DateTime @updatedAt
 }
 

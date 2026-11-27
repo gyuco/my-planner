@@ -18,6 +18,7 @@ import {
 } from "../services/taskService.js";
 import { assertAdmin, assertProjectAccess, assertTaskAccess, listProjectAssignees } from "../services/userService.js";
 import { userActor } from "../services/notificationService.js";
+import { getPretriageStatus, runPretriage } from "../services/pretriageService.js";
 import {
   taskFiltersQuerySchema,
   taskInputSchema,
@@ -142,5 +143,18 @@ export async function taskRoutes(app: FastifyInstance) {
     const { taskId } = req.params as { taskId: string };
     await assertTaskAccess((req as any).authUser, taskId);
     return listComments(taskId);
+  });
+
+  // --- Pre-triage con Gemini (tutti gli utenti con accesso al task) -------
+
+  app.get("/pretriage/status", { onRequest: [app.authenticate] }, async () => {
+    return getPretriageStatus();
+  });
+
+  // Aggiunge un commento con l'esito; non modifica i campi del task.
+  app.post("/tasks/:taskId/pretriage", { onRequest: [app.authenticate] }, async (req) => {
+    const { taskId } = req.params as { taskId: string };
+    await assertTaskAccess((req as any).authUser, taskId);
+    return runPretriage(taskId, userActor((req as any).authUser));
   });
 }

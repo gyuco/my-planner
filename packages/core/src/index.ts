@@ -375,6 +375,12 @@ export interface EmailSettings {
 export const DEFAULT_VOICE_MODEL = "gemini-3.8-live";
 
 /**
+ * Modello Gemini (testo) usato di default dal pre-triage dei task: alias
+ * "latest" del Flash-Lite, incluso nel piano gratuito di Google AI Studio.
+ */
+export const DEFAULT_PRETRIAGE_MODEL = "gemini-flash-lite-latest";
+
+/**
  * Config dell'assistente vocale Gemini Live (GET/PUT /settings/voice, solo
  * admin). La chiave API non viene mai restituita, solo il flag `apiKeySet`.
  * `configured` = abilitato e con chiave: solo allora gli utenti lo vedono.
@@ -386,12 +392,44 @@ export interface VoiceSettings {
   model: string;
   /** Voce predefinita di Gemini (es. "Kore"); null = scelta del modello. */
   voiceName: string | null;
+  /** Pre-triage dei task attivo (richiede solo la chiave, non l'assistente vocale). */
+  pretriageEnabled: boolean;
+  /** Modello Gemini di testo del pre-triage (es. "gemini-flash-lite-latest"). */
+  pretriageModel: string;
   updatedAt: string | null;
 }
 
 /** Disponibilita' dell'assistente per l'utente corrente (GET /voice/status). */
 export interface VoiceStatus {
   available: boolean;
+}
+
+/** Disponibilita' del pre-triage per l'utente corrente (GET /pretriage/status). */
+export interface PretriageStatus {
+  available: boolean;
+}
+
+/**
+ * Esito strutturato del pre-triage (POST /tasks/:taskId/pretriage): JSON
+ * prodotto da Gemini e ripulito dal server (duplicati solo tra i task aperti
+ * del progetto, priorita'/complessita' solo valori ammessi).
+ */
+export interface PretriageResult {
+  ready: boolean;
+  missing: string[];
+  ambiguities: string[];
+  suggestedPriority: TaskPriority | null;
+  suggestedComplexity: TaskComplexity | null;
+  possibleDuplicates: { taskId: string; title: string }[];
+  summary: string;
+  /** Modello usato. */
+  model: string;
+}
+
+/** Risposta di POST /tasks/:taskId/pretriage: esito + commento aggiunto al task. */
+export interface PretriageResponse {
+  result: PretriageResult;
+  comment: Comment;
 }
 
 /**
@@ -578,6 +616,9 @@ export type ErrorCode =
   | "EMAIL_SEND_FAILED"
   | "VOICE_UNAVAILABLE"
   | "VOICE_PROVIDER_ERROR"
+  | "PRETRIAGE_UNAVAILABLE"
+  | "PRETRIAGE_QUOTA"
+  | "PRETRIAGE_PROVIDER_ERROR"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -624,6 +665,9 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   EMAIL_SEND_FAILED: 502,
   VOICE_UNAVAILABLE: 503,
   VOICE_PROVIDER_ERROR: 502,
+  PRETRIAGE_UNAVAILABLE: 503,
+  PRETRIAGE_QUOTA: 429,
+  PRETRIAGE_PROVIDER_ERROR: 502,
   INTERNAL_ERROR: 500,
 };
 
