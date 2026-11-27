@@ -116,6 +116,7 @@ export const it: Dictionary = {
     loadError: "Impossibile caricare gli assegnatari",
     searchPlaceholder: "Cerca una persona...",
     noResults: "Nessun risultato",
+    saved: "Salvato",
   },
   taskType: {
     label: "Tipo",

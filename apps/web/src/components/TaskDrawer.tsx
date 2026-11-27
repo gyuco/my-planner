@@ -163,6 +163,12 @@ export function TaskDrawer({
   const saveQueuedRef = useRef(false);
   // Ultima modifica dell'assegnatario in corso: le risposte superate vengono ignorate.
   const assigneeRequestRef = useRef(0);
+  // Feedback del salvataggio assegnatario: spinner durante la PATCH, spunta
+  // "Salvato" per ~1.5s dopo la risposta.
+  const [assigneeSaving, setAssigneeSaving] = useState(false);
+  const [assigneeSaved, setAssigneeSaved] = useState(false);
+  const assigneeSavedTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(assigneeSavedTimerRef.current), []);
   const saveFieldsRef = useRef<(overrides?: { type?: TaskType; explicit?: boolean }) => Promise<void>>();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
@@ -300,14 +306,23 @@ export function TaskDrawer({
     const previous = { assigneeId: task.assigneeId, assigneeName: task.assigneeName };
     const requestId = ++assigneeRequestRef.current;
     setTask((prev) => (prev ? { ...prev, assigneeId, assigneeName: assignee?.name ?? null } : prev));
+    clearTimeout(assigneeSavedTimerRef.current);
+    setAssigneeSaved(false);
+    setAssigneeSaving(true);
     try {
       const updated = await updateTask(taskId, { assigneeId });
       if (requestId !== assigneeRequestRef.current) return;
+      // Sblocca subito il campo alla risposta della PATCH: il refresh della
+      // board (onChanged) parte in background e non viene atteso.
       setTask((prev) => (prev ? { ...prev, ...updated } : updated));
-      onChanged();
+      setAssigneeSaving(false);
+      setAssigneeSaved(true);
+      assigneeSavedTimerRef.current = setTimeout(() => setAssigneeSaved(false), 1500);
       toast.success(t.taskDrawer.saved);
+      onChanged();
     } catch (err) {
       if (requestId !== assigneeRequestRef.current) return;
+      setAssigneeSaving(false);
       setTask((prev) => (prev ? { ...prev, ...previous } : prev));
       setError(err instanceof ApiRequestError ? err.message : t.taskDrawer.saveError);
     }
@@ -620,6 +635,8 @@ export function TaskDrawer({
                   value={task.assigneeId}
                   valueName={task.assigneeName}
                   onChange={handleChangeAssignee}
+                  saving={assigneeSaving}
+                  saved={assigneeSaved}
                 />
                 <label>
                   {t.taskDrawer.ownerLabel}

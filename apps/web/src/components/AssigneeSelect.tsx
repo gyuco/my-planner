@@ -14,6 +14,10 @@ interface AssigneeSelectProps {
   disabled?: boolean;
   /** Nome da mostrare finche' la lista non e' caricata (es. `task.assigneeName`). */
   valueName?: string | null;
+  /** Salvataggio in corso (es. PATCH dal drawer): campo disabilitato, spinner e `aria-busy`. Opzionale. */
+  saving?: boolean;
+  /** Salvataggio appena riuscito: breve spunta "Salvato" al posto della freccia. Opzionale. */
+  saved?: boolean;
 }
 
 interface Option {
@@ -38,7 +42,7 @@ const VIEWPORT_MARGIN = 8;
  * `position: fixed` per non essere tagliato dal contenitore scrollabile del
  * drawer; si apre verso l'alto se sotto non c'e' spazio.
  */
-export function AssigneeSelect({ projectId, value, onChange, disabled, valueName }: AssigneeSelectProps) {
+export function AssigneeSelect({ projectId, value, onChange, disabled, valueName, saving = false, saved = false }: AssigneeSelectProps) {
   const { t } = useI18n();
   const [assignees, setAssignees] = useState<TaskAssignee[]>([]);
   const [error, setError] = useState(false);
@@ -56,7 +60,7 @@ export function AssigneeSelect({ projectId, value, onChange, disabled, valueName
   const listboxId = `${baseId}-listbox`;
   const optionId = (index: number) => `${baseId}-opt-${index}`;
 
-  const isDisabled = Boolean(disabled || error);
+  const isDisabled = Boolean(disabled || error || saving);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,13 +220,30 @@ export function AssigneeSelect({ projectId, value, onChange, disabled, valueName
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         disabled={isDisabled}
+        aria-busy={saving || undefined}
         title={error ? t.assignee.loadError : undefined}
         onClick={() => (open ? close(false) : openPopover())}
         onKeyDown={handleTriggerKeyDown}
       >
         <span className={`assignee-select-value${value ? "" : " is-placeholder"}`}>{triggerText}</span>
-        <ChevronDownIcon className="assignee-select-chevron" />
+        {saving ? (
+          <span className="assignee-select-status is-saving" aria-hidden="true">
+            <span className="spinner" />
+            {t.taskDrawer.saving}
+          </span>
+        ) : saved ? (
+          <span className="assignee-select-status is-saved" aria-hidden="true">
+            <CheckIcon />
+            {t.assignee.saved}
+          </span>
+        ) : (
+          <ChevronDownIcon className="assignee-select-chevron" />
+        )}
       </button>
+      {/* Annuncio per screen reader (lo stato visivo e' nel trigger, aria-hidden). */}
+      <span className="assignee-select-live" role="status" aria-live="polite">
+        {saving ? t.taskDrawer.saving : saved ? t.assignee.saved : ""}
+      </span>
       {open &&
         createPortal(
           <div
