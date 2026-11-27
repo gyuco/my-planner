@@ -302,3 +302,12 @@ export const emailSettingsInputSchema = z.object({
 export const emailTestInputSchema = z.object({
   to: z.string().trim().max(255).optional(),
 });
+
+export const voiceSettingsInputSchema = z.object({
+  enabled: z.boolean(),
+  // Vuota/omessa = mantiene la chiave gia' salvata; removeApiKey la cancella.
+  apiKey: z.string().trim().max(500).optional().nullable(),
+  removeApiKey: z.boolean().optional(),
+  model: z.string().trim().max(100).optional(),
+  voiceName: z.string().trim().max(50).optional().nullable(),
+});

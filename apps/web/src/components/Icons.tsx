@@ -213,3 +213,13 @@ export function MoreIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function MicIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="9" y="2" width="6" height="12" rx="3" />
+      <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+      <path d="M12 18v4" />
+    </Icon>
+  );
+}
