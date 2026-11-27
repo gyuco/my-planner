@@ -565,6 +565,8 @@ export const en = {
     noSubtasks: "No subtasks",
     addSubtaskPlaceholder: "New subtask title",
     addSubtaskError: "Error creating the subtask",
+    subtasksProgress: "{done}/{total} completed",
+    subtaskToggleDone: "Mark \"{title}\" as done",
     parentOf: "Subtask of:",
     openParent: "Open parent task",
     saved: "Changes saved",

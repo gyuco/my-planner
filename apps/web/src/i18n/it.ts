@@ -567,6 +567,8 @@ export const it: Dictionary = {
     noSubtasks: "Nessuna sotto-task",
     addSubtaskPlaceholder: "Titolo nuova sotto-task",
     addSubtaskError: "Errore durante la creazione della sotto-task",
+    subtasksProgress: "{done}/{total} completate",
+    subtaskToggleDone: "Segna \"{title}\" come completata",
     parentOf: "Sotto-task di:",
     openParent: "Apri task genitore",
     saved: "Modifiche salvate",
