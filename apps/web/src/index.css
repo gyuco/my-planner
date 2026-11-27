@@ -4075,3 +4075,130 @@ body.dnd-dragging * {
   display: block;
   margin: 0.75rem auto 0.25rem;
 }
+
+/* --- Assistente vocale (Gemini Live) -------------------------------------- */
+.voice {
+  position: relative;
+  display: inline-flex;
+}
+
+.voice-button.active {
+  color: #fff;
+  background: var(--accent-500);
+  /* L'alone segue il volume del microfono (--voice-level 0..1). */
+  box-shadow: 0 0 0 calc(2px + var(--voice-level, 0) * 6px) rgba(var(--accent-rgb), 0.22);
+  transition: box-shadow 0.1s linear;
+}
+
+.voice-button.active:hover {
+  color: #fff;
+  background: var(--accent-600);
+}
+
+.voice-panel {
+  position: absolute;
+  z-index: 21;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(390px, calc(100vw - 2rem));
+  max-height: min(70vh, 520px);
+  padding: 0.35rem 0.35rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.voice-status {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0.55rem 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-500);
+}
+
+.voice-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: var(--r-full);
+  background: var(--ink-300);
+}
+
+.voice-status-listening .voice-dot { background: var(--accent-500); animation: voice-pulse 1.4s ease-in-out infinite; }
+.voice-status-speaking .voice-dot { background: var(--plum-500); animation: voice-pulse 0.7s ease-in-out infinite; }
+.voice-status-working .voice-dot,
+.voice-status-connecting .voice-dot { background: var(--ochre-400); animation: voice-pulse 1s ease-in-out infinite; }
+.voice-status-error .voice-dot { background: var(--danger); }
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-dot { animation: none !important; }
+}
+
+.voice-error {
+  margin: 0 0.55rem 0.4rem;
+}
+
+.voice-transcript {
+  flex: 1;
+  min-height: 4rem;
+  overflow-y: auto;
+  padding: 0 0.55rem;
+}
+
+.voice-line {
+  margin: 0 0 0.45rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--r-md);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.voice-line-user {
+  margin-left: 2rem;
+  background: var(--accent-50);
+  color: var(--ink-900);
+}
+
+.voice-line-assistant {
+  margin-right: 2rem;
+  background: var(--surface-sunken);
+  color: var(--ink-800);
+}
+
+.voice-line-action {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent-600);
+}
+
+.voice-line-action.failed {
+  color: var(--danger);
+}
+
+.voice-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.4rem 0.55rem 0;
+}
+
+@media (max-width: 700px) {
+  /* Su telefono il pulsante non sta sul bordo destro: pannello fisso a tutta larghezza. */
+  .voice-panel {
+    position: fixed;
+    top: 3.6rem;
+    left: 1rem;
+    right: 1rem;
+    width: auto;
+  }
+}

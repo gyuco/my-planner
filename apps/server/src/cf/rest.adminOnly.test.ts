@@ -90,3 +90,35 @@ describe("REST Cloudflare impostazioni di progetto solo admin", () => {
     expect(status.status).toBe(201);
   });
 });
+
+describe("REST Cloudflare assistente vocale", () => {
+  it("le impostazioni vocali sono solo admin, lo stato e' per tutti", async () => {
+    const app = buildRestApp();
+    const { managerToken, adminToken } = await setup();
+    for (const [method, url, body] of [
+      ["GET", "/settings/voice", undefined],
+      ["PUT", "/settings/voice", { enabled: false }],
+      ["POST", "/settings/voice/test", undefined],
+    ] as const) {
+      const res = await call(app, method, url, managerToken, body);
+      expect(res.status, `${method} ${url}`).toBe(403);
+    }
+
+    const put = await call(app, "PUT", "/settings/voice", adminToken, {
+      enabled: true,
+      apiKey: "AIzaSyTEST-0123456789abcdefghijkl",
+    });
+    expect(put.status).toBe(200);
+    expect(await put.json()).toMatchObject({ configured: true, apiKeySet: true });
+
+    const status = await call(app, "GET", "/voice/status", managerToken);
+    expect(status.status).toBe(200);
+    expect(await status.json()).toEqual({ available: true });
+  });
+
+  it("/voice/session richiede l'autenticazione", async () => {
+    const app = buildRestApp();
+    const res = await app.request("/voice/session", { method: "POST" }, env);
+    expect(res.status).toBe(401);
+  });
+});

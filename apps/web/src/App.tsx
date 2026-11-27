@@ -10,6 +10,8 @@ import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
 import { StorageSettingsModal } from "./components/StorageSettingsModal";
 import { EmailSettingsModal } from "./components/EmailSettingsModal";
+import { VoiceSettingsModal } from "./components/VoiceSettingsModal";
+import { VoiceAssistant } from "./components/VoiceAssistant";
 import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import {
@@ -152,6 +154,11 @@ export function App() {
   const [showArchived, setShowArchived] = useState(false);
   const [showStorageSettings, setShowStorageSettings] = useState(false);
   const [showEmailSettings, setShowEmailSettings] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  // Incrementato quando l'assistente vocale modifica dati: ricarica il drawer aperto.
+  const [voiceDataVersion, setVoiceDataVersion] = useState(0);
+  // Rimonta il pulsante microfono dopo le impostazioni (attivato/disattivato).
+  const [voiceSettingsVersion, setVoiceSettingsVersion] = useState(0);
   const [showUsers, setShowUsers] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
@@ -558,6 +565,7 @@ export function App() {
         onOpenArchived={() => setShowArchived(true)}
         onOpenStorageSettings={() => setShowStorageSettings(true)}
         onOpenEmailSettings={() => setShowEmailSettings(true)}
+        onOpenVoiceSettings={() => setShowVoiceSettings(true)}
         onOpenUsers={() => setShowUsers(true)}
         onOpenActivity={() => {
           setRouteNotice(null);
@@ -595,6 +603,24 @@ export function App() {
               </button>
             )}
             <div className="topbar-group">
+              {currentUser && (
+                <VoiceAssistant
+                  key={voiceSettingsVersion}
+                  host={{
+                    getContext: () => ({
+                      userName: displayName(currentUser),
+                      projectId: currentProject?.id ?? null,
+                      projectName: currentProject?.name ?? null,
+                      openTaskId,
+                    }),
+                    onDataChanged: () => {
+                      loadBoard();
+                      setVoiceDataVersion((v) => v + 1);
+                    },
+                    onOpenTask: (taskId, projectId) => openTask(taskId, projectId, true),
+                  }}
+                />
+              )}
               <NotificationsBell
                 onOpenTask={(taskId, projectId) => {
                   openTask(taskId, projectId, true);
@@ -744,6 +770,7 @@ export function App() {
 
       {openTaskId && openTaskProjectId && (
         <TaskDrawer
+          key={`${openTaskId}:${voiceDataVersion}`}
           taskId={openTaskId}
           projectId={openTaskProjectId}
           onClose={() => setTaskParam(null, true)}
@@ -781,6 +808,15 @@ export function App() {
       )}
 
       {showEmailSettings && isAdmin && <EmailSettingsModal onClose={() => setShowEmailSettings(false)} />}
+
+      {showVoiceSettings && isAdmin && (
+        <VoiceSettingsModal
+          onClose={() => {
+            setShowVoiceSettings(false);
+            setVoiceSettingsVersion((v) => v + 1);
+          }}
+        />
+      )}
 
       {showUsers && currentUser && isAdmin && (
         <UsersModal

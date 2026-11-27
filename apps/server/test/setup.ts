@@ -24,6 +24,7 @@ setAttachmentStorageFactory(async () =>
  */
 export async function cleanDatabase() {
   await prisma.emailSettings.deleteMany();
+  await prisma.voiceSettings.deleteMany();
   await prisma.notificationState.deleteMany();
   await prisma.taskEvent.deleteMany();
   await prisma.userProject.deleteMany();

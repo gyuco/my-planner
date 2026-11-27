@@ -58,6 +58,13 @@ import {
 } from "../services/attachmentService.js";
 import { getStorageSettings, updateStorageSettings } from "../services/storageSettingsService.js";
 import { getEmailSettings, sendTestEmail, updateEmailSettings } from "../services/emailSettingsService.js";
+import {
+  createVoiceSession,
+  getVoiceSettings,
+  getVoiceStatus,
+  testVoiceSettings,
+  updateVoiceSettings,
+} from "../services/voiceService.js";
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { activityFiltersFromQuery, listActivity, listActivityActors } from "../services/activityService.js";
 import { getProjectStats } from "../services/statsService.js";
@@ -90,6 +97,7 @@ import {
   doneTasksQuerySchema,
   storageSettingsInputSchema,
   emailSettingsInputSchema,
+  voiceSettingsInputSchema,
   emailTestInputSchema,
   createUserInputSchema,
   updateUserInputSchema,
@@ -185,6 +193,7 @@ export function buildRestApp() {
     "/users/*",
     "/avatars/*",
     "/push/*",
+    "/voice/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -629,6 +638,20 @@ export function buildRestApp() {
     const input = emailTestInputSchema.parse(await c.req.json().catch(() => ({})));
     return c.json(await sendTestEmail(input.to || c.get("user").email));
   });
+
+  app.get("/settings/voice", async (c) => c.json(await getVoiceSettings()));
+
+  app.put("/settings/voice", async (c) => {
+    const input = voiceSettingsInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await updateVoiceSettings(input));
+  });
+
+  app.post("/settings/voice/test", async (c) => c.json(await testVoiceSettings()));
+
+  // --- Assistente vocale (tutti gli utenti autenticati) --------------------
+  app.get("/voice/status", async (c) => c.json(await getVoiceStatus()));
+
+  app.post("/voice/session", async (c) => c.json(await createVoiceSession()));
 
   return app;
 }

@@ -68,6 +68,7 @@ interface SidebarProps {
   onOpenArchived: () => void;
   onOpenStorageSettings: () => void;
   onOpenEmailSettings: () => void;
+  onOpenVoiceSettings: () => void;
   onOpenUsers: () => void;
   onOpenActivity: () => void;
 }
@@ -85,6 +86,7 @@ export function Sidebar({
   onOpenArchived,
   onOpenStorageSettings,
   onOpenEmailSettings,
+  onOpenVoiceSettings,
   onOpenUsers,
   onOpenActivity,
 }: SidebarProps) {
@@ -200,6 +202,11 @@ export function Sidebar({
         {isAdmin && (
           <button className="sidebar-item" onClick={onOpenEmailSettings}>
             {t.sidebar.emailSettings}
+          </button>
+        )}
+        {isAdmin && (
+          <button className="sidebar-item" onClick={onOpenVoiceSettings}>
+            {t.sidebar.voiceSettings}
           </button>
         )}
       </div>
