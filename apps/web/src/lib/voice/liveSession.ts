@@ -31,6 +31,17 @@ export interface LiveSessionCallbacks {
   onPhase: (phase: VoicePhase, error?: string) => void;
   onTranscript: (entries: TranscriptEntry[]) => void;
   onLevel?: (level: number) => void;
+  /** Microfono attivo/disattivato (o non disponibile: permesso negato, assente). */
+  onMic?: (state: MicState) => void;
+}
+
+export type MicState = "on" | "muted" | "unavailable";
+
+export interface LiveSessionOptions {
+  /** Chiusura automatica dopo questo silenzio (default 90 s). */
+  idleTimeoutMs?: number;
+  /** Parte con il microfono spento (es. conversazione iniziata scrivendo). */
+  startMuted?: boolean;
 }
 
 interface FunctionCall {
@@ -40,7 +51,7 @@ interface FunctionCall {
 }
 
 /** Chiusura automatica se nessuno parla per questo tempo (costi). */
-const IDLE_TIMEOUT_MS = 90_000;
+const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 
 export class LiveVoiceSession {
   private ws: WebSocket | null = null;
@@ -58,6 +69,10 @@ export class LiveVoiceSession {
   private speakingPoll: ReturnType<typeof setInterval> | null = null;
 
   private session: VoiceSession | null = null;
+  private ready = false;
+  private muted: boolean;
+  /** Messaggi scritti prima che la sessione sia pronta. */
+  private pendingTexts: string[] = [];
 
   constructor(
     private fetchSession: () => Promise<VoiceSession>,
@@ -65,7 +80,41 @@ export class LiveVoiceSession {
     private language: string,
     private labels: { actionPrefix: (name: string) => string },
     private callbacks: LiveSessionCallbacks,
-  ) {}
+    private options: LiveSessionOptions = {},
+  ) {
+    this.muted = Boolean(options.startMuted);
+  }
+
+  /** Volume dell'audio del modello (0..1), per animare l'avatar. */
+  outputLevel(): number {
+    return this.player.level();
+  }
+
+  get micState(): MicState {
+    return this.mic ? (this.muted ? "muted" : "on") : "unavailable";
+  }
+
+  setMuted(muted: boolean) {
+    this.muted = muted;
+    if (!muted) this.touch();
+    this.callbacks.onMic?.(this.micState);
+  }
+
+  /** Messaggio scritto: il modello risponde a voce come per il parlato. */
+  sendText(text: string) {
+    const clean = text.trim();
+    if (!clean || this.closed) return;
+    this.transcript = [...this.transcript, { id: this.nextEntryId++, role: "user", text: clean }];
+    this.callbacks.onTranscript(this.transcript);
+    this.touch();
+    if (!this.ready) {
+      this.pendingTexts.push(clean);
+      return;
+    }
+    // L'utente interrompe l'eventuale risposta in corso, come parlando.
+    this.player.flush();
+    this.send({ realtimeInput: { text: clean } });
+  }
 
   /** Da chiamare nel gesto dell'utente (click): sblocca l'audio su Safari/iOS. */
   async start() {
@@ -74,14 +123,21 @@ export class LiveVoiceSession {
     const resumed = this.player.resume();
 
     try {
-      // Microfono prima del token: se l'utente nega il permesso non si
-      // consuma nulla.
-      this.mic = await startMicCapture(
-        (chunk) => this.send({ realtimeInput: { audio: { data: chunk, mimeType: "audio/pcm;rate=16000" } } }),
-        this.callbacks.onLevel,
-      );
+      // Microfono facoltativo: se manca o e' negato si continua scrivendo.
+      try {
+        this.mic = await startMicCapture(
+          (chunk) => {
+            if (!this.muted) this.send({ realtimeInput: { audio: { data: chunk, mimeType: "audio/pcm;rate=16000" } } });
+          },
+          (level) => this.callbacks.onLevel?.(this.muted ? 0 : level),
+        );
+      } catch (err) {
+        if (!(err instanceof DOMException)) throw err;
+        this.mic = null;
+      }
+      this.callbacks.onMic?.(this.micState);
       await resumed;
-      if (this.closed) return this.mic.stop();
+      if (this.closed) return this.mic?.stop();
       this.session = await this.fetchSession();
     } catch (err) {
       this.fail(err instanceof Error ? err.message : String(err));
@@ -140,7 +196,7 @@ export class LiveVoiceSession {
 
   private touch() {
     if (this.idleTimer) clearTimeout(this.idleTimer);
-    this.idleTimer = setTimeout(() => this.stop(), IDLE_TIMEOUT_MS);
+    this.idleTimer = setTimeout(() => this.stop(), this.options.idleTimeoutMs ?? DEFAULT_IDLE_TIMEOUT_MS);
   }
 
   private send(message: unknown) {
@@ -194,8 +250,10 @@ export class LiveVoiceSession {
     }
 
     if (msg.setupComplete) {
+      this.ready = true;
       this.setPhase("listening");
       this.touch();
+      for (const text of this.pendingTexts.splice(0)) this.send({ realtimeInput: { text } });
       return;
     }
 

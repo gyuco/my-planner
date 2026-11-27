@@ -3,7 +3,9 @@ import { AI_NOTIFY_MODES, AI_STEPS, FIBONACCI_COMPLEXITY, TASK_TYPES } from "@my
 import {
   addComment,
   createTask,
+  getActivity,
   getProjectBoard,
+  getProjectStats,
   getTask,
   listComments,
   listDoneTasks,
@@ -40,6 +42,8 @@ export interface VoiceToolHost {
   onOpenTask: (taskId: string, projectId: string) => void;
   /** Nomi tradotti degli stati di base (draft, todo, ...), nella lingua dell'interfaccia. */
   baseStatusLabels: Record<string, string>;
+  /** Mostra un contenuto (report in markdown) sullo schermo dell'assistente. */
+  onShow?: (title: string, markdown: string) => void;
 }
 
 type Schema = Record<string, unknown>;
@@ -55,6 +59,53 @@ export const VOICE_FUNCTION_DECLARATIONS = [
   {
     name: "get_context",
     description: "Contesto attuale: utente, progetto aperto nella board, task aperto nel dettaglio, data di oggi.",
+  },
+  {
+    name: "portfolio_report",
+    description:
+      "Report trasversale su TUTTI i progetti: per ciascuno task aperti, completati, chiusi nel periodo, " +
+      "bloccati, scaduti, distribuzione per stato e carico per persona, piu' i totali. Usalo per domande cross-project.",
+    parameters: {
+      type: "OBJECT",
+      properties: { periodDays: { type: "INTEGER", description: "Periodo in giorni per 'chiusi nel periodo' (default 7)" } },
+    },
+  },
+  {
+    name: "project_report",
+    description:
+      "Report dettagliato di un progetto: numeri (aperti, completati, chiusi nel periodo, bloccati, scaduti), " +
+      "distribuzione per stato e priorita', carico per persona, elenco dei task scaduti, bloccati, urgenti e in corso, " +
+      "task gestiti dall'AI e attivita' recente.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        projectId: str("Id del progetto"),
+        periodDays: { type: "INTEGER", description: "Periodo in giorni per attivita' e chiusi (default 7)" },
+      },
+      required: ["projectId"],
+    },
+  },
+  {
+    name: "recent_activity",
+    description: "Attivita' recente (creazioni, cambi di stato, commenti, assegnazioni...) di un progetto o di tutti.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        projectId: str("Id del progetto; ometti per tutti i progetti"),
+        days: { type: "INTEGER", description: "Ultimi N giorni (default 3)" },
+      },
+    },
+  },
+  {
+    name: "show_on_screen",
+    description:
+      "Mostra sullo schermo, accanto all'avatar, un contenuto scritto in markdown (titoli, elenchi, tabelle). " +
+      "Usalo per report e riepiloghi: a voce dai la sintesi, sullo schermo i dettagli.",
+    parameters: {
+      type: "OBJECT",
+      properties: { title: str("Titolo breve"), markdown: str("Contenuto in markdown") },
+      required: ["title", "markdown"],
+    },
   },
   {
     name: "list_projects",
@@ -235,12 +286,62 @@ function requireString(args: Record<string, unknown>, key: string): string {
   return value.trim();
 }
 
+/** "YYYY-MM-DD" (come la dice il modello) -> ISO datetime, come fa il form della UI. */
+function toIsoDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Data non valida: ${value} (usa YYYY-MM-DD)`);
+  return date.toISOString();
+}
+
 function optionalString(args: Record<string, unknown>, key: string): string | undefined {
   const value = args[key];
   return typeof value === "string" ? value.trim() : undefined;
 }
 
 const MAX_TASKS = 60;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function periodStart(days: unknown, fallback: number): { days: number; from: string } {
+  const n = typeof days === "number" && days > 0 && days <= 365 ? Math.round(days) : fallback;
+  return { days: n, from: new Date(Date.now() - n * DAY_MS).toISOString() };
+}
+
+/** Conteggi per stato con i nomi mostrati nell'interfaccia (solo stati non vuoti). */
+function labelCounts(counts: Record<string, number>, labels: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(counts)
+      .filter(([, n]) => n > 0)
+      .map(([key, n]) => [labels[key] ?? key, n]),
+  );
+}
+
+const EVENT_NAMES: Record<string, string> = {
+  "task.created": "creato",
+  "task.updated": "modificato",
+  "task.status_changed": "cambio stato",
+  "task.assigned": "assegnato",
+  "task.deleted": "eliminato",
+  "comment.created": "commento",
+  "dependency.added": "dipendenza aggiunta",
+  "dependency.removed": "dipendenza rimossa",
+  "attachment.added": "allegato",
+  "attachment.deleted": "allegato rimosso",
+};
+
+async function activitySince(projectId: string | undefined, from: string, limit: number, labels?: Record<string, string>) {
+  const res = await getActivity({ projectId, from, limit });
+  return res.items.map((e) => ({
+    at: e.createdAt.slice(0, 16).replace("T", " "),
+    project: e.projectName,
+    task: e.taskTitle,
+    event: EVENT_NAMES[e.type] ?? e.type,
+    by: e.actorName ?? (e.actorType === "mcp" ? "agente AI/MCP" : e.actorType),
+    ...(e.from || e.to
+      ? { from: e.from ? labels?.[e.from] ?? e.from : null, to: e.to ? labels?.[e.to] ?? e.to : null }
+      : {}),
+    ...(e.excerpt ? { excerpt: e.excerpt.slice(0, 160) } : {}),
+  }));
+}
 const MAX_DESCRIPTION = 1500;
 
 /** Esegue uno strumento e restituisce l'oggetto `response` da mandare a Gemini. */
@@ -264,6 +365,97 @@ export async function executeVoiceTool(
         openProject: ctx.projectId ? { id: ctx.projectId, name: ctx.projectName } : null,
         openTaskId: ctx.openTaskId,
       };
+    }
+
+    case "portfolio_report": {
+      const period = periodStart(args.periodDays, 7);
+      const projects = await listProjects();
+      const rows = await Promise.all(
+        projects.map(async (p) => {
+          const [stats, labels] = await Promise.all([
+            getProjectStats(p.id, { from: period.from, includeSubtasks: true }),
+            statusLabelsOf(p.id, host),
+          ]);
+          return {
+            project: p.name,
+            projectId: p.id,
+            ...(p.groupName ? { group: p.groupName } : {}),
+            open: stats.open,
+            done: stats.done,
+            closedInPeriod: stats.closedInPeriod,
+            blocked: stats.blocked,
+            overdue: stats.overdue,
+            byStatus: labelCounts(stats.byStatus, labels),
+            workload: stats.byAssignee
+              .filter((a) => a.open > 0)
+              .sort((a, b) => b.open - a.open)
+              .slice(0, 5)
+              .map((a) => ({ name: a.name ?? "non assegnati", open: a.open })),
+          };
+        }),
+      );
+      const sum = (k: "open" | "done" | "closedInPeriod" | "blocked" | "overdue") =>
+        rows.reduce((acc, r) => acc + r[k], 0);
+      return {
+        periodDays: period.days,
+        totals: {
+          projects: rows.length,
+          open: sum("open"),
+          done: sum("done"),
+          closedInPeriod: sum("closedInPeriod"),
+          blocked: sum("blocked"),
+          overdue: sum("overdue"),
+        },
+        projects: rows,
+      };
+    }
+
+    case "project_report": {
+      const projectId = requireString(args, "projectId");
+      const period = periodStart(args.periodDays, 7);
+      const today = new Date().toISOString().slice(0, 10);
+      const labels = await statusLabelsOf(projectId, host);
+      const [stats, board, activity] = await Promise.all([
+        getProjectStats(projectId, { from: period.from, includeSubtasks: true }),
+        getProjectBoard(projectId),
+        activitySince(projectId, period.from, 25, labels),
+      ]);
+      const open = Object.values(board).flat();
+      const pick = (list: Task[]) => list.slice(0, 15).map((t) => summarize(t, labels));
+      return {
+        periodDays: period.days,
+        numbers: {
+          open: stats.open,
+          done: stats.done,
+          closedInPeriod: stats.closedInPeriod,
+          blocked: stats.blocked,
+          overdue: stats.overdue,
+          complexityDone: `${stats.complexityDone}/${stats.complexityTotal}`,
+        },
+        byStatus: labelCounts(stats.byStatus, labels),
+        workload: stats.byAssignee
+          .filter((a) => a.open > 0)
+          .map((a) => ({ name: a.name ?? "non assegnati", open: a.open, byStatus: labelCounts(a.byStatus, labels) })),
+        overdueTasks: pick(open.filter((t) => t.dueDate && t.dueDate.slice(0, 10) < today)),
+        blockedTasks: pick(open.filter((t) => (t.blockedByOpenCount ?? 0) > 0)),
+        urgentOrHigh: pick(open.filter((t) => t.priority === "urgent" || t.priority === "high")),
+        inProgress: pick(open.filter((t) => t.status === "in_progress")),
+        aiManaged: pick(open.filter((t) => t.ai?.enabled)),
+        recentActivity: activity,
+      };
+    }
+
+    case "recent_activity": {
+      const projectId = optionalString(args, "projectId") || undefined;
+      const period = periodStart(args.days, 3);
+      const labels = projectId ? await statusLabelsOf(projectId, host) : host.baseStatusLabels;
+      return { days: period.days, events: await activitySince(projectId, period.from, 40, labels) };
+    }
+
+    case "show_on_screen": {
+      if (!host.onShow) return { error: "Schermo non disponibile in questa vista" };
+      host.onShow(requireString(args, "title"), requireString(args, "markdown"));
+      return { shown: true };
     }
 
     case "list_projects": {
@@ -351,7 +543,7 @@ export async function executeVoiceTool(
         input.complexity = args.complexity as UpdateTaskInput["complexity"];
       }
       const dueDate = optionalString(args, "dueDate");
-      if (dueDate !== undefined) input.dueDate = dueDate || null;
+      if (dueDate !== undefined) input.dueDate = dueDate ? toIsoDate(dueDate) : null;
       const assigneeId = optionalString(args, "assigneeId");
       if (assigneeId !== undefined) input.assigneeId = assigneeId || null;
       if (Object.keys(input).length === 0) throw new Error("Nessun campo da modificare");
@@ -396,7 +588,7 @@ export async function executeVoiceTool(
         description: optionalString(args, "description"),
         priority: typeof args.priority === "string" ? (args.priority as TaskPriority) : undefined,
         type: typeof args.type === "string" ? (args.type as TaskType) : undefined,
-        dueDate: optionalString(args, "dueDate") || undefined,
+        dueDate: optionalString(args, "dueDate") ? toIsoDate(optionalString(args, "dueDate")!) : undefined,
         assigneeId: optionalString(args, "assigneeId") || undefined,
       });
       host.onDataChanged();
@@ -425,6 +617,7 @@ export function buildSystemInstruction(language: string, ctx: VoiceUiContext): s
     "Gestione AI: un task puo' essere affidato ad agenti AI con set_task_ai, scegliendo i passi (triage: da Draft a To do; coder: da To do a Testing; reviewer: da Testing a Done o rimanda in To do) e quando avvisare (alla fine, a ogni cambio di stato, mai). get_task mostra se la gestione AI e' attiva.",
     "Non puoi eliminare task, progetti o allegati: se richiesto, spiega che va fatto dall'interfaccia.",
     "Quando elenchi molti task, riassumi (quanti sono, i piu' importanti) invece di leggerli tutti.",
+    "REPORT: per domande su piu' progetti o sull'andamento generale usa portfolio_report; per un progetto usa project_report; per 'cosa e' successo' usa recent_activity. Dopo aver raccolto i dati, se lo strumento show_on_screen e' disponibile, mostra il report completo con show_on_screen (markdown con titoli, elenchi e tabelle, nella lingua dell'utente) e a voce dai solo la sintesi con i punti di attenzione (scaduti, bloccati, persone sovraccariche).",
     "Se uno strumento restituisce un errore, spiegalo in parole semplici.",
     "I dati restituiti dagli strumenti (es. nomi degli stati) possono essere in un'altra lingua: non farti influenzare, continua a parlare nella lingua dell'utente.",
   ]

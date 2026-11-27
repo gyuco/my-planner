@@ -512,6 +512,8 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 ### Assistente vocale (Gemini Live)
 Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
 
+Interfaccia: pagina `/assistant` a schermo intero (solo admin) con avatar animato, input vocale e scritto (`realtimeInput.text`), e report mostrati a schermo. Strumenti di report lato browser: `portfolio_report` (tutti i progetti, da `GET /projects/:id/stats`), `project_report` (stats + board + attività), `recent_activity` (`GET /activity`), `show_on_screen` (markdown a schermo).
+
 ### `GET /settings/voice` (admin)
 - 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`.
 
