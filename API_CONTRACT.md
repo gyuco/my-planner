@@ -61,6 +61,9 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
 | `VOICE_UNAVAILABLE` | 503 | Assistente vocale non attivo o chiave non decifrabile (`POST /voice/session`) |
 | `VOICE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta o non è raggiungibile (`POST /voice/session`, `POST /settings/voice/test`) |
+| `PRETRIAGE_UNAVAILABLE` | 503 | Pre-triage non attivo, senza chiave o chiave non decifrabile (`POST /tasks/:taskId/pretriage`) |
+| `PRETRIAGE_QUOTA` | 429 | Quota gratuita di Gemini esaurita (HTTP 429 / `RESOURCE_EXHAUSTED`) |
+| `PRETRIAGE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta, non ha risposto entro 30 s o ha restituito una risposta non valida (`POST /tasks/:taskId/pretriage`, `POST /settings/voice/pretriage-test`) |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
 `message` è sempre una stringa human-readable in italiano (coerente col resto del codebase), pensata per essere mostrata sia in UI sia restituita a un agente AI via MCP.
@@ -372,6 +375,20 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 `GET /tasks/:taskId/comments`
 - 200: `Comment[]` ordinati per `createdAt asc` (cronologico)
 
+### Pre-triage (Gemini)
+
+Su richiesta (pulsante "Pre-triage" nel drawer), per **qualsiasi utente con accesso al task** (`assertTaskAccess`, non solo admin). Usa la chiave dell'assistente vocale e il modello `pretriageModel` delle impostazioni Gemini (vedi §6ter, `apps/server/src/services/pretriageService.ts`).
+
+`GET /pretriage/status` (autenticato)
+- 200: `{ available: boolean }` — `pretriageEnabled` e chiave presente; mostra o nasconde il pulsante.
+
+`POST /tasks/:taskId/pretriage`
+- Nessun body. Manda a Gemini (`POST v1beta/models/{model}:generateContent`, `responseMimeType: application/json` + `responseSchema`) titolo, tipo, priorità, complessità, tag e descrizione del task, più id, stato e titolo di al massimo 50 altri task aperti (non `done`) dello stesso progetto per segnalare i duplicati. Il modello risponde nella lingua della descrizione.
+- Il JSON viene ripulito: `possibleDuplicates` solo con id presenti nella lista inviata (titolo preso dal DB), `suggestedPriority` solo `low|medium|high|urgent` (altrimenti null), `suggestedComplexity` arrotondata al valore Fibonacci più vicino (o null).
+- Aggiunge al task un commento markdown ("Pre-triage (Gemini · {model})", esito ✅/⚠️, cosa manca, ambiguità, suggerimenti, link ai possibili duplicati) con l'attore dell'utente, come `POST /tasks/:taskId/comments` (evento `comment.created` nell'attività). **Non modifica mai i campi del task.**
+- 200: `{ result: PretriageResult, comment: Comment }` — `PretriageResult` = `{ ready, missing: string[], ambiguities: string[], suggestedPriority, suggestedComplexity, possibleDuplicates: [{ taskId, title }], summary, model }`.
+- 403/404 come le altre route del task · 503 `PRETRIAGE_UNAVAILABLE` se non attivo · 429 `PRETRIAGE_QUOTA` ("Quota gratuita di Gemini esaurita per oggi, riprova più tardi") · 502 `PRETRIAGE_PROVIDER_ERROR` (messaggio di Google, timeout 30 s, risposta non JSON).
+
 ---
 
 ## 5. REST — Board (B8)
@@ -509,24 +526,31 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - Usa la config **salvata**, anche se non ancora abilitata.
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
 
-### Assistente vocale (Gemini Live)
+### Impostazioni Gemini: assistente vocale (Gemini Live) e pre-triage
+Le impostazioni `/settings/voice*` (UI "Impostazioni Gemini") contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
+
 Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
 
 Interfaccia: pagina `/assistant` a schermo intero (solo admin) con avatar animato, input vocale e scritto (`realtimeInput.text`), e report mostrati a schermo. Strumenti di report lato browser: `portfolio_report` (tutti i progetti, da `GET /projects/:id/stats`), `project_report` (stats + board + attività), `recent_activity` (`GET /activity`), `show_on_screen` (markdown a schermo).
 
 ### `GET /settings/voice` (admin)
-- 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`.
+- 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, pretriageEnabled, pretriageModel, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = assistente vocale abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`, `pretriageEnabled: false`, `pretriageModel: "gemini-flash-lite-latest"` (`DEFAULT_PRETRIAGE_MODEL`).
 
 ### `PUT /settings/voice` (admin)
-- Body: `{ enabled: boolean, apiKey?, removeApiKey?: boolean, model?, voiceName? }`
+- Body: `{ enabled: boolean, apiKey?, removeApiKey?: boolean, model?, voiceName?, pretriageEnabled?: boolean, pretriageModel? }`
 - `apiKey` omessa/vuota → mantiene quella salvata; `removeApiKey: true` la cancella. Salvata cifrata come la password SMTP (`SETTINGS_ENCRYPTION_KEY`, fallback `JWT_SECRET`).
 - `model` senza prefisso `models/` (viene tolto se presente); `voiceName` = voce predefinita Gemini (es. `Kore`) o null.
-- 400 `VALIDATION_ERROR`: `enabled: true` senza chiave; modello, voce o chiave non validi.
+- `pretriageEnabled` / `pretriageModel` omessi → invariati; `pretriageModel` vuoto → default. Stesso formato di `model`.
+- 400 `VALIDATION_ERROR`: `enabled: true` o `pretriageEnabled: true` senza chiave (ognuno richiede solo la chiave, non l'altro); modelli, voce o chiave non validi.
 - 200: `VoiceSettings` aggiornato.
 
 ### `POST /settings/voice/test` (admin)
 - Legge i metadati del modello salvato con la chiave salvata (`GET v1beta/models/{model}`, nessun costo di generazione).
 - 200: `{ ok: true, model }` · 400 `VALIDATION_ERROR` senza chiave · 502 `VOICE_PROVIDER_ERROR` con il messaggio di Google.
+
+### `POST /settings/voice/pretriage-test` (admin)
+- Come `/settings/voice/test` ma con `pretriageModel` (`GET v1beta/models/{pretriageModel}`, nessun costo).
+- 200: `{ ok: true, model }` · 400 `VALIDATION_ERROR` senza chiave · 502 `PRETRIAGE_PROVIDER_ERROR` con il messaggio di Google.
 
 ### `GET /voice/status` (admin)
 - 200: `{ available: boolean }` — mostra o nasconde il pulsante microfono.
@@ -727,6 +751,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 6. `TaskEvent` + `NotificationState` (nuovi modelli) — notifiche in-app (§6ter). `TaskEvent.id` è `Int @default(autoincrement())` e funge da cursore monotono; `actorId` è nullable (MCP/sistema) con `onDelete: SetNull`; `taskId` è uno scalare senza relation, così l'evento sopravvive alla delete del task (il titolo è denormalizzato in `data`). Migrazioni: `prisma/migrations/20261019140000_add_notifications` (Node/SQLite) e `apps/server/migrations/0006_add_notifications.sql` (D1).
 
 7. Indice `TaskEvent(taskId, id)` per il log attività per task (§6quater). Migrazioni: `prisma/migrations/20261019200000_task_event_task_index` e `apps/server/migrations/0008_add_task_event_task_index.sql`.
+
+8. `VoiceSettings.pretriageEnabled` (Boolean, default false) e `VoiceSettings.pretriageModel` (String, default `gemini-flash-lite-latest`) — pre-triage dei task con Gemini (§4). Migrazioni: `prisma/migrations/20261127180000_add_pretriage_settings` e `apps/server/migrations/0026_add_pretriage_settings.sql`.
 
 Vedi diff applicato in coda al file schema.
 

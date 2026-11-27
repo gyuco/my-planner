@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copyText } from "../lib/clipboard";
-import { CheckIcon, LinkIcon, SparkleIcon, SubtaskIcon, TrashIcon, XIcon } from "./Icons";
+import { CheckIcon, LinkIcon, SparkleIcon, SparklesIcon, SubtaskIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES, isBaseStatus } from "@my-planner/core";
 import { statusLabel } from "../lib/statuses";
@@ -14,12 +14,14 @@ import {
   deleteAttachment,
   deleteTask,
   downloadAttachment,
+  getPretriageStatus,
   getTask,
   listAttachments,
   listComments,
   listTasks,
   moveTask,
   removeDependency,
+  runPretriage,
   updateTask,
   uploadAttachment,
   listProjectStatuses,
@@ -172,6 +174,23 @@ export function TaskDrawer({
   const saveFieldsRef = useRef<(overrides?: { type?: TaskType; explicit?: boolean }) => Promise<void>>();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [openSections, setOpenSections] = useState<Set<DrawerSection>>(() => new Set());
+  // Pre-triage con Gemini: pulsante visibile solo se attivato dall'admin.
+  const [pretriageAvailable, setPretriageAvailable] = useState(false);
+  const [pretriageRunning, setPretriageRunning] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPretriageStatus()
+      .then((s) => {
+        if (!cancelled) setPretriageAvailable(s.available);
+      })
+      .catch(() => {
+        /* resta nascosto */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function handleCopyLink() {
     if (await copyText(absoluteUrl(taskPath(projectId, taskId)))) {
@@ -426,6 +445,32 @@ export function TaskDrawer({
     }
   }
 
+  /** Pre-triage: l'esito arriva come commento (il task non viene modificato). */
+  async function handlePretriage() {
+    if (pretriageRunning) return;
+    setPretriageRunning(true);
+    try {
+      await runPretriage(taskId);
+      setComments(await listComments(taskId));
+      toast.success(t.taskDrawer.pretriageDone);
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : t.taskDrawer.pretriageError);
+    } finally {
+      setPretriageRunning(false);
+    }
+  }
+
+  /** I link ai task nei commenti (es. duplicati del pre-triage) aprono il task nel drawer. */
+  function handleCommentsClick(e: React.MouseEvent<HTMLElement>) {
+    const anchor = (e.target as HTMLElement).closest("a");
+    if (!anchor || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    const url = new URL(anchor.href, window.location.href);
+    const linkedTaskId = url.searchParams.get("task");
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/projects/") || !linkedTaskId) return;
+    e.preventDefault();
+    onOpenTask(linkedTaskId);
+  }
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -596,16 +641,38 @@ export function TaskDrawer({
               <div className="drawer-description">
                 <div className="drawer-description-head">
                   <span className="field-label">{t.taskDrawer.descriptionLabel}</span>
-                  <button
-                    type="button"
-                    className="link-button"
-                    onClick={() => {
-                      if (editingDescription) saveFields();
-                      setEditingDescription((v) => !v);
-                    }}
-                  >
-                    {editingDescription ? t.taskDrawer.preview : t.taskDrawer.edit}
-                  </button>
+                  <span className="drawer-description-actions">
+                    {pretriageAvailable && (
+                      <button
+                        type="button"
+                        className="drawer-pretriage-button"
+                        onClick={handlePretriage}
+                        disabled={pretriageRunning}
+                        aria-busy={pretriageRunning}
+                        title={t.taskDrawer.pretriageTitle}
+                      >
+                        {pretriageRunning ? (
+                          <>
+                            <span className="spinner" aria-hidden="true" /> {t.taskDrawer.pretriageRunning}
+                          </>
+                        ) : (
+                          <>
+                            <SparklesIcon /> {t.taskDrawer.pretriage}
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={() => {
+                        if (editingDescription) saveFields();
+                        setEditingDescription((v) => !v);
+                      }}
+                    >
+                      {editingDescription ? t.taskDrawer.preview : t.taskDrawer.edit}
+                    </button>
+                  </span>
                 </div>
                 {editingDescription ? (
                   <textarea
@@ -825,7 +892,7 @@ export function TaskDrawer({
 
             <section className="drawer-section">
               <h3>{t.taskDrawer.comments}</h3>
-              <ul className="drawer-list drawer-comments">
+              <ul className="drawer-list drawer-comments" onClick={handleCommentsClick}>
                 {comments.map((c) => (
                   <li key={c.id}>
                     <div className="comment-date">{formatDateTime(c.createdAt)}</div>

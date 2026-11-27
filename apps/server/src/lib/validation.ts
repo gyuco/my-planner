@@ -310,4 +310,7 @@ export const voiceSettingsInputSchema = z.object({
   removeApiKey: z.boolean().optional(),
   model: z.string().trim().max(100).optional(),
   voiceName: z.string().trim().max(50).optional().nullable(),
+  // Pre-triage (stessa chiave): omessi = invariati; modello vuoto = default.
+  pretriageEnabled: z.boolean().optional(),
+  pretriageModel: z.string().trim().max(100).optional(),
 });

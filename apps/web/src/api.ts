@@ -24,6 +24,8 @@ import type {
   VoiceSettings,
   VoiceSession,
   VoiceStatus,
+  PretriageStatus,
+  PretriageResponse,
   UserAccount,
   UserRole,
   NotificationsResponse,
@@ -674,6 +676,9 @@ export interface VoiceSettingsInput {
   removeApiKey?: boolean;
   model?: string;
   voiceName?: string | null;
+  /** Pre-triage (stessa chiave): omessi = invariati. */
+  pretriageEnabled?: boolean;
+  pretriageModel?: string;
 }
 
 export function getVoiceSettings(): Promise<VoiceSettings> {
@@ -686,6 +691,22 @@ export function updateVoiceSettings(input: VoiceSettingsInput): Promise<VoiceSet
 
 export function testVoiceSettings(): Promise<{ ok: true; model: string }> {
   return apiFetch(`/settings/voice/test`, { method: "POST" });
+}
+
+/** Verifica il modello del pre-triage con la chiave salvata (metadati, nessun costo). */
+export function testPretriageSettings(): Promise<{ ok: true; model: string }> {
+  return apiFetch(`/settings/voice/pretriage-test`, { method: "POST" });
+}
+
+// --- Pre-triage dei task (Gemini, tutti gli utenti con accesso al task) -------
+
+export function getPretriageStatus(): Promise<PretriageStatus> {
+  return apiFetch(`/pretriage/status`);
+}
+
+/** Analizza il task con Gemini e aggiunge l'esito come commento (non modifica il task). */
+export function runPretriage(taskId: string): Promise<PretriageResponse> {
+  return apiFetch(`/tasks/${taskId}/pretriage`, { method: "POST" });
 }
 
 export function getVoiceStatus(): Promise<VoiceStatus> {

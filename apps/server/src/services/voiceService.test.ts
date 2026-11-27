@@ -70,6 +70,48 @@ describe("impostazioni assistente vocale", () => {
   });
 });
 
+describe("impostazioni pre-triage (stessa chiave)", () => {
+  it("default spento con il modello di testo di default", async () => {
+    expect(await getVoiceSettings()).toMatchObject({
+      pretriageEnabled: false,
+      pretriageModel: "gemini-flash-lite-latest",
+    });
+  });
+
+  it("si attiva anche con l'assistente vocale spento, purche' ci sia la chiave", async () => {
+    await expect(updateVoiceSettings({ enabled: false, pretriageEnabled: true })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      message: "Inserisci la chiave API per attivare il pre-triage",
+    });
+    const settings = await updateVoiceSettings({
+      enabled: false,
+      apiKey: API_KEY,
+      pretriageEnabled: true,
+      pretriageModel: "models/gemini-2.5-flash",
+    });
+    expect(settings).toMatchObject({
+      enabled: false,
+      configured: false,
+      pretriageEnabled: true,
+      pretriageModel: "gemini-2.5-flash",
+    });
+  });
+
+  it("campi omessi = invariati, modello vuoto = default, modello non valido rifiutato", async () => {
+    await updateVoiceSettings({ enabled: false, apiKey: API_KEY, pretriageEnabled: true, pretriageModel: "gemini-2.5-flash" });
+    expect(await updateVoiceSettings({ enabled: true })).toMatchObject({
+      pretriageEnabled: true,
+      pretriageModel: "gemini-2.5-flash",
+    });
+    expect(await updateVoiceSettings({ enabled: true, pretriageModel: "" })).toMatchObject({
+      pretriageModel: "gemini-flash-lite-latest",
+    });
+    await expect(updateVoiceSettings({ enabled: true, pretriageModel: "../evil" })).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+    });
+  });
+});
+
 describe("token effimero", () => {
   it("richiede l'assistente attivo", async () => {
     await expect(createVoiceSession()).rejects.toMatchObject({ code: "VOICE_UNAVAILABLE" });
