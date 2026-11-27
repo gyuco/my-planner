@@ -11,7 +11,8 @@ import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
 import { StorageSettingsModal } from "./components/StorageSettingsModal";
 import { EmailSettingsModal } from "./components/EmailSettingsModal";
 import { VoiceSettingsModal } from "./components/VoiceSettingsModal";
-import { VoiceAssistant } from "./components/VoiceAssistant";
+import { VoiceAssistantButton } from "./components/VoiceAssistant";
+import { AssistantPage } from "./pages/AssistantPage";
 import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import {
@@ -267,6 +268,10 @@ export function App() {
       document.title = `${t.guide.sidebar} · My Planner`;
       return;
     }
+    if (view === "assistant") {
+      document.title = `${t.assistant.title} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (view === "stats" && currentProject) {
       document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
@@ -447,6 +452,8 @@ export function App() {
   useEffect(() => {
     if (!loggedIn || !projectsLoaded) return;
     if (view === "profile" || view === "activity" || view === "guide") return;
+    // Assistente: solo admin (si aspetta di sapere chi e' l'utente prima di decidere).
+    if (view === "assistant" && (!currentUser || isAdmin)) return;
     if (selectedProjectId) return;
     const target = projects[0]?.id ?? "all";
     const unknownProject = route.projectId !== null && route.projectId !== "all";
@@ -454,7 +461,7 @@ export function App() {
       setRouteNotice(t.app.projectNotFound);
     }
     navigate({ pathname: projectPath(target), search: location.search }, { replace: true });
-  }, [loggedIn, projectsLoaded, view, selectedProjectId, projects, route.projectId, location.search, navigate, t]);
+  }, [loggedIn, projectsLoaded, view, selectedProjectId, projects, route.projectId, location.search, navigate, t, currentUser, isAdmin]);
 
   // Deep link ?task=: risolve il progetto del task (e verifica l'accesso).
   useEffect(() => {
@@ -543,9 +550,14 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={view === "activity" || view === "guide" ? null : selectedProjectId}
+        selectedProjectId={view === "activity" || view === "guide" || view === "assistant" ? null : selectedProjectId}
         activityActive={view === "activity"}
         guideActive={view === "guide"}
+        assistantActive={view === "assistant"}
+        onOpenAssistant={() => {
+          navigate("/assistant");
+          setSidebarOpen(false);
+        }}
         onOpenGuide={() => {
           navigate("/guide");
           setSidebarOpen(false);
@@ -588,7 +600,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "assistant" ? t.assistant.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -604,20 +616,12 @@ export function App() {
             )}
             <div className="topbar-group">
               {currentUser && isAdmin && (
-                <VoiceAssistant
+                <VoiceAssistantButton
                   key={voiceSettingsVersion}
-                  host={{
-                    getContext: () => ({
-                      userName: displayName(currentUser),
-                      projectId: currentProject?.id ?? null,
-                      projectName: currentProject?.name ?? null,
-                      openTaskId,
-                    }),
-                    onDataChanged: () => {
-                      loadBoard();
-                      setVoiceDataVersion((v) => v + 1);
-                    },
-                    onOpenTask: (taskId, projectId) => openTask(taskId, projectId, true),
+                  active={view === "assistant"}
+                  onOpen={() => {
+                    navigate("/assistant");
+                    setSidebarOpen(false);
                   }}
                 />
               )}
@@ -664,7 +668,24 @@ export function App() {
           </div>
         </header>
 
-        {view === "guide" ? (
+        {view === "assistant" && isAdmin && currentUser ? (
+          <AssistantPage
+            host={{
+              // Nella pagina dell'assistente il "progetto corrente" e' l'ultimo visitato.
+              getContext: () => {
+                const last = projects.find((p) => p.id === lastProjectRef.current) ?? null;
+                return {
+                  userName: displayName(currentUser),
+                  projectId: last?.id ?? null,
+                  projectName: last?.name ?? null,
+                  openTaskId: null,
+                };
+              },
+              onDataChanged: () => setVoiceDataVersion((v) => v + 1),
+              onOpenTask: (taskId, projectId) => openTask(taskId, projectId),
+            }}
+          />
+        ) : view === "guide" ? (
           <GuidePage />
         ) : view === "activity" ? (
           <ActivityPage
