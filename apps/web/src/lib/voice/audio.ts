@@ -118,11 +118,26 @@ export async function startMicCapture(
 /** Riproduzione in coda dei blocchi audio del modello, interrompibile. */
 export class PcmPlayer {
   private ctx: AudioContext;
+  private analyser: AnalyserNode;
+  private samples: Float32Array<ArrayBuffer>;
   private nextTime = 0;
   private sources = new Set<AudioBufferSourceNode>();
 
   constructor() {
     this.ctx = new AudioContext({ sampleRate: OUTPUT_SAMPLE_RATE });
+    this.analyser = this.ctx.createAnalyser();
+    this.analyser.fftSize = 512;
+    this.samples = new Float32Array(this.analyser.fftSize);
+    this.analyser.connect(this.ctx.destination);
+  }
+
+  /** Volume corrente (0..1) di cio' che si sta riproducendo. */
+  level(): number {
+    if (this.sources.size === 0) return 0;
+    this.analyser.getFloatTimeDomainData(this.samples);
+    let sum = 0;
+    for (let i = 0; i < this.samples.length; i++) sum += this.samples[i] ** 2;
+    return Math.min(1, Math.sqrt(sum / this.samples.length) * 5);
   }
 
   /** Va chiamato dentro il gesto dell'utente (Safari/iOS bloccano l'audio altrimenti). */
@@ -144,7 +159,7 @@ export class PcmPlayer {
 
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;
-    src.connect(this.ctx.destination);
+    src.connect(this.analyser);
     const startAt = Math.max(this.nextTime, this.ctx.currentTime + 0.02);
     src.start(startAt);
     this.nextTime = startAt + buffer.duration;
