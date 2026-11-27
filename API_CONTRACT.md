@@ -59,6 +59,8 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `ATTACHMENT_TYPE_NOT_ALLOWED` | 415 | Tipo file non ammesso |
 | `CONFLICT` | 409 | Altri conflitti generici (es. nome progetto duplicato, se applicabile) |
 | `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
+| `VOICE_UNAVAILABLE` | 503 | Assistente vocale non attivo o chiave non decifrabile (`POST /voice/session`) |
+| `VOICE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta o non è raggiungibile (`POST /voice/session`, `POST /settings/voice/test`) |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
 `message` è sempre una stringa human-readable in italiano (coerente col resto del codebase), pensata per essere mostrata sia in UI sia restituita a un agente AI via MCP.
@@ -163,7 +165,7 @@ Path sconosciuti o progetti non accessibili/archiviati → redirect al primo pro
 ### `GET /projects/:projectId/assignees`
 - Auth: JWT, accesso al progetto
 - 200: `[{ id, email, name }]` — admin e manager del progetto (`name` = nome e cognome, oppure email)
-- `POST /projects`, le impostazioni di progetto (`PATCH /projects/:projectId`, archive/unarchive, `POST/PATCH/DELETE /projects/:projectId/statuses*`, `/projects/:projectId/tokens*`), `GET/PUT /settings/storage`, `/settings/email*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
+- `POST /projects`, le impostazioni di progetto (`PATCH /projects/:projectId`, archive/unarchive, `POST/PATCH/DELETE /projects/:projectId/statuses*`, `/projects/:projectId/tokens*`), `GET/PUT /settings/storage`, `/settings/email*`, `/settings/voice*`, `/voice/*`, `POST /admin/run-standup` e `/users*` sono riservate agli admin.
 
 ### Notifiche push (Web Push)
 - `GET /push/public-key` → `{ publicKey }`: chiave pubblica VAPID (base64url, P-256 non compressa) da passare a `pushManager.subscribe` come `applicationServerKey`. Le chiavi sono generate al primo uso e salvate in `PushSettings` (privata cifrata con secretBox).
@@ -506,6 +508,31 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - Body: `{ to?: string }` (default: email dell'admin che chiama).
 - Usa la config **salvata**, anche se non ancora abilitata.
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
+
+### Assistente vocale (Gemini Live)
+Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
+
+### `GET /settings/voice` (admin)
+- 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`.
+
+### `PUT /settings/voice` (admin)
+- Body: `{ enabled: boolean, apiKey?, removeApiKey?: boolean, model?, voiceName? }`
+- `apiKey` omessa/vuota → mantiene quella salvata; `removeApiKey: true` la cancella. Salvata cifrata come la password SMTP (`SETTINGS_ENCRYPTION_KEY`, fallback `JWT_SECRET`).
+- `model` senza prefisso `models/` (viene tolto se presente); `voiceName` = voce predefinita Gemini (es. `Kore`) o null.
+- 400 `VALIDATION_ERROR`: `enabled: true` senza chiave; modello, voce o chiave non validi.
+- 200: `VoiceSettings` aggiornato.
+
+### `POST /settings/voice/test` (admin)
+- Legge i metadati del modello salvato con la chiave salvata (`GET v1beta/models/{model}`, nessun costo di generazione).
+- 200: `{ ok: true, model }` · 400 `VALIDATION_ERROR` senza chiave · 502 `VOICE_PROVIDER_ERROR` con il messaggio di Google.
+
+### `GET /voice/status` (admin)
+- 200: `{ available: boolean }` — mostra o nasconde il pulsante microfono.
+
+### `POST /voice/session` (admin)
+- Crea un token effimero: 1 uso, da aprire entro 2 minuti, sessione valida al massimo 30 minuti.
+- 200: `VoiceSession` — `{ token, wsUrl, model, voiceName, expiresAt }` (`wsUrl` include già il token).
+- 503 `VOICE_UNAVAILABLE` se l'assistente non è attivo · 502 `VOICE_PROVIDER_ERROR` se Google rifiuta (es. chiave non valida).
 
 ## 6quater. REST — Log attività
 

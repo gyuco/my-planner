@@ -21,6 +21,9 @@ import type {
   StorageSettings,
   EmailSettings,
   EmailSecurity,
+  VoiceSettings,
+  VoiceSession,
+  VoiceStatus,
   UserAccount,
   UserRole,
   NotificationsResponse,
@@ -660,6 +663,38 @@ export function updateEmailSettings(input: EmailSettingsInput): Promise<EmailSet
 
 export function sendTestEmail(to?: string): Promise<{ ok: true; to: string }> {
   return apiFetch(`/settings/email/test`, { method: "POST", body: JSON.stringify(to ? { to } : {}) });
+}
+
+// --- Assistente vocale (Gemini Live) ----------------------------------------
+
+export interface VoiceSettingsInput {
+  enabled: boolean;
+  /** Vuota/omessa = mantiene la chiave salvata. */
+  apiKey?: string;
+  removeApiKey?: boolean;
+  model?: string;
+  voiceName?: string | null;
+}
+
+export function getVoiceSettings(): Promise<VoiceSettings> {
+  return apiFetch(`/settings/voice`);
+}
+
+export function updateVoiceSettings(input: VoiceSettingsInput): Promise<VoiceSettings> {
+  return apiFetch(`/settings/voice`, { method: "PUT", body: JSON.stringify(input) });
+}
+
+export function testVoiceSettings(): Promise<{ ok: true; model: string }> {
+  return apiFetch(`/settings/voice/test`, { method: "POST" });
+}
+
+export function getVoiceStatus(): Promise<VoiceStatus> {
+  return apiFetch(`/voice/status`);
+}
+
+/** Token effimero monouso per aprire una conversazione Gemini Live. */
+export function createVoiceSession(): Promise<VoiceSession> {
+  return apiFetch(`/voice/session`, { method: "POST" });
 }
 
 /**

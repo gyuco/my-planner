@@ -371,6 +371,43 @@ export interface EmailSettings {
   updatedAt: string | null;
 }
 
+/** Modello Gemini Live usato di default dall'assistente vocale. */
+export const DEFAULT_VOICE_MODEL = "gemini-3.8-live";
+
+/**
+ * Config dell'assistente vocale Gemini Live (GET/PUT /settings/voice, solo
+ * admin). La chiave API non viene mai restituita, solo il flag `apiKeySet`.
+ * `configured` = abilitato e con chiave: solo allora gli utenti lo vedono.
+ */
+export interface VoiceSettings {
+  enabled: boolean;
+  configured: boolean;
+  apiKeySet: boolean;
+  model: string;
+  /** Voce predefinita di Gemini (es. "Kore"); null = scelta del modello. */
+  voiceName: string | null;
+  updatedAt: string | null;
+}
+
+/** Disponibilita' dell'assistente per l'utente corrente (GET /voice/status). */
+export interface VoiceStatus {
+  available: boolean;
+}
+
+/**
+ * Sessione vocale (POST /voice/session): token effimero monouso da usare
+ * nel WebSocket Live al posto della chiave API, che resta sul server.
+ */
+export interface VoiceSession {
+  token: string;
+  /** URL WebSocket completo (token incluso). */
+  wsUrl: string;
+  model: string;
+  voiceName: string | null;
+  /** Oltre questo istante il token non apre piu' nuove sessioni. */
+  expiresAt: string;
+}
+
 /** Dispositivo registrato per le notifiche push (GET /auth/me/push-subscriptions). */
 export interface PushDevice {
   id: string;
@@ -539,6 +576,8 @@ export type ErrorCode =
   | "ATTACHMENT_TYPE_NOT_ALLOWED"
   | "CONFLICT"
   | "EMAIL_SEND_FAILED"
+  | "VOICE_UNAVAILABLE"
+  | "VOICE_PROVIDER_ERROR"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -583,6 +622,8 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   ATTACHMENT_TYPE_NOT_ALLOWED: 415,
   CONFLICT: 409,
   EMAIL_SEND_FAILED: 502,
+  VOICE_UNAVAILABLE: 503,
+  VOICE_PROVIDER_ERROR: 502,
   INTERNAL_ERROR: 500,
 };
 
