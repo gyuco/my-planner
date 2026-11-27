@@ -38,7 +38,11 @@ test.describe("T4 - login e board base", () => {
     const taskCard = draftColumn.locator(".task-card", { hasText: taskTitle });
     await expect(taskCard).toBeVisible();
 
-    // Drag & drop verso "In progress"
+    // Drag & drop verso "In progress". Con molti progetti nel DB e2e la
+    // sidebar supera l'altezza della finestra: il click sul progetto in fondo
+    // fa scorrere la pagina e le colonne finiscono sopra il viewport. Si
+    // riporta la board in vista prima di leggere le coordinate.
+    await page.locator(".column").first().scrollIntoViewIfNeeded();
     const cardBox = await taskCard.boundingBox();
     const targetBox = await inProgressColumn.boundingBox();
     if (!cardBox || !targetBox) throw new Error("bounding box mancante per drag&drop");
