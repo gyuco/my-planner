@@ -222,6 +222,9 @@ export const AI_RUN_TTL_MS = 60 * 60 * 1000;
 /** Rimandi del reviewer dopo i quali il percorso AI si ferma e avvisa. */
 export const AI_MAX_REJECTS = 3;
 
+/** Lunghezza massima della nota dell'admin per l'agente AI (TaskAi.note). */
+export const AI_NOTE_MAX_LENGTH = 4000;
+
 export interface TaskAi {
   enabled: boolean;
   /** Passi scelti, nell'ordine triage -> coder -> reviewer. */
@@ -230,6 +233,12 @@ export interface TaskAi {
   /** Destinatario degli avvisi (l'admin che ha attivato la gestione AI). */
   watcherId: string | null;
   watcherName: string | null;
+  /**
+   * Nota libera dell'admin per l'agente (raccomandazioni, vincoli, contesto):
+   * l'agente la legge prima di iniziare e la segue in tutti i passi. null se
+   * assente. Conservata anche a gestione AI spenta.
+   */
+  note: string | null;
   /** Passo preso in carico da un agente (ai_start_step), se c'e'. */
   running?: { step: AiStep; startedAt: string } | null;
   /** Rimandi del reviewer nel giro corrente (al massimo AI_MAX_REJECTS). */
@@ -245,6 +254,8 @@ export interface TaskAiInput {
   enabled: boolean;
   steps?: AiStep[];
   notify?: AiNotifyMode;
+  /** Nota per l'agente (max AI_NOTE_MAX_LENGTH): stringa vuota/spazi o null = nessuna nota; omessa = invariata. */
+  note?: string | null;
 }
 
 /**
@@ -488,11 +499,13 @@ export type TaskTrackedField =
   | "tags"
   | "dueDate"
   | "parentId"
-  | "ai";
+  | "ai"
+  | "aiNote";
 
 /**
- * Singola modifica di un campo. Per `description` i valori non vengono
- * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null. Il
+ * Singola modifica di un campo. Per `description` e `aiNote` (nota dell'admin
+ * per l'agente) i valori non vengono salvati (testo potenzialmente lungo):
+ * `from`/`to` sono sempre null. Il
  * cambio di assegnatario e' un evento a parte (`task.assigned`).
  */
 export interface TaskFieldChange {

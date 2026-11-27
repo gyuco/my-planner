@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AI_NOTIFY_MODES, AI_STEPS, TASK_EVENT_TYPES } from "@my-planner/core";
+import { AI_NOTE_MAX_LENGTH, AI_NOTIFY_MODES, AI_STEPS, TASK_EVENT_TYPES } from "@my-planner/core";
 
 /**
  * Schemi zod condivisi tra le route REST, allineati agli enum e ai formati
@@ -150,6 +150,7 @@ export const taskAiInputSchema = z
     enabled: z.boolean(),
     steps: z.array(z.enum(AI_STEPS)).max(AI_STEPS.length).optional(),
     notify: z.enum(AI_NOTIFY_MODES).optional(),
+    note: z.string().max(AI_NOTE_MAX_LENGTH).nullable().optional(),
   })
   .refine((v) => !v.enabled || (v.steps?.length ?? 0) > 0, {
     message: "Scegli almeno un passo AI (triage, coder, reviewer)",
