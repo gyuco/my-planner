@@ -1,6 +1,6 @@
 import { aiPendingStep, aiRunningStep, isBaseStatus, suggestParentStatus, type Task, type TaskPriority, type TaskStatusKey } from "@my-planner/core";
 import { useI18n } from "../i18n";
-import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SubtaskIcon, UndoIcon } from "./Icons";
+import { AlertIcon, CheckIcon, ListChecksIcon, LockIcon, MoreIcon, SparkleIcon, SubtaskIcon, UndoIcon } from "./Icons";
 import { UserAvatarContent } from "../lib/avatar";
 import { baseStatusLabels } from "../lib/statuses";
 
@@ -72,6 +72,8 @@ interface TaskCardProps {
    */
   moveTargets?: { status: TaskStatusKey; label: string }[];
   onMove?: (status: TaskStatusKey) => void;
+  /** Solo admin: apre la gestione AI in una modal senza aprire il task. */
+  onOpenAi?: () => void;
 }
 
 export function TaskCard({
@@ -89,6 +91,7 @@ export function TaskCard({
   leaving,
   moveTargets,
   onMove,
+  onOpenAi,
 }: TaskCardProps) {
   const { t, dateLocale } = useI18n();
   const PRIORITY_LABEL: Record<TaskPriority, string> = {
@@ -276,6 +279,23 @@ export function TaskCard({
       )}
 
       <div className="task-card-footer">
+        {onOpenAi && (
+          <button
+            type="button"
+            className="task-card-ai"
+            title={t.taskAi.manageTitle}
+            aria-label={t.taskAi.manageTitle}
+            // Click/tastiera sul bottone non devono avviare il drag ne' aprire il drawer.
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenAi();
+            }}
+          >
+            <SparkleIcon />
+          </button>
+        )}
         {blocked && (
           <span className="task-card-blocked" title={t.taskCard.blockedTitle}>
             <LockIcon /> {task.blockedByOpenCount}

@@ -15,6 +15,7 @@ import { VoiceAssistantButton } from "./components/VoiceAssistant";
 import { AssistantPage } from "./pages/AssistantPage";
 import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
+import { TaskAiModal } from "./components/TaskAiModal";
 import {
   FilterBar,
   UNASSIGNED_FILTER,
@@ -150,6 +151,8 @@ export function App() {
   const [statusLabels, setStatusLabels] = useState<Record<string, string>>({});
   const [statusesVersion, setStatusesVersion] = useState(0);
   const [showCreateTask, setShowCreateTask] = useState(false);
+  // Gestione AI aperta dalla card della board (solo admin), senza aprire il task.
+  const [aiTask, setAiTask] = useState<{ id: string; title: string; projectId: string } | null>(null);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -767,6 +770,7 @@ export function App() {
                   aiQueueProjectId={
                     isAdmin && currentProject?.aiRoutineConfigured ? currentProject.id : null
                   }
+                  onTaskAi={isAdmin ? (task) => setAiTask({ id: task.id, title: task.title, projectId: task.projectId }) : undefined}
                 />
               </>
             )}
@@ -801,6 +805,18 @@ export function App() {
           claudeSessionProjectId={
             isAdmin && projects.find((p) => p.id === openTaskProjectId)?.aiRoutineConfigured ? openTaskProjectId : null
           }
+        />
+      )}
+
+      {aiTask && isAdmin && (
+        <TaskAiModal
+          taskId={aiTask.id}
+          taskTitle={aiTask.title}
+          claudeSessionProjectId={
+            projects.find((p) => p.id === aiTask.projectId)?.aiRoutineConfigured ? aiTask.projectId : null
+          }
+          onClose={() => setAiTask(null)}
+          onSaved={() => loadBoard()}
         />
       )}
 

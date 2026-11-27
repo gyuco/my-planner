@@ -3909,7 +3909,9 @@ body.dnd-dragging * {
 /* Le regole generiche dei campi del drawer (width 100%, padding) non devono
    valere per caselle e radio della gestione AI. */
 .drawer .ai-section input[type="checkbox"],
-.drawer .ai-section input[type="radio"] {
+.drawer .ai-section input[type="radio"],
+.modal .ai-section input[type="checkbox"],
+.modal .ai-section input[type="radio"] {
   width: 1rem;
   height: 1rem;
   padding: 0;
@@ -4504,3 +4506,68 @@ body.dnd-dragging * {
     max-width: 92%;
   }
 }
+
+/* -------------------------------------------------------------------------
+   Gestione AI in modal (dalla card della board o dal drawer, solo admin)
+   ------------------------------------------------------------------------- */
+.task-ai-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.task-ai-modal-head h2 { margin: 0; }
+.task-ai-modal-task { margin: -0.4rem 0 0; overflow-wrap: anywhere; }
+.task-ai-modal .ai-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  border: 0;
+  padding: 0;
+}
+.task-ai-modal .guide-link { align-self: flex-start; }
+
+/* Barra "Gestione AI" in cima al drawer: riepilogo + pulsante che apre la modal. */
+.drawer-ai-bar {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+}
+/* Batte .drawer-section:first-child (niente bordo superiore). */
+.drawer-section.drawer-ai-bar { border-top: 1px solid var(--line); padding-top: 0.7rem; }
+.drawer-ai-bar-text { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.drawer-ai-bar-text h3 { margin: 0; }
+.ai-manage-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  padding: 0.4rem 0.75rem;
+}
+.ai-manage-button svg { width: 1em; height: 1em; }
+
+/* Eliminazione in fondo al drawer */
+.drawer-danger-zone { align-items: flex-start; }
+
+/* Pulsante AI sulla card della board (solo admin) */
+.task-card-ai {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--accent-500);
+  flex-shrink: 0;
+}
+.task-card-ai:hover { background: var(--accent-500); color: var(--surface); border-color: var(--accent-500); }
+.task-card-ai svg { width: 0.95rem; height: 0.95rem; }
