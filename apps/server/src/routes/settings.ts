@@ -57,13 +57,13 @@ export async function settingsRoutes(app: FastifyInstance) {
     return testVoiceSettings();
   });
 
-  // Assistente vocale: per tutti gli utenti autenticati (le azioni passano
-  // poi dalle normali API REST, con i permessi dell'utente).
-  app.get("/voice/status", { onRequest: [app.authenticate] }, async () => {
+  // Assistente vocale: solo admin (le azioni passano poi dalle normali API
+  // REST, con i permessi dell'utente).
+  app.get("/voice/status", { onRequest: [app.authenticate, app.requireAdmin] }, async () => {
     return getVoiceStatus();
   });
 
-  app.post("/voice/session", { onRequest: [app.authenticate] }, async () => {
+  app.post("/voice/session", { onRequest: [app.authenticate, app.requireAdmin] }, async () => {
     return createVoiceSession();
   });
 }

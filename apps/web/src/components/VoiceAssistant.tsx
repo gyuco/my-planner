@@ -14,7 +14,7 @@ const LANGUAGE_NAMES: Record<string, string> = { it: "italiano", en: "English", 
 
 /**
  * Pulsante microfono nella topbar: apre una conversazione vocale con Gemini
- * Live. Visibile solo se l'admin ha configurato l'assistente.
+ * Live. Solo per gli admin, e solo se l'assistente e' configurato.
  */
 export function VoiceAssistant({ host }: VoiceAssistantProps) {
   const { t, locale } = useI18n();

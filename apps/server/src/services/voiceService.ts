@@ -61,7 +61,7 @@ export async function getVoiceSettings(): Promise<VoiceSettings> {
   return toPublic(await findRow());
 }
 
-/** Per tutti gli utenti autenticati: mostra o nasconde il pulsante microfono. */
+/** Solo admin: mostra o nasconde il pulsante microfono. */
 export async function getVoiceStatus(): Promise<VoiceStatus> {
   return { available: toPublic(await findRow()).configured };
 }

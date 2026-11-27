@@ -603,7 +603,7 @@ export function App() {
               </button>
             )}
             <div className="topbar-group">
-              {currentUser && (
+              {currentUser && isAdmin && (
                 <VoiceAssistant
                   key={voiceSettingsVersion}
                   host={{

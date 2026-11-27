@@ -205,7 +205,7 @@ export function buildRestApp() {
 
   // Route admin-only: gestione utenti e impostazioni globali. L'auth e' gia'
   // stata applicata dal blocco sopra.
-  for (const p of ["/settings/*", "/admin/*", "/users", "/users/*"]) {
+  for (const p of ["/settings/*", "/admin/*", "/users", "/users/*", "/voice/*"]) {
     app.use(p, async (c, next) => {
       try {
         assertAdmin(c.get("user"));
@@ -648,7 +648,7 @@ export function buildRestApp() {
 
   app.post("/settings/voice/test", async (c) => c.json(await testVoiceSettings()));
 
-  // --- Assistente vocale (tutti gli utenti autenticati) --------------------
+  // --- Assistente vocale (solo admin) --------------------------------------
   app.get("/voice/status", async (c) => c.json(await getVoiceStatus()));
 
   app.post("/voice/session", async (c) => c.json(await createVoiceSession()));
