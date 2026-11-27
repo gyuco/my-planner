@@ -277,6 +277,7 @@ export const it: Dictionary = {
       update_task: "Task modificato",
       add_comment: "Commento aggiunto",
       create_task: "Task creato",
+      set_task_ai: "Gestione AI aggiornata",
     },
   },
   voiceSettings: {
