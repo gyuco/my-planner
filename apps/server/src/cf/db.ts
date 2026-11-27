@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient } from "../../prisma/d1client/wasm.js";
 import { PrismaD1 } from "@prisma/adapter-d1";
 import { setPrismaResolver } from "../lib/prisma.js";
+import { patchD1DateInference } from "./d1DateFix.js";
 import type { CfEnv } from "./env.js";
 
 /**
@@ -66,6 +67,8 @@ function serializeClient<T extends object>(client: T): T {
  * ogni richiesta lavora sul proprio client e sulla propria coda: nessuna
  * promise viene mai attraversata tra I/O context diversi.
  */
+patchD1DateInference();
+
 const requestScope = new AsyncLocalStorage<PrismaClient>();
 
 setPrismaResolver(() => requestScope.getStore() ?? null);
