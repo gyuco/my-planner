@@ -12,6 +12,8 @@ interface TaskAiSectionProps {
   isAdmin: boolean;
   /** Progetto con routine configurata: l'admin puo' aprire una sessione Claude su questo task. */
   claudeSessionProjectId?: string | null;
+  /** Nella modal il titolo e' gia' nell'intestazione. */
+  hideTitle?: boolean;
   onSaved: (task: Task) => void;
 }
 
@@ -21,7 +23,7 @@ interface TaskAiSectionProps {
  * Done) e quando essere avvisato. Gli altri utenti vedono solo lo stato,
  * e solo se la gestione AI e' attiva.
  */
-export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, onSaved }: TaskAiSectionProps) {
+export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, hideTitle = false, onSaved }: TaskAiSectionProps) {
   const { t, formatDateTime } = useI18n();
   const toast = useToast();
   const ai = task.ai;
@@ -127,12 +129,18 @@ export function TaskAiSection({ task, isAdmin, claudeSessionProjectId = null, on
 
   return (
     <section className="drawer-section ai-section" aria-label={t.taskAi.title}>
-      <h3>
-        {t.taskAi.title}{" "}
+      {hideTitle ? (
         <Link className="guide-link" to="/guide#guide-use">
           {t.guide.open}
         </Link>
-      </h3>
+      ) : (
+        <h3>
+          {t.taskAi.title}{" "}
+          <Link className="guide-link" to="/guide#guide-use">
+            {t.guide.open}
+          </Link>
+        </h3>
+      )}
       <label className="ai-option ai-toggle">
         <input
           type="checkbox"

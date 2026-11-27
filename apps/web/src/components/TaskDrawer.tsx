@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copyText } from "../lib/clipboard";
-import { CheckIcon, LinkIcon, TrashIcon, XIcon } from "./Icons";
+import { CheckIcon, LinkIcon, SparkleIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
 import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
 import { statusLabel } from "../lib/statuses";
@@ -33,6 +33,7 @@ import { previewKind } from "../lib/attachmentPreview";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
 import { TaskAiSection } from "./TaskAiSection";
+import { TaskAiModal } from "./TaskAiModal";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const ACTIVITY_POLL_INTERVAL_MS = 10_000;
@@ -128,6 +129,7 @@ export function TaskDrawer({
     [projectStatuses],
   );
   const [task, setTask] = useState<Task | null>(null);
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -495,23 +497,6 @@ export function TaskDrawer({
                 </>
               )}
             </button>
-            {task && (
-              <button
-                type="button"
-                className="drawer-delete-task"
-                onClick={handleDeleteTask}
-                disabled={deleting}
-                title={t.taskDrawer.deleteTask}
-              >
-                {deleting ? (
-                  t.taskDrawer.deleting
-                ) : (
-                  <>
-                    <TrashIcon /> {t.taskDrawer.deleteTask}
-                  </>
-                )}
-              </button>
-            )}
             <button className="icon-button" onClick={onClose} title={t.taskDrawer.closeTitle} aria-label={t.taskDrawer.closeTitle}>
               <XIcon />
             </button>
@@ -536,6 +521,24 @@ export function TaskDrawer({
                 </button>
               </div>
             )}
+            {isAdmin ? (
+              <section className="drawer-section drawer-ai-bar" aria-label={t.taskAi.title}>
+                <div className="drawer-ai-bar-text">
+                  <h3>{t.taskAi.title}</h3>
+                  <span className="ai-hint">
+                    {task.ai?.enabled
+                      ? `${task.ai.steps.map((s) => t.taskAi.step[s]).join(" → ")}${task.ai.failure ? ` · ${t.taskAi.failedBadge}` : ""}`
+                      : t.taskAi.disabled}
+                  </span>
+                </div>
+                <button type="button" className="ai-manage-button" onClick={() => setAiModalOpen(true)}>
+                  <SparkleIcon /> {t.taskAi.manage}
+                </button>
+              </section>
+            ) : (
+              <TaskAiSection task={task} isAdmin={false} onSaved={() => undefined} />
+            )}
+
             <section className="drawer-section">
               <label>
                 {t.taskDrawer.statusLabel}
@@ -676,16 +679,6 @@ export function TaskDrawer({
                 {saving ? t.taskDrawer.saving : t.taskDrawer.save}
               </button>
             </section>
-
-            <TaskAiSection
-              task={task}
-              isAdmin={isAdmin}
-              claudeSessionProjectId={claudeSessionProjectId}
-              onSaved={(updated) => {
-                setTask((prev) => (prev ? { ...prev, ai: updated.ai } : prev));
-                onChanged();
-              }}
-            />
 
             <CollapsibleSection
               {...sectionProps("dependencies")}
@@ -837,9 +830,41 @@ export function TaskDrawer({
                 </button>
               )}
             </CollapsibleSection>
+
+            <section className="drawer-section drawer-danger-zone">
+              <button
+                type="button"
+                className="drawer-delete-task"
+                onClick={handleDeleteTask}
+                disabled={deleting}
+                title={t.taskDrawer.deleteTask}
+              >
+                {deleting ? (
+                  t.taskDrawer.deleting
+                ) : (
+                  <>
+                    <TrashIcon /> {t.taskDrawer.deleteTask}
+                  </>
+                )}
+              </button>
+            </section>
           </div>
         )}
       </aside>
+      {aiModalOpen && isAdmin && task && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <TaskAiModal
+            taskId={task.id}
+            taskTitle={task.title}
+            claudeSessionProjectId={claudeSessionProjectId}
+            onClose={() => setAiModalOpen(false)}
+            onSaved={(updated) => {
+              setTask((prev) => (prev ? { ...prev, ai: updated.ai } : prev));
+              onChanged();
+            }}
+          />
+        </div>
+      )}
       {lightboxIndex !== null && mediaAttachments[lightboxIndex] && (
         <div onClick={(e) => e.stopPropagation()}>
           <MediaLightbox
