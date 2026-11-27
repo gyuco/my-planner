@@ -4504,3 +4504,73 @@ body.dnd-dragging * {
     max-width: 92%;
   }
 }
+
+
+/* --- Task list markdown (checklist) --- */
+
+/* Classi aggiunte da renderMarkdown (lib/markdown.ts): `contains-task-list`
+   sulla lista, `task-list-item` (+ `is-checked`) sul <li>,
+   `task-list-checkbox` sull'input, `task-list-text` sul testo in riga.
+   Niente pallino, checkbox piccola in riga e testo con rientro sospeso
+   allineato al testo (non sotto la checkbox). */
+.contains-task-list,
+.drawer-description-preview .contains-task-list,
+.comment-body .contains-task-list { padding-left: 0; }
+
+/* Voci normali finite in una lista mista mantengono il loro rientro. */
+.contains-task-list > li:not(.task-list-item) { margin-left: 1.4rem; }
+
+/* Specificita' (0,2,0): batte anche `.drawer-list li` / `.drawer-comments li`
+   (0,1,1), che altrimenti trasformerebbero le voci nei commenti in "card". */
+.task-list-item,
+.comment-body .task-list-item {
+  display: list-item;
+  list-style: none;
+  position: relative;
+  margin: 0.3rem 0;
+  padding: 0 0 0 1.65rem;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+  line-height: inherit;
+}
+.task-list-item > p { margin: 0.3rem 0; }
+
+/* Checkbox di sola lettura (disabled, come generata da marked): disegnata a
+   mano perche' la resa nativa "disabled" la ingrigisce. Specificita' (0,2,0):
+   batte `.drawer input` (width:100%, padding, bordo). */
+.task-list-item .task-list-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  left: 0.1rem;
+  top: 0.3em;
+  top: calc((1lh - 1rem) / 2);
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--ink-300);
+  border-radius: 4px;
+  background: var(--surface) center / 0.7rem 0.7rem no-repeat;
+  box-shadow: none;
+  accent-color: var(--accent-500);
+  cursor: default;
+  opacity: 1;
+}
+.task-list-item > p > .task-list-checkbox { top: calc(0.3rem + (1lh - 1rem) / 2); }
+
+.task-list-item .task-list-checkbox:checked {
+  border-color: var(--accent-500);
+  background-color: var(--accent-500);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.task-list-item.is-checked > .task-list-text,
+.task-list-item.is-checked > p > .task-list-text {
+  color: var(--ink-400);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-300);
+  text-decoration-thickness: 1px;
+}
