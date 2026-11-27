@@ -564,6 +564,8 @@ export const es: Dictionary = {
     noSubtasks: "Sin subtareas",
     addSubtaskPlaceholder: "Título de la nueva subtarea",
     addSubtaskError: "Error al crear la subtarea",
+    subtasksProgress: "{done}/{total} completadas",
+    subtaskToggleDone: "Marcar \"{title}\" como completada",
     parentOf: "Subtarea de:",
     openParent: "Abrir tarea principal",
     saved: "Cambios guardados",

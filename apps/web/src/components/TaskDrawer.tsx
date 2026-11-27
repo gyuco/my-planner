@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { copyText } from "../lib/clipboard";
-import { CheckIcon, LinkIcon, TrashIcon, XIcon } from "./Icons";
+import { CheckIcon, LinkIcon, SubtaskIcon, TrashIcon, XIcon } from "./Icons";
 import { absoluteUrl, taskPath } from "../lib/routes";
-import { FIBONACCI_COMPLEXITY, TASK_STATUSES } from "@my-planner/core";
+import { FIBONACCI_COMPLEXITY, TASK_STATUSES, isBaseStatus } from "@my-planner/core";
 import { statusLabel } from "../lib/statuses";
 import type { Attachment, Comment, ProjectStatus, Task, TaskAssignee, TaskComplexity, TaskPriority, TaskStatusKey, TaskType } from "@my-planner/core";
 import { renderMarkdown } from "../lib/markdown";
@@ -735,26 +735,71 @@ export function TaskDrawer({
 
             {!task.parentId && (
               <CollapsibleSection {...sectionProps("subtasks")} title={t.taskDrawer.subtasks} count={(task.subtasks ?? []).length}>
-                <ul className="drawer-list">
-                  {(task.subtasks ?? []).map((s) => (
-                    <li key={s.id}>
-                      <label className="drawer-subtask-item">
-                        <input
-                          type="checkbox"
-                          checked={s.status === "done"}
-                          onChange={(e) => handleToggleSubtaskDone(s.id, e.target.checked)}
+                {(task.subtasks ?? []).length > 0 && (() => {
+                  const subtasks = task.subtasks ?? [];
+                  const doneCount = subtasks.filter((s) => s.status === "done").length;
+                  const pct = Math.round((doneCount / subtasks.length) * 100);
+                  return (
+                    <div className="subtask-progress">
+                      <div className="subtask-progress-head">
+                        <span className="subtask-progress-label">
+                          <SubtaskIcon className="subtask-progress-icon" />
+                          {t.taskDrawer.subtasksProgress
+                            .replace("{done}", String(doneCount))
+                            .replace("{total}", String(subtasks.length))}
+                        </span>
+                        <span className="subtask-progress-pct">{pct}%</span>
+                      </div>
+                      <div
+                        className="subtask-progress-track"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={pct}
+                      >
+                        <div
+                          className={`subtask-progress-fill${pct === 100 ? " subtask-progress-fill-done" : ""}`}
+                          style={{ width: `${pct}%` }}
                         />
-                        <button type="button" className="link-button" onClick={() => onOpenTask(s.id)}>
-                          {s.title}
-                        </button>
-                      </label>
-                    </li>
-                  ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+                <ul className="drawer-list subtask-list">
+                  {(task.subtasks ?? []).map((s) => {
+                    const done = s.status === "done";
+                    const tone = isBaseStatus(s.status) ? s.status : "custom";
+                    return (
+                      <li key={s.id} className={`subtask-row${done ? " is-done" : ""}`}>
+                        <label className="drawer-subtask-item">
+                          <input
+                            type="checkbox"
+                            className="subtask-check"
+                            checked={done}
+                            aria-label={t.taskDrawer.subtaskToggleDone.replace("{title}", s.title)}
+                            onChange={(e) => handleToggleSubtaskDone(s.id, e.target.checked)}
+                          />
+                          <button
+                            type="button"
+                            className="link-button subtask-title"
+                            title={s.title}
+                            onClick={() => onOpenTask(s.id)}
+                          >
+                            {s.title}
+                          </button>
+                        </label>
+                        <span className={`subtask-status subtask-status-${tone}`}>
+                          <span className="subtask-status-dot" aria-hidden="true" />
+                          {statusLabel(t, s.status, customLabels)}
+                        </span>
+                      </li>
+                    );
+                  })}
                   {(task.subtasks ?? []).length === 0 && (
                     <li className="drawer-empty">{t.taskDrawer.noSubtasks}</li>
                   )}
                 </ul>
-                <form onSubmit={handleAddSubtasks} className="drawer-inline-form drawer-inline-form-column">
+                <form onSubmit={handleAddSubtasks} className="drawer-inline-form drawer-inline-form-column subtask-add-form">
                   <textarea
                     placeholder={t.taskDrawer.addSubtaskPlaceholder}
                     value={newSubtaskTitles}

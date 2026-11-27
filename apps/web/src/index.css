@@ -4504,3 +4504,249 @@ body.dnd-dragging * {
     max-width: 92%;
   }
 }
+
+/* --- Sotto-task nel drawer --- */
+
+/* Riepilogo di avanzamento in testa alla sezione (stile .task-card-progress). */
+.subtask-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.65rem;
+  padding: 0.55rem 0.7rem 0.6rem;
+  background: var(--accent-50);
+  border: 1px solid var(--accent-100);
+  border-radius: var(--r-md);
+}
+
+.subtask-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-700);
+}
+
+.subtask-progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.subtask-progress-icon { width: 14px; height: 14px; flex-shrink: 0; }
+
+.subtask-progress-pct {
+  color: var(--ink-500);
+  font-variant-numeric: tabular-nums;
+}
+
+.subtask-progress-track {
+  height: 4px;
+  border-radius: var(--r-full);
+  background: var(--accent-100);
+  overflow: hidden;
+}
+
+.subtask-progress-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--accent-500);
+  transition: width 0.25s var(--ease);
+}
+
+.subtask-progress-fill-done { background: var(--status-done); }
+
+/* Lista con connettore di gerarchia: linea verticale + "gomito" per ogni riga. */
+.drawer-list.subtask-list {
+  position: relative;
+  gap: 0.35rem;
+  padding-left: 1.1rem;
+}
+
+.drawer-list.subtask-list::before {
+  content: "";
+  position: absolute;
+  left: 0.4rem;
+  top: 0;
+  bottom: 1.1rem;
+  width: 2px;
+  border-radius: var(--r-full);
+  background: var(--accent-100);
+}
+
+.drawer-list.subtask-list > .drawer-empty {
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0;
+}
+
+.drawer-list .subtask-row {
+  position: relative;
+  gap: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 0.18s var(--ease), background 0.18s var(--ease);
+}
+
+.drawer-list .subtask-row::before {
+  content: "";
+  position: absolute;
+  left: calc(-0.7rem - 1px);
+  top: 50%;
+  width: 0.7rem;
+  height: 2px;
+  border-radius: var(--r-full);
+  background: var(--accent-100);
+}
+
+.drawer-list .subtask-row:hover { border-color: var(--ink-200); }
+
+.drawer-list .subtask-row.is-done { background: var(--surface-sunken); box-shadow: none; }
+
+/* Annulla `.drawer label { flex-direction: column }`: checkbox e titolo in riga. */
+.drawer .subtask-row .drawer-subtask-item {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+  color: var(--ink-800);
+}
+
+/* Checkbox compatta con l'accent del tema: annulla `.drawer input { width:100% }`. */
+.drawer .subtask-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid var(--ink-300);
+  border-radius: 5px;
+  background: var(--surface) center / 10px 10px no-repeat;
+  cursor: pointer;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+
+.drawer .subtask-check:hover { border-color: var(--accent-500); }
+
+.drawer .subtask-check:checked {
+  border-color: var(--accent-500);
+  background-color: var(--accent-500);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.drawer .subtask-check:focus-visible {
+  outline: none;
+  border-color: var(--accent-500);
+  box-shadow: var(--shadow-focus);
+}
+
+/* Titolo: annulla lo stile "bottone" di `.drawer-list button`. */
+.drawer-list .subtask-row .subtask-title {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: var(--ink-800);
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-list .subtask-row .subtask-title:hover { color: var(--accent-600); }
+
+.drawer-list .subtask-row.is-done .subtask-title {
+  color: var(--ink-400);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-300);
+}
+
+/* Badge di stato: pillola neutra con pallino nel colore della colonna. */
+.subtask-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  max-width: 7.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line-soft);
+  background: var(--surface-sunken);
+  color: var(--ink-500);
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.subtask-row.is-done .subtask-status { background: var(--surface); }
+
+.subtask-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--status-custom);
+}
+
+.subtask-status-draft .subtask-status-dot { background: var(--status-draft); }
+.subtask-status-todo .subtask-status-dot { background: var(--status-todo); }
+.subtask-status-in_progress .subtask-status-dot { background: var(--status-in_progress); }
+.subtask-status-testing .subtask-status-dot { background: var(--status-testing); }
+.subtask-status-done .subtask-status-dot { background: var(--status-done); }
+.subtask-status-done { color: var(--status-done); }
+
+/* Form "aggiungi sotto-task": allineato alla lista, bottone compatto. */
+.subtask-add-form {
+  margin-top: 0.6rem;
+  padding-left: 1.1rem;
+  align-items: stretch;
+}
+
+.drawer .subtask-add-form textarea {
+  min-height: 2.6rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.85rem;
+  background: var(--surface);
+  border-style: dashed;
+}
+
+.drawer .subtask-add-form textarea:focus { border-style: solid; }
+
+.subtask-add-form button {
+  align-self: flex-end;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.subtask-add-form button:hover:not(:disabled) {
+  border-color: var(--accent-600);
+  background: var(--accent-600);
+}
+
+.subtask-add-form button:disabled { opacity: 0.5; cursor: default; }
+
+@media (max-width: 700px) {
+  .drawer-list.subtask-list,
+  .subtask-add-form { padding-left: 0.9rem; }
+  .drawer-list.subtask-list::before { left: 0.3rem; }
+  .drawer-list .subtask-row::before { left: calc(-0.6rem - 1px); width: 0.6rem; }
+  .subtask-status { max-width: 6rem; }
+}
