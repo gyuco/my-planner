@@ -4605,6 +4605,8 @@ body.dnd-dragging * {
 }
 @media (prefers-reduced-motion: reduce) {
   .assignee-select-status.is-saved { animation: none; }
+}
+
 /* --- Sotto-task nel drawer --- */
 
 /* Riepilogo di avanzamento in testa alla sezione (stile .task-card-progress). */
@@ -4849,6 +4851,7 @@ body.dnd-dragging * {
   .drawer-list.subtask-list::before { left: 0.3rem; }
   .drawer-list .subtask-row::before { left: calc(-0.6rem - 1px); width: 0.6rem; }
   .subtask-status { max-width: 6rem; }
+}
 
 /* --- Task list markdown (checklist) --- */
 
