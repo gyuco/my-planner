@@ -2381,6 +2381,23 @@ body.dnd-dragging * {
   justify-content: space-between;
 }
 
+.drawer-description-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Pre-triage con Gemini (visibile se attivato nelle impostazioni Gemini). */
+.drawer-pretriage-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+.drawer-pretriage-button svg { width: 0.95em; height: 0.95em; flex-shrink: 0; color: var(--accent-600); }
+.drawer-pretriage-button .spinner { width: 11px; height: 11px; }
+
 .link-button {
   border: none;
   background: none;
