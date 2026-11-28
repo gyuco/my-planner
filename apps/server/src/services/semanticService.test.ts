@@ -171,6 +171,25 @@ describe("ricerca", () => {
     expect(all.map((r) => r.taskId).sort()).toEqual([login.id, foreign.id].sort());
   });
 
+  it("se la query filtrata fallisce riprova senza filtro e filtra sul DB", async () => {
+    const { a, login, foreign } = await seed();
+    const original = fakeVectorize.query;
+    const seen: (Record<string, unknown> | undefined)[] = [];
+    fakeVectorize.query = async (vector, options) => {
+      seen.push(options.filter);
+      if (options.filter) throw new Error("metadata index not found");
+      return original(vector, options);
+    };
+    try {
+      const results = await semanticSearch({ query: "login lento", projectIds: [a.id] });
+      expect(results.map((r) => r.taskId)).toEqual([login.id]);
+      expect(results.some((r) => r.taskId === foreign.id)).toBe(false);
+      expect(seen).toEqual([{ projectId: { $in: [a.id] } }, undefined]);
+    } finally {
+      fakeVectorize.query = original;
+    }
+  });
+
   it("lista progetti vuota o query vuota: nessun risultato", async () => {
     await seed();
     expect(await semanticSearch({ query: "login", projectIds: [] })).toEqual([]);
