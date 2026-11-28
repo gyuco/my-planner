@@ -604,8 +604,8 @@ Modelli: embedding `@cf/baai/bge-m3` (multilingue, 1024 dimensioni), trascrizion
 
 ### `GET /search/semantic?q=&projectIds=a,b&limit=20` (autenticato)
 - Ricerca per significato. `projectIds` omesso = tutti i progetti accessibili (stessa regola di `GET /tasks/done`); i progetti non accessibili vengono ignorati.
-- 200: `SemanticTaskMatch[]` = `{ taskId, projectId, title, status, score }`, ordinati per `score` (coseno, 0..1) decrescente, solo con `score >= 0.45`.
-- La board, con il toggle "Semantica" acceso (`?semantic=1`), si carica senza `search` e mostra solo i task trovati, sotto-task comprese.
+- 200: `SemanticTaskMatch[]` = `{ taskId, projectId, title, status, score }`, ordinati per `score` (coseno, 0..1) decrescente, solo con `score >= 0.40`.
+- La board, con il toggle "Semantica" acceso (`?semantic=1`), si carica senza `search` e mostra i task trovati per significato più quelli che contengono il testo cercato (titolo o descrizione), sotto-task comprese.
 
 ### `POST /projects/:projectId/tasks/similar` (accesso al progetto)
 - Body: `{ title, description?, excludeTaskId? }`.

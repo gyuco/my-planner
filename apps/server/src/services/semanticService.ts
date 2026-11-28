@@ -30,7 +30,7 @@ const MAX_EMBED_CHARS = 2000;
 const REINDEX_BATCH = 50;
 
 /** Sotto questa somiglianza un risultato della ricerca non e' pertinente. */
-export const SEARCH_MIN_SCORE = 0.45;
+export const SEARCH_MIN_SCORE = 0.4;
 /** Da questa somiglianza in su un task esistente e' un possibile duplicato. */
 export const DUPLICATE_MIN_SCORE = 0.72;
 

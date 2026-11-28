@@ -3574,6 +3574,13 @@ body.dnd-dragging * {
   .filter-panel .filter-chips { margin-right: 0; }
   .filter-panel .filter-select { width: 100%; min-height: 2.5rem; }
   .filter-bar .filter-projects { order: 3; }
+
+  /* Ricerca + toggle "Semantica": il gruppo prende il posto dell'input
+     accanto a "Filtri"; il conteggio dei risultati va a capo sotto. */
+  .filter-bar .filter-search-group { order: 1; flex: 1 1 12rem; min-width: 0; flex-wrap: wrap; }
+  .filter-search-group .filter-search { order: 0; flex: 1 1 8rem; min-width: 0; font-size: 1rem; }
+  .filter-search-group .filter-chip-semantic { min-height: 2.5rem; }
+  .filter-search-group .filter-semantic-count { flex-basis: 100%; }
 }
 
 /* -------------------------------------------------------------------------

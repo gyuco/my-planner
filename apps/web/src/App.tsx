@@ -78,6 +78,13 @@ function getStoredSidebarCollapsed(): boolean {
   }
 }
 
+/** Match testuale (titolo o descrizione, senza maiuscole), come la ricerca del server. */
+function matchesText(t: BoardTask, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  return t.title.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q);
+}
+
 function filterBoard(
   board: Board,
   filters: BoardFiltersState,
@@ -105,7 +112,9 @@ function filterBoard(
     // card anche se il parent non e' suo, altrimenti resterebbero invisibili.
     // Ricerca semantica: restano solo i task trovati, sotto-task comprese
     // (un match su una sotto-task non deve sparire dentro il parent).
-    if (semanticHits && !semanticHits.has(t.id)) return false;
+    // Restano anche i match testuali classici: una parola parziale ("Landin")
+    // ha poco significato per il modello ma va comunque trovata.
+    if (semanticHits && !semanticHits.has(t.id) && !matchesText(t, filters.search)) return false;
     const byPerson = filters.assignedToMe || filters.assignee !== null || semanticHits !== null;
     if (t.parentId && !filters.showSubtasks && !byPerson) return false;
     if (filters.assignedToMe && (!currentUserId || t.assigneeId !== currentUserId)) return false;
