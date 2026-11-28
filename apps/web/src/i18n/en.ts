@@ -810,6 +810,12 @@ export const en = {
     voiceSaved: "Voice note saved as a comment",
     voiceError: "Transcription failed",
     voiceMicDenied: "Microphone unavailable or permission denied",
+    reindexSection: "Semantic search (Workers AI)",
+    reindexHint: "Adds every existing task to the semantic search index. Needed once after activation, or if search misses old tasks. New or edited tasks are indexed automatically.",
+    reindex: "Reindex search",
+    reindexRunning: "Indexing…",
+    reindexDone: "Done: {count} tasks indexed",
+    reindexError: "Indexing failed",
   },
   api: {
     sessionExpired: "Session expired, please log in again",

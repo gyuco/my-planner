@@ -812,6 +812,12 @@ export const it: Dictionary = {
     voiceSaved: "Nota vocale salvata come commento",
     voiceError: "Trascrizione non riuscita",
     voiceMicDenied: "Microfono non disponibile o permesso negato",
+    reindexSection: "Ricerca semantica (Workers AI)",
+    reindexHint: "Inserisce nell'indice della ricerca semantica tutti i task esistenti. Serve una volta dopo l'attivazione, o se la ricerca non trova task vecchi. I task nuovi o modificati vengono indicizzati da soli.",
+    reindex: "Reindicizza la ricerca",
+    reindexRunning: "Indicizzazione in corso…",
+    reindexDone: "Fatto: {count} task indicizzati",
+    reindexError: "Indicizzazione non riuscita",
   },
   api: {
     sessionExpired: "Sessione scaduta, effettua di nuovo il login",

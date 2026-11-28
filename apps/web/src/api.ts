@@ -734,6 +734,11 @@ export function findSimilarTasks(
   return apiFetch(`/projects/${projectId}/tasks/similar`, { method: "POST", body: JSON.stringify(input), signal });
 }
 
+/** Solo admin: ricostruisce l'indice della ricerca semantica con tutti i task. */
+export function reindexSemanticSearch(): Promise<{ indexed: number }> {
+  return apiFetch(`/admin/reindex-search`, { method: "POST" });
+}
+
 /** Trascrive una nota vocale con Whisper e la salva come commento del task. */
 export function uploadVoiceNote(
   taskId: string,

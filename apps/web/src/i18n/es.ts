@@ -813,6 +813,12 @@ export const es: Dictionary = {
     voiceSaved: "Nota de voz guardada como comentario",
     voiceError: "La transcripción falló",
     voiceMicDenied: "Micrófono no disponible o permiso denegado",
+    reindexSection: "Búsqueda semántica (Workers AI)",
+    reindexHint: "Añade todas las tareas existentes al índice de búsqueda semántica. Se necesita una vez tras la activación, o si la búsqueda no encuentra tareas antiguas. Las tareas nuevas o editadas se indexan solas.",
+    reindex: "Reindexar búsqueda",
+    reindexRunning: "Indexando…",
+    reindexDone: "Hecho: {count} tareas indexadas",
+    reindexError: "La indexación falló",
   },
   api: {
     sessionExpired: "Sesión caducada, inicia sesión de nuevo",
