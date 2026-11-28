@@ -61,6 +61,9 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `EMAIL_SEND_FAILED` | 502 | Il server SMTP ha rifiutato/non ha completato l'invio (solo `POST /settings/email/test`) |
 | `VOICE_UNAVAILABLE` | 503 | Assistente vocale non attivo o chiave non decifrabile (`POST /voice/session`) |
 | `VOICE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta o non è raggiungibile (`POST /voice/session`, `POST /settings/voice/test`) |
+| `PRETRIAGE_UNAVAILABLE` | 503 | Pre-triage non attivo, senza chiave o chiave non decifrabile (`POST /tasks/:taskId/pretriage`) |
+| `PRETRIAGE_QUOTA` | 429 | Quota gratuita di Gemini esaurita (HTTP 429 / `RESOURCE_EXHAUSTED`) |
+| `PRETRIAGE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta, non ha risposto entro 30 s o ha restituito una risposta non valida (`POST /tasks/:taskId/pretriage`, `POST /settings/voice/pretriage-test`) |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
 `message` è sempre una stringa human-readable in italiano (coerente col resto del codebase), pensata per essere mostrata sia in UI sia restituita a un agente AI via MCP.
@@ -311,12 +314,13 @@ Ovunque si passa uno `status` (move, filtro `status` di list, MCP) si accetta un
 
 ### `PUT /tasks/:taskId/ai` (solo admin)
 Gestione AI del task: il task viene lavorato da un modello nei passi scelti, ognuno legato alla colonna da cui parte.
-- Body: `{ "enabled": boolean, "steps"?: ("triage"|"coder"|"reviewer")[], "notify"?: "end"|"each"|"none" }`. Con `enabled: true` serve almeno un passo (400 `VALIDATION_ERROR`); i passi vengono normalizzati nell'ordine triage -> coder -> reviewer, senza doppioni.
+- Body: `{ "enabled": boolean, "steps"?: ("triage"|"coder"|"reviewer")[], "notify"?: "end"|"each"|"none", "note"?: string | null }`. Con `enabled: true` serve almeno un passo (400 `VALIDATION_ERROR`); i passi vengono normalizzati nell'ordine triage -> coder -> reviewer, senza doppioni.
 - Passi: **triage** lavora su `draft` (-> `todo`), **coder** su `todo` (-> `testing`), **reviewer** su `testing` (-> `done`, oppure di nuovo `todo` se rimanda indietro). Il passo in attesa e' quello che parte dalla colonna corrente (`aiPendingStep` in `@my-planner/core`); spostare il task a mano non spegne la gestione AI.
 - `notify`: avvisi al destinatario alla fine del percorso (`end`), a ogni cambio di stato (`each`) o mai (`none`). Il destinatario (`watcherId`) e' l'admin che salva con `enabled: true`.
-- Spegnere (`enabled: false`) conserva passi e modalita'. Ogni cambio scrive un evento `task.updated` con `changes: [{ field: "ai", from, to }]` (`"triage,coder|end"`, `null` = spenta).
+- `note`: nota libera dell'admin per l'agente (commenti, raccomandazioni, vincoli), max 4000 caratteri (oltre: 400 `VALIDATION_ERROR`). Spazi ai bordi tolti; stringa vuota/solo spazi o `null` = nessuna nota; omessa = invariata. Si salva anche con `enabled: false` (resta pronta per quando si riattiva). Arriva all'agente: `note` in `list_ai_tasks`, `ai.note` in `get_task`/`ai_start_step`, regola nelle istruzioni (`work_ai_queue` e prompt della routine) e blocco delimitato nel payload della sessione interattiva su un task.
+- Spegnere (`enabled: false`) conserva passi, modalita' e nota. Ogni cambio scrive un evento `task.updated` con `changes: [{ field: "ai", from, to }]` (`"triage,coder|end"`, `null` = spenta); un cambio della nota aggiunge `{ field: "aiNote", from: null, to: null }` (come per `description`, il testo non viene registrato).
 - 200: `Task`. 403 per i manager.
-- Ogni `Task` restituito (REST e MCP) include `ai: { enabled, steps, notify, watcherId, watcherName }`.
+- Ogni `Task` restituito (REST e MCP) include `ai: { enabled, steps, notify, watcherId, watcherName, note }` (`note`: `string | null`).
 - `ai` include anche lo stato di esecuzione: `running` (`{ step, startedAt }`, passo preso in carico; scade dopo 60 minuti), `rejectCount` (rimandi del reviewer nel giro corrente) e `failure` (`{ at, reason }`, percorso fermato). Salvare la configurazione (o "Riprendi" nella UI) azzera fallimento, blocco e rimandi; anche uno spostamento fatto da un utente libera il blocco e riprende il percorso.
 - Esecuzione dei passi da parte degli agenti: tool MCP `ai_*` (§7, "Gestione AI").
 
@@ -371,6 +375,20 @@ Nota: l'attuale `PATCH /tasks/:taskId/status` in `routes/board.ts` va rinominato
 
 `GET /tasks/:taskId/comments`
 - 200: `Comment[]` ordinati per `createdAt asc` (cronologico)
+
+### Pre-triage (Gemini)
+
+Su richiesta (pulsante "Pre-triage" nel drawer), per **qualsiasi utente con accesso al task** (`assertTaskAccess`, non solo admin). Usa la chiave dell'assistente vocale e il modello `pretriageModel` delle impostazioni Gemini (vedi §6ter, `apps/server/src/services/pretriageService.ts`).
+
+`GET /pretriage/status` (autenticato)
+- 200: `{ available: boolean }` — `pretriageEnabled` e chiave presente; mostra o nasconde il pulsante.
+
+`POST /tasks/:taskId/pretriage`
+- Nessun body. Manda a Gemini (`POST v1beta/models/{model}:generateContent`, `responseMimeType: application/json` + `responseSchema`) titolo, tipo, priorità, complessità, tag e descrizione del task, più id, stato e titolo di al massimo 50 altri task aperti (non `done`) dello stesso progetto per segnalare i duplicati. Il modello risponde nella lingua della descrizione.
+- Il JSON viene ripulito: `possibleDuplicates` solo con id presenti nella lista inviata (titolo preso dal DB), `suggestedPriority` solo `low|medium|high|urgent` (altrimenti null), `suggestedComplexity` arrotondata al valore Fibonacci più vicino (o null).
+- Aggiunge al task un commento markdown ("Pre-triage (Gemini · {model})", esito ✅/⚠️, cosa manca, ambiguità, suggerimenti, link ai possibili duplicati) con l'attore dell'utente, come `POST /tasks/:taskId/comments` (evento `comment.created` nell'attività). **Non modifica mai i campi del task.**
+- 200: `{ result: PretriageResult, comment: Comment }` — `PretriageResult` = `{ ready, missing: string[], ambiguities: string[], suggestedPriority, suggestedComplexity, possibleDuplicates: [{ taskId, title }], summary, model }`.
+- 403/404 come le altre route del task · 503 `PRETRIAGE_UNAVAILABLE` se non attivo · 429 `PRETRIAGE_QUOTA` ("Quota gratuita di Gemini esaurita per oggi, riprova più tardi") · 502 `PRETRIAGE_PROVIDER_ERROR` (messaggio di Google, timeout 30 s, risposta non JSON).
 
 ---
 
@@ -509,24 +527,31 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - Usa la config **salvata**, anche se non ancora abilitata.
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
 
-### Assistente vocale (Gemini Live)
+### Impostazioni Gemini: assistente vocale (Gemini Live) e pre-triage
+Le impostazioni `/settings/voice*` (UI "Impostazioni Gemini") contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
+
 Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
 
 Interfaccia: pagina `/assistant` a schermo intero (solo admin) con avatar animato, input vocale e scritto (`realtimeInput.text`), e report mostrati a schermo. Strumenti di report lato browser: `portfolio_report` (tutti i progetti, da `GET /projects/:id/stats`), `project_report` (stats + board + attività), `recent_activity` (`GET /activity`), `show_on_screen` (markdown a schermo).
 
 ### `GET /settings/voice` (admin)
-- 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`.
+- 200: `VoiceSettings` — `{ enabled, configured, apiKeySet, model, voiceName, pretriageEnabled, pretriageModel, updatedAt }`. La chiave non è mai restituita, solo `apiKeySet`. `configured` = assistente vocale abilitato e con chiave. Default senza riga: `enabled: false`, `model: "gemini-3.8-live"`, `pretriageEnabled: false`, `pretriageModel: "gemini-flash-lite-latest"` (`DEFAULT_PRETRIAGE_MODEL`).
 
 ### `PUT /settings/voice` (admin)
-- Body: `{ enabled: boolean, apiKey?, removeApiKey?: boolean, model?, voiceName? }`
+- Body: `{ enabled: boolean, apiKey?, removeApiKey?: boolean, model?, voiceName?, pretriageEnabled?: boolean, pretriageModel? }`
 - `apiKey` omessa/vuota → mantiene quella salvata; `removeApiKey: true` la cancella. Salvata cifrata come la password SMTP (`SETTINGS_ENCRYPTION_KEY`, fallback `JWT_SECRET`).
 - `model` senza prefisso `models/` (viene tolto se presente); `voiceName` = voce predefinita Gemini (es. `Kore`) o null.
-- 400 `VALIDATION_ERROR`: `enabled: true` senza chiave; modello, voce o chiave non validi.
+- `pretriageEnabled` / `pretriageModel` omessi → invariati; `pretriageModel` vuoto → default. Stesso formato di `model`.
+- 400 `VALIDATION_ERROR`: `enabled: true` o `pretriageEnabled: true` senza chiave (ognuno richiede solo la chiave, non l'altro); modelli, voce o chiave non validi.
 - 200: `VoiceSettings` aggiornato.
 
 ### `POST /settings/voice/test` (admin)
 - Legge i metadati del modello salvato con la chiave salvata (`GET v1beta/models/{model}`, nessun costo di generazione).
 - 200: `{ ok: true, model }` · 400 `VALIDATION_ERROR` senza chiave · 502 `VOICE_PROVIDER_ERROR` con il messaggio di Google.
+
+### `POST /settings/voice/pretriage-test` (admin)
+- Come `/settings/voice/test` ma con `pretriageModel` (`GET v1beta/models/{pretriageModel}`, nessun costo).
+- 200: `{ ok: true, model }` · 400 `VALIDATION_ERROR` senza chiave · 502 `PRETRIAGE_PROVIDER_ERROR` con il messaggio di Google.
 
 ### `GET /voice/status` (admin)
 - 200: `{ available: boolean }` — mostra o nasconde il pulsante microfono.
@@ -689,7 +714,7 @@ z.object({
 
 ### Gestione AI (tool `ai_*`, server di progetto e globale)
 Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
-- `list_ai_tasks { step?, projectId? (solo globale) }` → `[{ taskId, projectId, projectName, repoUrl, title, status, step, priority, type, rejectCount }]`: task con un passo in attesa (triage su `draft`, coder su `todo` senza blocchi aperti, reviewer su `testing`), esclusi quelli presi in carico (blocco non scaduto) o fermati e i progetti archiviati; ordinati per priorità.
+- `list_ai_tasks { step?, projectId? (solo globale) }` → `[{ taskId, projectId, projectName, repoUrl, title, status, step, priority, type, rejectCount, note }]` (`note` = nota dell'admin per l'agente, `null` se assente): task con un passo in attesa (triage su `draft`, coder su `todo` senza blocchi aperti, reviewer su `testing`), esclusi quelli presi in carico (blocco non scaduto) o fermati e i progetti archiviati; ordinati per priorità.
 - `ai_start_step { taskId, step? }` → `Task`: prende in carico il passo in attesa (blocco 60 min, evento `ai.step_started`). `CONFLICT` se già in carico o fermato, `DEPENDENCY_BLOCKED` per il coder con blocchi aperti, `VALIDATION_ERROR` se nessun passo è in attesa o `step` non coincide.
 - `ai_complete_step { taskId, summary }` → `Task`: commento `🤖 <Passo> completato` + spostamento (triage → `todo`, coder → `testing`, reviewer → `done`, che azzera i rimandi). Funziona anche senza `ai_start_step`. `CONFLICT` se il task non è più nella colonna del passo.
 - `ai_reject { taskId, reason }` → `Task`: solo reviewer; commento + ritorno in `todo`, `rejectCount + 1`. Al 3° rimando il percorso si ferma (`ai.failed`).
@@ -706,7 +731,7 @@ Il server decide le transizioni, l'agente non usa `move_task` sui task AI.
 - `PUT /projects/:projectId/ai-routine` body `{ routineId: "trig_…", token? }`: il token del trigger API della routine è salvato cifrato (secretBox) e non viene mai restituito; omesso = resta quello salvato.
 - `DELETE /projects/:projectId/ai-routine`: rimuove la configurazione.
 - `POST /projects/:projectId/ai-routine/run` → `{ fired, taskIds, sessionUrl, reason }`: avvia subito la routine per tutti i task in attesa (anche se già avviati di recente).
-- `POST /projects/:projectId/ai-routine/session` body `{ message, taskId? }` → `{ sessionUrl }`: avvia una sessione interattiva di Claude Code con la routine (l'utente continua la conversazione su claude.ai). `message` stringa trim 1..4000; `taskId` facoltativo, deve appartenere al progetto (altrimenti `404 NOT_FOUND`). Il payload inviato alla routine è `My Planner: sessione interattiva.` seguito da `projectId: <id>`, `taskId: <id>` (solo se indicato), `Richiesta:` e il messaggio; il prompt della routine in questo caso non lavora la coda AI. Non modifica `Task.ai.dispatch`. Routine non configurata o avvio fallito (token rifiutato, 429, rete) → `400 VALIDATION_ERROR` con il motivo, salvato anche in `lastError`. Solo admin (`403 FORBIDDEN` per gli altri ruoli).
+- `POST /projects/:projectId/ai-routine/session` body `{ message, taskId? }` → `{ sessionUrl }`: avvia una sessione interattiva di Claude Code con la routine (l'utente continua la conversazione su claude.ai). `message` stringa trim 1..4000; `taskId` facoltativo, deve appartenere al progetto (altrimenti `404 NOT_FOUND`). Il payload inviato alla routine è `My Planner: sessione interattiva.` seguito da `projectId: <id>`, `taskId: <id>` (solo se indicato), la nota dell'admin per l'agente del task se presente (tra le righe `<<< Nota dell'admin per l'agente` e `Fine nota dell'admin >>>`), `Richiesta:` e il messaggio; il prompt della routine in questo caso non lavora la coda AI. Non modifica `Task.ai.dispatch`. Routine non configurata o avvio fallito (token rifiutato, 429, rete) → `400 VALIDATION_ERROR` con il motivo, salvato anche in `lastError`. Solo admin (`403 FORBIDDEN` per gli altri ruoli).
 - Avvio automatico: dopo un cambio di stato o una modifica della gestione AI fatti da un utente (non dagli agenti MCP), se il progetto ha la routine configurata, il server chiama `POST https://api.anthropic.com/v1/claude_code/routines/{id}/fire` con `{ text }` che contiene solo `projectId` e `taskId (step)` dei task in attesa. Una chiamata per progetto; lo stesso passo non viene riavviato prima di 30 minuti. Errori (token rifiutato, 429 con `Retry-After`, rete) salvati in `lastError`. Ogni `Task.ai.dispatch` riporta `{ step, at, sessionUrl }` dell'ultimo avvio.
 - I progetti esposti da REST e MCP non includono mai le colonne della routine: solo `aiRoutineConfigured: boolean`.
 
@@ -727,6 +752,8 @@ Applicate direttamente in `apps/server/prisma/schema.prisma`:
 6. `TaskEvent` + `NotificationState` (nuovi modelli) — notifiche in-app (§6ter). `TaskEvent.id` è `Int @default(autoincrement())` e funge da cursore monotono; `actorId` è nullable (MCP/sistema) con `onDelete: SetNull`; `taskId` è uno scalare senza relation, così l'evento sopravvive alla delete del task (il titolo è denormalizzato in `data`). Migrazioni: `prisma/migrations/20261019140000_add_notifications` (Node/SQLite) e `apps/server/migrations/0006_add_notifications.sql` (D1).
 
 7. Indice `TaskEvent(taskId, id)` per il log attività per task (§6quater). Migrazioni: `prisma/migrations/20261019200000_task_event_task_index` e `apps/server/migrations/0008_add_task_event_task_index.sql`.
+
+8. `VoiceSettings.pretriageEnabled` (Boolean, default false) e `VoiceSettings.pretriageModel` (String, default `gemini-flash-lite-latest`) — pre-triage dei task con Gemini (§4). Migrazioni: `prisma/migrations/20261127180000_add_pretriage_settings` e `apps/server/migrations/0026_add_pretriage_settings.sql`.
 
 Vedi diff applicato in coda al file schema.
 

@@ -45,6 +45,18 @@ const STEP_GUIDE: Record<AiStep, string[]> = {
   ],
 };
 
+/**
+ * Regola sulla nota dell'admin (`ai.note`, `note` in list_ai_tasks): e' il
+ * solo testo del task scritto apposta per l'agente da un admin, quindi va
+ * seguita, ma senza scavalcare sicurezza e regole del flusso.
+ */
+export const AI_NOTE_RULES = [
+  "- Nota dell'admin: se il task ha ai.note (in list_ai_tasks: note), leggila prima di iniziare e seguila in tutti i passi.",
+  "  Ha priorita' sulle tue scelte di metodo, ma non sui vincoli di sicurezza ne' sulle regole del flusso (branch claude/<taskId>,",
+  "  PR verso develop e mai verso main, chiusura con ai_complete_step / ai_reject / ai_fail). Se la nota e' in conflitto",
+  "  con i criteri di accettazione, segnalalo nel riepilogo del passo.",
+];
+
 /** Corpo delle istruzioni: flusso, regole e guida dei passi. */
 export function aiWorkerInstructions(scope: AiInstructionsScope = {}): string {
   const project = scope.project ?? null;
@@ -76,6 +88,7 @@ export function aiWorkerInstructions(scope: AiInstructionsScope = {}): string {
     "- Non usare move_task sui task gestiti da AI e non modificare task diversi da quello in lavorazione.",
     "- Mai push su main o develop ne' merge delle pull request: solo branch claude/<taskId> e PR verso develop.",
     "- Se un tool risponde CONFLICT (task gia' in lavorazione o spostato), passa al task successivo.",
+    ...AI_NOTE_RULES,
     "",
     "Guida dei passi:",
     ...steps.flatMap((s) => [...STEP_GUIDE[s], ""]),

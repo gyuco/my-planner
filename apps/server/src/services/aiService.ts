@@ -79,6 +79,8 @@ export interface AiQueueItem {
   priority: TaskPriority;
   type: string;
   rejectCount: number;
+  /** Nota dell'admin per l'agente (da seguire in tutti i passi), null se assente. */
+  note: string | null;
 }
 
 /**
@@ -119,6 +121,7 @@ export async function listAiQueue(projectIds: string[] | undefined, step?: AiSte
       priority: task.priority as TaskPriority,
       type: task.type,
       rejectCount: task.aiRejectCount,
+      note: task.aiNote ?? null,
     }));
 }
 

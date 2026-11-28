@@ -248,7 +248,8 @@ function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: 
     "Recupera un task a cui il token ha accesso. Se il task ha sotto-task, la risposta include " +
       "subtaskCount/openSubtaskCount/subtaskStatusCounts e l'array subtasks (id/title/status di ciascuna); un task senza sotto-task ha " +
       "subtaskCount 0. parentId e' valorizzato solo se il task e' esso stesso una sotto-task di un altro. " +
-      "Se l'URL pubblico dell'app e' configurato, la risposta include `url`: link diretto al task nella UI.",
+      "Se l'URL pubblico dell'app e' configurato, la risposta include `url`: link diretto al task nella UI. " +
+      "Per i task gestiti da AI, ai.note e' la nota dell'admin per l'agente (null se assente).",
     { taskId: z.string() },
     async ({ taskId }) =>
       withErrors(async () => {
@@ -475,12 +476,14 @@ function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: 
     "lavoro (triage: analizza e arricchisci il task con update_task; coder: implementa nel repository del progetto su un branch " +
     "dedicato e apri una PR; reviewer: rivedi la PR) -> ai_complete_step con il riepilogo (il server sposta il task: " +
     "triage Draft->TODO, coder TODO->Testing, reviewer Testing->Done), oppure ai_reject (solo reviewer: torna in TODO) " +
-    "o ai_fail se non riesci a completare. Non spostare i task AI con move_task.";
+    "o ai_fail se non riesci a completare. Non spostare i task AI con move_task. " +
+    "Se il task ha una nota dell'admin (note nella coda, ai.note nel task) leggila prima di iniziare e seguila in tutti i passi.";
 
   server.tool(
     "list_ai_tasks",
     `Coda dei task gestiti da AI con un passo in attesa (${ref.replace(/^del /, "nel ")}${scope.kind === "global" ? ", o in tutti i progetti accessibili se projectId e' omesso" : ""}), ` +
-      "dal piu' urgente. Ogni voce ha step (triage | coder | reviewer), repoUrl del progetto e rejectCount. " +
+      "dal piu' urgente. Ogni voce ha step (triage | coder | reviewer), repoUrl del progetto, rejectCount e note " +
+      "(nota dell'admin per l'agente, null se assente). " +
       "Esclude task gia' in lavorazione, fermati o (per coder) bloccati da dipendenze aperte. " + AI_WORKFLOW,
     {
       ...(scope.kind === "global" ? { projectId: z.string().optional() } : {}),
@@ -493,7 +496,8 @@ function buildServer(scope: McpScope, extraTools?: (server: McpServer, helpers: 
   server.tool(
     "ai_start_step",
     "Prende in carico il passo AI in attesa di taskId (blocco di 60 minuti: altri agenti non lo vedono in coda). " +
-      "step facoltativo: se indicato deve coincidere con il passo in attesa. Restituisce il task completo. " + AI_WORKFLOW,
+      "step facoltativo: se indicato deve coincidere con il passo in attesa. Restituisce il task completo " +
+      "(ai.note = nota dell'admin per l'agente, se presente). " + AI_WORKFLOW,
     { taskId: z.string(), step: z.enum(AI_STEPS).optional() },
     async ({ taskId, step }) =>
       withErrors(async () => {

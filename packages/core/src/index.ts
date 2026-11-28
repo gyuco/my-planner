@@ -222,6 +222,9 @@ export const AI_RUN_TTL_MS = 60 * 60 * 1000;
 /** Rimandi del reviewer dopo i quali il percorso AI si ferma e avvisa. */
 export const AI_MAX_REJECTS = 3;
 
+/** Lunghezza massima della nota dell'admin per l'agente AI (TaskAi.note). */
+export const AI_NOTE_MAX_LENGTH = 4000;
+
 export interface TaskAi {
   enabled: boolean;
   /** Passi scelti, nell'ordine triage -> coder -> reviewer. */
@@ -230,6 +233,12 @@ export interface TaskAi {
   /** Destinatario degli avvisi (l'admin che ha attivato la gestione AI). */
   watcherId: string | null;
   watcherName: string | null;
+  /**
+   * Nota libera dell'admin per l'agente (raccomandazioni, vincoli, contesto):
+   * l'agente la legge prima di iniziare e la segue in tutti i passi. null se
+   * assente. Conservata anche a gestione AI spenta.
+   */
+  note: string | null;
   /** Passo preso in carico da un agente (ai_start_step), se c'e'. */
   running?: { step: AiStep; startedAt: string } | null;
   /** Rimandi del reviewer nel giro corrente (al massimo AI_MAX_REJECTS). */
@@ -245,6 +254,8 @@ export interface TaskAiInput {
   enabled: boolean;
   steps?: AiStep[];
   notify?: AiNotifyMode;
+  /** Nota per l'agente (max AI_NOTE_MAX_LENGTH): stringa vuota/spazi o null = nessuna nota; omessa = invariata. */
+  note?: string | null;
 }
 
 /**
@@ -375,6 +386,12 @@ export interface EmailSettings {
 export const DEFAULT_VOICE_MODEL = "gemini-3.8-live";
 
 /**
+ * Modello Gemini (testo) usato di default dal pre-triage dei task: alias
+ * "latest" del Flash-Lite, incluso nel piano gratuito di Google AI Studio.
+ */
+export const DEFAULT_PRETRIAGE_MODEL = "gemini-flash-lite-latest";
+
+/**
  * Config dell'assistente vocale Gemini Live (GET/PUT /settings/voice, solo
  * admin). La chiave API non viene mai restituita, solo il flag `apiKeySet`.
  * `configured` = abilitato e con chiave: solo allora gli utenti lo vedono.
@@ -386,12 +403,44 @@ export interface VoiceSettings {
   model: string;
   /** Voce predefinita di Gemini (es. "Kore"); null = scelta del modello. */
   voiceName: string | null;
+  /** Pre-triage dei task attivo (richiede solo la chiave, non l'assistente vocale). */
+  pretriageEnabled: boolean;
+  /** Modello Gemini di testo del pre-triage (es. "gemini-flash-lite-latest"). */
+  pretriageModel: string;
   updatedAt: string | null;
 }
 
 /** Disponibilita' dell'assistente per l'utente corrente (GET /voice/status). */
 export interface VoiceStatus {
   available: boolean;
+}
+
+/** Disponibilita' del pre-triage per l'utente corrente (GET /pretriage/status). */
+export interface PretriageStatus {
+  available: boolean;
+}
+
+/**
+ * Esito strutturato del pre-triage (POST /tasks/:taskId/pretriage): JSON
+ * prodotto da Gemini e ripulito dal server (duplicati solo tra i task aperti
+ * del progetto, priorita'/complessita' solo valori ammessi).
+ */
+export interface PretriageResult {
+  ready: boolean;
+  missing: string[];
+  ambiguities: string[];
+  suggestedPriority: TaskPriority | null;
+  suggestedComplexity: TaskComplexity | null;
+  possibleDuplicates: { taskId: string; title: string }[];
+  summary: string;
+  /** Modello usato. */
+  model: string;
+}
+
+/** Risposta di POST /tasks/:taskId/pretriage: esito + commento aggiunto al task. */
+export interface PretriageResponse {
+  result: PretriageResult;
+  comment: Comment;
 }
 
 /**
@@ -488,11 +537,13 @@ export type TaskTrackedField =
   | "tags"
   | "dueDate"
   | "parentId"
-  | "ai";
+  | "ai"
+  | "aiNote";
 
 /**
- * Singola modifica di un campo. Per `description` i valori non vengono
- * salvati (testo potenzialmente lungo): `from`/`to` sono sempre null. Il
+ * Singola modifica di un campo. Per `description` e `aiNote` (nota dell'admin
+ * per l'agente) i valori non vengono salvati (testo potenzialmente lungo):
+ * `from`/`to` sono sempre null. Il
  * cambio di assegnatario e' un evento a parte (`task.assigned`).
  */
 export interface TaskFieldChange {
@@ -578,6 +629,9 @@ export type ErrorCode =
   | "EMAIL_SEND_FAILED"
   | "VOICE_UNAVAILABLE"
   | "VOICE_PROVIDER_ERROR"
+  | "PRETRIAGE_UNAVAILABLE"
+  | "PRETRIAGE_QUOTA"
+  | "PRETRIAGE_PROVIDER_ERROR"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -624,6 +678,9 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   EMAIL_SEND_FAILED: 502,
   VOICE_UNAVAILABLE: 503,
   VOICE_PROVIDER_ERROR: 502,
+  PRETRIAGE_UNAVAILABLE: 503,
+  PRETRIAGE_QUOTA: 429,
+  PRETRIAGE_PROVIDER_ERROR: 502,
   INTERNAL_ERROR: 500,
 };
 
