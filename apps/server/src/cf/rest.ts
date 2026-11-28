@@ -65,6 +65,7 @@ import {
   testVoiceSettings,
   updateVoiceSettings,
 } from "../services/voiceService.js";
+import { getPretriageStatus, runPretriage, testPretriageSettings } from "../services/pretriageService.js";
 import { listNotifications, markNotificationsRead, userActor } from "../services/notificationService.js";
 import { activityFiltersFromQuery, listActivity, listActivityActors } from "../services/activityService.js";
 import { getProjectStats } from "../services/statsService.js";
@@ -194,6 +195,7 @@ export function buildRestApp() {
     "/avatars/*",
     "/push/*",
     "/voice/*",
+    "/pretriage/*",
   ];
   for (const p of protectedPaths) {
     app.use(p, async (c, next) => {
@@ -536,6 +538,15 @@ export function buildRestApp() {
     return c.json(await listComments(c.req.param("taskId")));
   });
 
+  // --- Pre-triage con Gemini (tutti gli utenti con accesso al task) --------
+  app.get("/pretriage/status", async (c) => c.json(await getPretriageStatus()));
+
+  // Aggiunge un commento con l'esito; non modifica i campi del task.
+  app.post("/tasks/:taskId/pretriage", async (c) => {
+    await assertTaskAccess(c.get("user"), c.req.param("taskId"));
+    return c.json(await runPretriage(c.req.param("taskId"), userActor(c.get("user"))));
+  });
+
   // --- Board ---------------------------------------------------------------
   app.get("/projects/:projectId/board", async (c) => {
     const { projectId } = c.req.param();
@@ -647,6 +658,9 @@ export function buildRestApp() {
   });
 
   app.post("/settings/voice/test", async (c) => c.json(await testVoiceSettings()));
+
+  // Verifica del modello del pre-triage (stessa chiave, metadati: nessun costo).
+  app.post("/settings/voice/pretriage-test", async (c) => c.json(await testPretriageSettings()));
 
   // --- Assistente vocale (solo admin) --------------------------------------
   app.get("/voice/status", async (c) => c.json(await getVoiceStatus()));

@@ -14,6 +14,7 @@ import {
   testVoiceSettings,
   updateVoiceSettings,
 } from "../services/voiceService.js";
+import { testPretriageSettings } from "../services/pretriageService.js";
 
 /**
  * Impostazioni globali (storage allegati, SMTP notifiche): riservate agli admin, perche'
@@ -55,6 +56,11 @@ export async function settingsRoutes(app: FastifyInstance) {
 
   app.post("/settings/voice/test", { onRequest: [app.authenticate, app.requireAdmin] }, async () => {
     return testVoiceSettings();
+  });
+
+  // Verifica del modello del pre-triage (stessa chiave, metadati: nessun costo).
+  app.post("/settings/voice/pretriage-test", { onRequest: [app.authenticate, app.requireAdmin] }, async () => {
+    return testPretriageSettings();
   });
 
   // Assistente vocale: solo admin (le azioni passano poi dalle normali API

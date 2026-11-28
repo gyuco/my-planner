@@ -2381,6 +2381,23 @@ body.dnd-dragging * {
   justify-content: space-between;
 }
 
+.drawer-description-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Pre-triage con Gemini (visibile se attivato nelle impostazioni Gemini). */
+.drawer-pretriage-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
+}
+.drawer-pretriage-button svg { width: 0.95em; height: 0.95em; flex-shrink: 0; color: var(--accent-600); }
+.drawer-pretriage-button .spinner { width: 11px; height: 11px; }
+
 .link-button {
   border: none;
   background: none;
@@ -4526,6 +4543,40 @@ body.dnd-dragging * {
   padding: 0;
 }
 .task-ai-modal .guide-link { align-self: flex-start; }
+
+/* Nota dell'admin per l'agente: textarea a tutta larghezza, ridimensionabile
+   in verticale; meta (suggerimento + contatore) sotto, che va a capo su mobile. */
+.ai-section .ai-note-field { display: flex; flex-direction: column; gap: 0.35rem; width: 100%; min-width: 0; }
+.ai-section .ai-note-field textarea {
+  min-height: 7.5rem;
+  resize: vertical;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.ai-note-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.ai-note-count { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.ai-note-count-over { color: var(--danger); }
+.ai-note-readonly { display: flex; flex-direction: column; gap: 0.2rem; }
+.ai-note-text {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--r-md);
+  background: var(--surface-sunken);
+  color: var(--ink-800);
+  font-size: 0.84rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ai-note-badge { white-space: nowrap; }
+@media (max-width: 640px) {
+  /* >= 16px evita lo zoom automatico di iOS al focus. */
+  .ai-section .ai-note-field textarea { font-size: 1rem; min-height: 9rem; }
+}
 
 /* Barra "Gestione AI" in cima al drawer: riepilogo + pulsante che apre la modal. */
 .drawer-ai-bar {

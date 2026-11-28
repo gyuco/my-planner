@@ -99,8 +99,10 @@ export function ActivityList({ items, showProject = false, onOpenTask, onFilterT
 
   function changeText(change: TaskFieldChange): string {
     const label = t.activity.fields[change.field];
-    // Descrizione e parent non hanno valori leggibili (testo lungo / id).
-    if (change.field === "description" || change.field === "parentId") return `${label}: ${t.activity.changed}`;
+    // Descrizione, parent e nota per l'agente non hanno valori leggibili (testo lungo / id).
+    if (change.field === "description" || change.field === "parentId" || change.field === "aiNote") {
+      return `${label}: ${t.activity.changed}`;
+    }
     return `${label}: ${changeValue(change, change.from)} → ${changeValue(change, change.to)}`;
   }
 

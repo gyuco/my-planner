@@ -23,6 +23,7 @@ describe("gestione AI del task", () => {
       notify: "end",
       watcherId: null,
       watcherName: null,
+      note: null,
       running: null,
       rejectCount: 0,
       failure: null,
