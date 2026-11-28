@@ -172,12 +172,13 @@ export async function semanticSearch(input: SemanticSearchInput): Promise<Semant
   if (input.projectIds && input.projectIds.length === 0) return [];
   const { ai, vectorize } = requireSearchRuntime();
 
-  const limit = Math.min(Math.max(input.limit ?? 20, 1), 50);
+  // 100 = massimo topK di Vectorize senza valori/metadati.
+  const limit = Math.min(Math.max(input.limit ?? 20, 1), 100);
   const minScore = input.minScore ?? SEARCH_MIN_SCORE;
   const [vector] = await embedTexts(ai, [query]);
 
   // Uno in piu' per poter scartare il task escluso senza perdere un risultato.
-  const topK = limit + (input.excludeTaskId ? 1 : 0);
+  const topK = Math.min(limit + (input.excludeTaskId ? 1 : 0), UNFILTERED_TOP_K);
   let result: { matches: { id: string; score: number }[] };
   try {
     result = await vectorize.query(vector, {

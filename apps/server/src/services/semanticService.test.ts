@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { setBackgroundRunner } from "../lib/email/provider.js";
 import { setAiRuntimeProvider, type AiBinding, type VectorIndexBinding, type VectorRecord } from "../lib/workersAi.js";
-import { createProject, createSubtasks, createTask, deleteTask, listComments, updateTask } from "./taskService.js";
+import { createProject, createSubtasks, createTask, deleteTask, getAggregatedBoard, getBoard, listComments, listDoneTasks, listTasks, updateTask } from "./taskService.js";
+import { prisma } from "../lib/prisma.js";
 import {
   EMBEDDING_MODEL,
   WHISPER_MODEL,
@@ -209,6 +210,51 @@ describe("ricerca", () => {
     expect(dup.map((d) => d.taskId)).toEqual([login.id]);
     expect(await findSimilarTasks(a.id, { title: "Notifiche email" })).toEqual([]);
     expect(await findSimilarTasks(a.id, { title: "Login lento su mobile", excludeTaskId: login.id })).toEqual([]);
+  });
+});
+
+describe("ricerca dei task (board, archivio, list_tasks)", () => {
+  async function seed() {
+    const a = await createProject("A");
+    const b = await createProject("B");
+    const login = await createTask(a.id, { title: "Login lento su mobile" });
+    const fattura = await createTask(a.id, { title: "Export fattura in PDF" });
+    const chiuso = await createTask(a.id, { title: "Login lentissimo vecchio" });
+    await prisma.task.update({ where: { id: chiuso.id }, data: { status: "done" } });
+    const foreign = await createTask(b.id, { title: "Login lento" });
+    await flush();
+    return { a, b, login, fattura, chiuso, foreign };
+  }
+  const ids = (board: Record<string, { id: string }[]>) => Object.values(board).flat().map((t) => t.id).sort();
+
+  it("e' semantica: trova per significato anche senza le parole esatte", async () => {
+    const { a, login, chiuso } = await seed();
+    // "lentezza dell'accesso login" non e' una sottostringa di nessun titolo.
+    expect(ids(await getBoard(a.id, { search: "lentezza login" }))).toEqual([login.id, chiuso.id].sort());
+    expect((await listTasks(a.id, { search: "lentezza login" })).map((t) => t.id).sort()).toEqual([login.id, chiuso.id].sort());
+    const done = await listDoneTasks({ projectIds: [a.id], q: "lentezza login" });
+    expect(done.tasks.map((t) => t.id)).toEqual([chiuso.id]);
+  });
+
+  it("la board aggregata resta nei progetti ammessi", async () => {
+    const { a, login, chiuso } = await seed();
+    expect(ids(await getAggregatedBoard([a.id], { search: "login lento" }))).toEqual([login.id, chiuso.id].sort());
+  });
+
+  it("senza Workers AI ripiega sulla ricerca testuale", async () => {
+    const { a, fattura } = await seed();
+    setAiRuntimeProvider(null);
+    expect(ids(await getBoard(a.id, { search: "fattura" }))).toEqual([fattura.id]);
+    expect(ids(await getBoard(a.id, { search: "lentezza login" }))).toEqual([]);
+  });
+
+  it("se la ricerca semantica fallisce ripiega sulla ricerca testuale", async () => {
+    const { a, fattura } = await seed();
+    setAiRuntimeProvider(() => ({
+      ai: { run: async () => { throw new Error("4006: daily free allocation exceeded"); } },
+      vectorize: fakeVectorize,
+    }));
+    expect(ids(await getBoard(a.id, { search: "fattura" }))).toEqual([fattura.id]);
   });
 });
 

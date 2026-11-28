@@ -1,7 +1,7 @@
 import type { Project, TaskPriority } from "@my-planner/core";
 import { useState } from "react";
 import { useI18n } from "../i18n";
-import { FilterIcon, SparkleIcon, SubtaskIcon } from "./Icons";
+import { FilterIcon, SubtaskIcon } from "./Icons";
 
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -21,8 +21,6 @@ export interface BoardFiltersState {
   priorities: TaskPriority[];
   blockedOnly: boolean;
   search: string;
-  /** Ricerca per significato (Workers AI + Vectorize) invece che testuale. */
-  semantic: boolean;
   tag: string | null;
   /** Mostra le sotto-task come card nella loro colonna (default: nascoste, aggregate nel parent). */
   showSubtasks: boolean;
@@ -39,10 +37,6 @@ interface FilterBarProps {
   projects?: Project[];
   selectedProjectIds?: string[] | null;
   onSelectedProjectIdsChange?: (ids: string[] | null) => void;
-  /** Mostra il toggle della ricerca semantica (solo se il server la supporta). */
-  semanticAvailable?: boolean;
-  /** Risultati della ricerca semantica in corso: null = non attiva o in caricamento. */
-  semanticResultCount?: number | null;
 }
 
 export function FilterBar({
@@ -53,8 +47,6 @@ export function FilterBar({
   projects,
   selectedProjectIds,
   onSelectedProjectIdsChange,
-  semanticAvailable = false,
-  semanticResultCount = null,
 }: FilterBarProps) {
   const { t } = useI18n();
   // Su mobile chip e select stanno in un pannello richiudibile (bottone "Filtri");
@@ -188,33 +180,13 @@ export function FilterBar({
 
       </div>
 
-      <div className="filter-search-group">
-        <input
-          type="search"
-          className="filter-search"
-          placeholder={t.filters.searchPlaceholder}
-          value={filters.search}
-          onChange={(e) => onChange({ ...filters, search: e.target.value })}
-        />
-        {semanticAvailable && (
-          <button
-            type="button"
-            className={`filter-chip filter-chip-semantic${filters.semantic ? " active" : ""}`}
-            aria-pressed={filters.semantic}
-            title={t.semantic.searchToggleHint}
-            onClick={() => onChange({ ...filters, semantic: !filters.semantic })}
-          >
-            <SparkleIcon /> {t.semantic.searchToggle}
-          </button>
-        )}
-        {semanticAvailable && filters.semantic && filters.search.trim() && semanticResultCount !== null && (
-          <span className="filter-semantic-count" role="status">
-            {semanticResultCount === 0
-              ? t.semantic.searchNoResults
-              : t.semantic.searchResults.replace("{count}", String(semanticResultCount))}
-          </span>
-        )}
-      </div>
+      <input
+        type="search"
+        className="filter-search"
+        placeholder={t.filters.searchPlaceholder}
+        value={filters.search}
+        onChange={(e) => onChange({ ...filters, search: e.target.value })}
+      />
 
       {projects && onSelectedProjectIdsChange && (
         <div className="filter-projects">

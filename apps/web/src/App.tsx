@@ -41,12 +41,9 @@ import {
   listProjectStatuses,
   listProjects,
   ApiRequestError,
-  semanticSearchTasks,
   setUnauthorizedHandler,
   type DoneTasksQuery,
 } from "./api";
-import { useAiFeatures } from "./lib/aiFeatures";
-import { useToast } from "./lib/toast";
 import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
 import { parseRoute, projectPath, settingsPath } from "./lib/routes";
@@ -78,19 +75,7 @@ function getStoredSidebarCollapsed(): boolean {
   }
 }
 
-/** Match testuale (titolo o descrizione, senza maiuscole), come la ricerca del server. */
-function matchesText(t: BoardTask, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return false;
-  return t.title.toLowerCase().includes(q) || (t.description ?? "").toLowerCase().includes(q);
-}
-
-function filterBoard(
-  board: Board,
-  filters: BoardFiltersState,
-  currentUserId: string | null,
-  semanticHits: Set<string> | null,
-): Board {
+function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: string | null): Board {
   const titles = new Map<string, string>();
   const statusKeys = boardStatusKeys(board);
   for (const status of statusKeys) {
@@ -110,12 +95,9 @@ function filterBoard(
     // (nota 2026-09-23).
     // Con "Assegnati a me" le sotto-task assegnate all'utente compaiono come
     // card anche se il parent non e' suo, altrimenti resterebbero invisibili.
-    // Ricerca semantica: restano solo i task trovati, sotto-task comprese
-    // (un match su una sotto-task non deve sparire dentro il parent).
-    // Restano anche i match testuali classici: una parola parziale ("Landin")
-    // ha poco significato per il modello ma va comunque trovata.
-    if (semanticHits && !semanticHits.has(t.id) && !matchesText(t, filters.search)) return false;
-    const byPerson = filters.assignedToMe || filters.assignee !== null || semanticHits !== null;
+    // Con una ricerca attiva (semantica, lato server) le sotto-task trovate
+    // compaiono come card: dentro il parent sparirebbero.
+    const byPerson = filters.assignedToMe || filters.assignee !== null || filters.search.trim() !== "";
     if (t.parentId && !filters.showSubtasks && !byPerson) return false;
     if (filters.assignedToMe && (!currentUserId || t.assigneeId !== currentUserId)) return false;
     if (filters.assignee === UNASSIGNED_FILTER ? t.assigneeId !== null : filters.assignee && t.assigneeId !== filters.assignee) {
@@ -155,7 +137,6 @@ function collectTags(board: Board): string[] {
 
 export function App() {
   const { t, locale } = useI18n();
-  const toast = useToast();
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
@@ -389,39 +370,6 @@ export function App() {
     };
   }, [selectedProjectId, statusesVersion]);
 
-  // Ricerca semantica (Workers AI + Vectorize): attiva solo se il server la
-  // supporta, il toggle e' acceso e c'e' una query.
-  const aiFeatures = useAiFeatures();
-  const semanticQuery = aiFeatures.semanticSearch && filters.semantic ? filters.search.trim() : "";
-  const [semanticHits, setSemanticHits] = useState<Set<string> | null>(null);
-  useEffect(() => {
-    if (!semanticQuery || !selectedProjectId) {
-      setSemanticHits(null);
-      return;
-    }
-    let cancelled = false;
-    const projectIds =
-      selectedProjectId === "all" ? (aggregatedProjectIds ?? undefined) : [selectedProjectId];
-    // Pausa mentre si scrive: ogni ricerca consuma neuroni della quota giornaliera.
-    const timer = window.setTimeout(() => {
-      semanticSearchTasks(semanticQuery, projectIds)
-        .then((matches) => {
-          if (!cancelled) setSemanticHits(new Set(matches.map((m) => m.taskId)));
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          setSemanticHits(new Set());
-          // Il messaggio del server dice la causa (quota, Vectorize...).
-          toast.error(err instanceof ApiRequestError ? `${t.semantic.searchError}: ${err.message}` : t.semantic.searchError);
-        });
-    }, 400);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semanticQuery, selectedProjectId, aggregatedProjectIds]);
-
   const loadBoard = useCallback(async () => {
     if (!selectedProjectId || !boardKey) return;
     const requestId = ++boardRequestId.current;
@@ -429,9 +377,7 @@ export function App() {
       // Priorità multi-chip e "solo bloccati" filtrati lato client (il
       // contratto REST supporta un solo `priority` alla volta); la ricerca
       // testuale invece è delegata al server (`search`, vedi API_CONTRACT.md §5).
-      // In modalita' semantica la board si carica intera e la filtra il
-      // client con gli id trovati (vedi semanticHits).
-      const boardFilters = { search: semanticQuery ? undefined : filters.search || undefined, tag: filters.tag ?? undefined };
+      const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
       const data =
         selectedProjectId === "all"
           ? await getAggregatedBoard(aggregatedProjectIds ?? undefined, boardFilters)
@@ -447,7 +393,7 @@ export function App() {
       setBoardFor(boardKey);
       setLoadError(t.app.loadBoardError);
     }
-  }, [selectedProjectId, boardKey, filters.search, semanticQuery, filters.tag, aggregatedProjectIds, t]);
+  }, [selectedProjectId, boardKey, filters.search, filters.tag, aggregatedProjectIds, t]);
 
   useEffect(() => {
     loadBoard();
@@ -469,7 +415,7 @@ export function App() {
   // Archivio dei completati: la board non li carica, qui si chiedono solo il
   // conteggio (badge Done) e, nella modale, le pagine con gli stessi filtri.
   const doneQuery = useMemo<DoneTasksQuery>(() => {
-    const byPerson = filters.assignedToMe || filters.assignee !== null;
+    const byPerson = filters.assignedToMe || filters.assignee !== null || filters.search.trim() !== "";
     return {
       projectIds:
         selectedProjectId === "all"
@@ -479,7 +425,7 @@ export function App() {
           : selectedProjectId
             ? [selectedProjectId]
             : undefined,
-      search: semanticQuery ? undefined : filters.search || undefined,
+      search: filters.search || undefined,
       tag: filters.tag ?? undefined,
       priorities: filters.priorities.length > 0 ? filters.priorities : undefined,
       assigneeId: filters.assignedToMe
@@ -489,7 +435,7 @@ export function App() {
           : (filters.assignee ?? undefined),
       includeSubtasks: filters.showSubtasks || byPerson,
     };
-  }, [selectedProjectId, aggregatedProjectIds, filters, semanticQuery, currentUserId]);
+  }, [selectedProjectId, aggregatedProjectIds, filters, currentUserId]);
   const doneQueryKey = JSON.stringify(doneQuery);
   const [doneCount, setDoneCount] = useState<number | null>(null);
   useEffect(() => {
@@ -509,8 +455,8 @@ export function App() {
   }, [doneQueryKey, board]);
 
   const filteredBoard = useMemo(
-    () => filterBoard(board, filters, currentUserId, semanticHits),
-    [board, filters, currentUserId, semanticHits],
+    () => filterBoard(board, filters, currentUserId),
+    [board, filters, currentUserId],
   );
   const availableTags = useMemo(() => collectTags(board), [board]);
   const availableAssignees = useMemo(() => collectAssignees(board), [board]);
@@ -827,12 +773,6 @@ export function App() {
                   selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
                   onSelectedProjectIdsChange={
                     selectedProjectId === "all" ? setAggregatedProjectIds : undefined
-                  }
-                  semanticAvailable={aiFeatures.semanticSearch}
-                  semanticResultCount={
-                    semanticHits
-                      ? boardStatusKeys(filteredBoard).reduce((n, k) => n + (filteredBoard[k]?.length ?? 0), 0)
-                      : null
                   }
                 />
 
