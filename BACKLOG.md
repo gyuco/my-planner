@@ -325,6 +325,14 @@ Adattamento degli scenari e2e esistenti (T4-T9) per puntare a `wrangler dev` (o 
 
 ---
 
+### AI1 — Workers AI e Vectorize (v2)
+Fuori dallo scope v1 del PRD ("automazioni"), implementato come v2 sul solo Worker Cloudflare (vedi API_CONTRACT.md §6sexies):
+- ricerca semantica sui task (toggle "Semantica" nella barra filtri, `GET /search/semantic`) e avviso di possibili duplicati nella modale "Nuovo task" (`POST /projects/:id/tasks/similar`);
+- standup giornaliero con riassunto in linguaggio naturale in testa alla mail;
+- note vocali da smartphone (pulsante "Nota vocale" nei commenti del drawer) trascritte con Whisper e salvate come commento.
+
+Messa in produzione: l'indice Vectorize lo crea la CI prima del deploy (il token Cloudflare deve avere il permesso Vectorize: Edit e Workers AI: Read); dopo il primo deploy lanciare una volta `POST /admin/reindex-search` per indicizzare i task esistenti. Su Node/Docker le funzioni restano nascoste.
+
 ## Debito tecnico noto (da review B1-B18)
 
 Segnalato da `reviewer`, non bloccante per la v1, da rivedere in un secondo momento:

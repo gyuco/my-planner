@@ -1,4 +1,5 @@
 import type { D1Database, DurableObjectNamespace, R2Bucket } from "@cloudflare/workers-types";
+import type { AiBinding, VectorIndexBinding } from "../lib/workersAi.js";
 
 /**
  * Binding del Worker Cloudflare (CF1). Passato come `env` a fetch e ai Durable
@@ -11,6 +12,11 @@ export interface CfEnv {
   // Durable Object della board in tempo reale (un'istanza per progetto, vedi
   // src/cf/realtime.ts). Opzionale: senza binding la board non si aggiorna da sola.
   PROJECT_REALTIME?: DurableObjectNamespace;
+  // Workers AI (ricerca semantica, note vocali, riassunto dello standup) e
+  // indice Vectorize dei task (vedi services/semanticService.ts). Opzionali:
+  // senza binding le funzioni AI spariscono dalla UI.
+  AI?: AiBinding;
+  VECTORIZE?: VectorIndexBinding;
   JWT_SECRET: string;
   BOOTSTRAP_EMAIL?: string;
   BOOTSTRAP_PASSWORD?: string;

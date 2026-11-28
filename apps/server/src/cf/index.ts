@@ -12,6 +12,8 @@ import { cfSmtpSocketFactory } from "./smtpSocket.js";
 import { setBackgroundRunner, setSmtpSocketFactory } from "../lib/email/provider.js";
 import { setSecretKeyProvider } from "../lib/secretBox.js";
 import { setRealtimePublisher } from "../lib/realtime.js";
+import { setAiRuntimeProvider } from "../lib/workersAi.js";
+import { summarizeStandup } from "./standup.js";
 import { handleRealtimeUpgrade, matchRealtimePath, sendToProjectRealtime } from "./realtime.js";
 import type { CfEnv } from "./env.js";
 
@@ -61,6 +63,13 @@ setRealtimePublisher((message) => {
       console.error("[my-planner] avviso realtime non consegnato", err);
     }),
   );
+});
+
+// Workers AI e Vectorize dell'invocazione corrente (ricerca semantica, note
+// vocali, riassunto dello standup).
+setAiRuntimeProvider(() => {
+  const env = invocation.getStore()?.env;
+  return env ? { ai: env.AI ?? null, vectorize: env.VECTORIZE ?? null } : null;
 });
 
 // Deve restare allineato a [triggers].crons in wrangler.toml.
@@ -121,11 +130,12 @@ export default {
       invocation.run({ env, ctx }, () => withRequestPrisma(env, async () => {
         await prepareRequest(env);
         const report = await buildStandupReport();
+        const summary = await summarizeStandup(report, env.AI);
         await sendStandupEmail(
           env,
           `Standup my-planner — ${report.todayLabel}`,
-          renderStandupText(report),
-          renderStandupHtml(report)
+          renderStandupText(report, summary),
+          renderStandupHtml(report, summary)
         );
       }))
     );

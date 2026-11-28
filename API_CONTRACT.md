@@ -63,6 +63,8 @@ Questo garantisce che un agente AI possa leggere `code`/`message` in modo determ
 | `VOICE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta o non è raggiungibile (`POST /voice/session`, `POST /settings/voice/test`) |
 | `PRETRIAGE_UNAVAILABLE` | 503 | Pre-triage non attivo, senza chiave o chiave non decifrabile (`POST /tasks/:taskId/pretriage`) |
 | `PRETRIAGE_QUOTA` | 429 | Quota gratuita di Gemini esaurita (HTTP 429 / `RESOURCE_EXHAUSTED`) |
+| `AI_UNAVAILABLE` | 503 | Funzione Workers AI non disponibile (server Node/Docker o Worker senza binding `AI`/`VECTORIZE`) |
+| `AI_PROVIDER_ERROR` | 502 | Workers AI o Vectorize hanno rifiutato la richiesta (es. quota gratuita giornaliera di neuroni esaurita) |
 | `PRETRIAGE_PROVIDER_ERROR` | 502 | Gemini ha rifiutato la richiesta, non ha risposto entro 30 s o ha restituito una risposta non valida (`POST /tasks/:taskId/pretriage`, `POST /settings/voice/pretriage-test`) |
 | `INTERNAL_ERROR` | 500 | Errore non gestito |
 
@@ -588,6 +590,37 @@ Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_c
 - **Nessun tool MCP** per il log (vista per utente).
 
 ---
+
+## 6sexies. Workers AI e Vectorize (solo Worker Cloudflare)
+
+Ricerca semantica sui task, avviso di duplicati alla creazione, note vocali trascritte con Whisper e riassunto dello standup. Usano i binding `AI` e `VECTORIZE` del Worker (`apps/server/wrangler.toml`), dentro la quota gratuita giornaliera di neuroni; su Node/Docker non ci sono e ogni funzione risponde `AI_UNAVAILABLE`. Codice: `services/semanticService.ts`, `services/voiceNoteService.ts`, `cf/standup.ts`.
+
+Modelli: embedding `@cf/baai/bge-m3` (multilingue, 1024 dimensioni), trascrizione `@cf/openai/whisper-large-v3-turbo`, riassunto `@cf/meta/llama-3.3-70b-instruct-fp8-fast`.
+
+**Indice.** Vectorize `my-planner-tasks` (`--dimensions=1024 --metric=cosine`, indice di metadati `projectId` stringa). Un vettore per task, id = taskId, testo = titolo + descrizione (max 2000 caratteri). Si aggiorna in background (`waitUntil`) alla creazione di task e sotto-task, quando cambiano titolo o descrizione, e viene rimosso all'eliminazione. Lo stato del task non conta: la ricerca restituisce anche i completati.
+
+### `GET /ai/features` (autenticato)
+- 200: `{ semanticSearch: boolean, voiceNotes: boolean, standupSummary: boolean }` — la UI mostra i controlli solo se `true`. Anche sul server Node (tutto `false`).
+
+### `GET /search/semantic?q=&projectIds=a,b&limit=20` (autenticato)
+- Ricerca per significato. `projectIds` omesso = tutti i progetti accessibili (stessa regola di `GET /tasks/done`); i progetti non accessibili vengono ignorati.
+- 200: `SemanticTaskMatch[]` = `{ taskId, projectId, title, status, score }`, ordinati per `score` (coseno, 0..1) decrescente, solo con `score >= 0.45`.
+- La board, con il toggle "Semantica" acceso (`?semantic=1`), si carica senza `search` e mostra solo i task trovati, sotto-task comprese.
+
+### `POST /projects/:projectId/tasks/similar` (accesso al progetto)
+- Body: `{ title, description?, excludeTaskId? }`.
+- 200: fino a 5 `SemanticTaskMatch` dello stesso progetto con `score >= 0.72` (possibili duplicati). La modale "Nuovo task" lo chiama mentre si scrive (debounce 700 ms) e mostra un avviso non bloccante.
+
+### `POST /tasks/:taskId/voice-notes` (accesso al task)
+- `multipart/form-data`: `audio` (webm/ogg/mp4/m4a/mp3/wav/flac, max 10 MB) e `language` opzionale (codice ISO a 2 lettere, la UI manda la lingua dell'interfaccia).
+- 201: `{ transcript, comment }` — la trascrizione diventa un commento `🎙️ **Nota vocale**` con l'attore di chi l'ha registrata. L'audio non viene conservato.
+- 400 audio vuoto o nessuna parola riconosciuta; 413 troppo grande; 415 formato non audio.
+
+### `POST /admin/reindex-search` (admin)
+- Ricostruisce l'indice di tutti i task (task creati prima dell'attivazione o dopo un cambio di modello). 200: `{ indexed: number }`.
+
+### Standup giornaliero
+Il cron (e `POST /admin/run-standup`) chiede al modello un riassunto in prosa (3-6 frasi, italiano) e lo mette in testa alla mail, sopra il dettaglio per progetto. Best-effort: se il binding manca o la quota e' finita la mail parte con il solo dettaglio. `POST /admin/run-standup` restituisce anche `summary` (stringa o `null`).
 
 ## 6quinquies. Board in tempo reale (WebSocket, solo Worker Cloudflare)
 

@@ -6,6 +6,7 @@ import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
 import { TaskTypePicker } from "./TaskTypePicker";
 import { AssigneeSelect } from "./AssigneeSelect";
+import { SimilarTasksHint } from "./SimilarTasksHint";
 
 interface CreateTaskModalProps {
   projectId: string;
@@ -154,6 +155,8 @@ export function CreateTaskModal({ projectId, onClose, onCreated }: CreateTaskMod
           {t.createTask.descriptionLabel}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} />
         </label>
+
+        <SimilarTasksHint projectId={projectId} title={title} description={description} />
 
         <AssigneeSelect
           projectId={projectId}

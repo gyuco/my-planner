@@ -5005,3 +5005,112 @@ body.dnd-dragging * {
   text-decoration-color: var(--ink-300);
   text-decoration-thickness: 1px;
 }
+
+/* --- Workers AI: ricerca semantica, duplicati, note vocali ------------------ */
+
+.filter-search-group {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.filter-chip-semantic {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.filter-chip-semantic svg { width: 14px; height: 14px; }
+
+.filter-semantic-count {
+  font-size: 0.78rem;
+  color: var(--ink-500);
+}
+
+.similar-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunken);
+  font-size: 0.85rem;
+}
+
+.similar-tasks-title { color: var(--ink-900); }
+.similar-tasks-hint { color: var(--ink-500); font-size: 0.8rem; }
+
+.similar-tasks ul {
+  margin: 0.2rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.similar-tasks li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0.5rem;
+}
+
+.similar-tasks a { color: var(--accent-600); text-decoration: none; }
+.similar-tasks a:hover { text-decoration: underline; }
+.similar-tasks-meta { color: var(--ink-400); font-size: 0.75rem; }
+
+.voice-note-button,
+.voice-note button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-700);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.voice-note-button { margin-top: 0.5rem; }
+.voice-note-button svg { width: 16px; height: 16px; }
+.voice-note-button:disabled { opacity: 0.6; cursor: progress; }
+
+.voice-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.voice-note-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--r-full);
+  background: var(--danger);
+  animation: voice-note-pulse 1.2s var(--ease) infinite;
+}
+
+.voice-note-time { font-variant-numeric: tabular-nums; color: var(--ink-800); min-width: 2.6rem; }
+
+.voice-note .voice-note-stop {
+  border-color: var(--accent-500);
+  background: var(--accent-500);
+  color: #fff;
+}
+
+@keyframes voice-note-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-note-dot { animation: none; }
+}

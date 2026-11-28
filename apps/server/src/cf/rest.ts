@@ -75,7 +75,9 @@ import {
   listProjectStatuses,
   renameProjectStatus,
 } from "../services/statusService.js";
-import { buildStandupReport, renderStandupHtml, renderStandupText } from "./standup.js";
+import { buildStandupReport, renderStandupHtml, renderStandupText, summarizeStandup } from "./standup.js";
+import { findSimilarTasks, getAiFeatures, reindexAllTasks, semanticSearch } from "../services/semanticService.js";
+import { transcribeVoiceNote } from "../services/voiceNoteService.js";
 import { sendStandupEmail } from "./email.js";
 import {
   taskFiltersQuerySchema,
@@ -109,6 +111,8 @@ import {
   markNotificationsReadInputSchema,
   activityQuerySchema,
   projectStatsQuerySchema,
+  semanticSearchQuerySchema,
+  similarTasksInputSchema,
 } from "../lib/validation.js";
 import { prisma } from "../lib/prisma.js";
 import { hashToken, listUserMcpTokens, revokeUserMcpToken } from "../mcp/auth.js";
@@ -295,14 +299,19 @@ export function buildRestApp() {
   // chiunque potrebbe far partire invii di mail a raffica.
   app.post("/admin/run-standup", async (c) => {
     const report = await buildStandupReport();
+    const summary = await summarizeStandup(report, c.env.AI);
     await sendStandupEmail(
       c.env,
       `Standup my-planner — ${report.todayLabel}`,
-      renderStandupText(report),
-      renderStandupHtml(report)
+      renderStandupText(report, summary),
+      renderStandupHtml(report, summary)
     );
-    return c.json({ status: "sent", totals: report.totals });
+    return c.json({ status: "sent", totals: report.totals, summary });
   });
+
+  // Ricostruisce l'indice Vectorize di tutti i task (task creati prima
+  // dell'attivazione della ricerca semantica, o dopo un cambio di modello).
+  app.post("/admin/reindex-search", async (c) => c.json(await reindexAllTasks()));
 
   // --- Progetti ------------------------------------------------------------
   app.get("/projects", async (c) => {
@@ -545,6 +554,47 @@ export function buildRestApp() {
   app.post("/tasks/:taskId/pretriage", async (c) => {
     await assertTaskAccess(c.get("user"), c.req.param("taskId"));
     return c.json(await runPretriage(c.req.param("taskId"), userActor(c.get("user"))));
+  });
+
+  // --- Workers AI ----------------------------------------------------------
+  app.get("/ai/features", (c) => c.json(getAiFeatures()));
+
+  // Ricerca semantica su un progetto o, senza projectId, su tutti quelli
+  // accessibili (stessa regola dell'archivio dei completati).
+  app.get("/search/semantic", async (c) => {
+    const { q, projectIds, limit } = semanticSearchQuerySchema.parse(c.req.query());
+    const allowed = await doneProjectScope(c.get("user"), projectIds);
+    return c.json(await semanticSearch({ query: q, projectIds: allowed, limit }));
+  });
+
+  // Possibili duplicati mentre si scrive un nuovo task (o se ne modifica uno).
+  app.post("/projects/:projectId/tasks/similar", async (c) => {
+    const projectId = c.req.param("projectId");
+    await assertProjectAccess(c.get("user"), projectId);
+    const input = similarTasksInputSchema.parse(await c.req.json().catch(() => ({})));
+    return c.json(await findSimilarTasks(projectId, input));
+  });
+
+  // Nota vocale: audio multipart (campo "audio") trascritto con Whisper e
+  // salvato come commento del task.
+  app.post("/tasks/:taskId/voice-notes", async (c) => {
+    await assertTaskAccess(c.get("user"), c.req.param("taskId"));
+    const form = await c.req.formData().catch(() => null);
+    const file = form?.get("audio");
+    if (!form || !(file instanceof File)) {
+      throw new ApiErrorException("VALIDATION_ERROR", "Campo 'audio' mancante nel form multipart");
+    }
+    const language = form.get("language");
+    const result = await transcribeVoiceNote(
+      c.req.param("taskId"),
+      {
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        mimeType: file.type,
+        language: typeof language === "string" ? language : null,
+      },
+      userActor(c.get("user")),
+    );
+    return c.json(result, 201);
   });
 
   // --- Board ---------------------------------------------------------------

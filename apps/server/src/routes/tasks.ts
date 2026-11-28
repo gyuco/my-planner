@@ -18,6 +18,7 @@ import {
 } from "../services/taskService.js";
 import { assertAdmin, assertProjectAccess, assertTaskAccess, listProjectAssignees } from "../services/userService.js";
 import { userActor } from "../services/notificationService.js";
+import { getAiFeatures } from "../services/semanticService.js";
 import { getPretriageStatus, runPretriage } from "../services/pretriageService.js";
 import {
   taskFiltersQuerySchema,
@@ -144,6 +145,9 @@ export async function taskRoutes(app: FastifyInstance) {
     await assertTaskAccess((req as any).authUser, taskId);
     return listComments(taskId);
   });
+
+  // --- Workers AI: su Node non ci sono binding, risponde tutto false -------
+  app.get("/ai/features", { onRequest: [app.authenticate] }, async () => getAiFeatures());
 
   // --- Pre-triage con Gemini (tutti gli utenti con accesso al task) -------
 
