@@ -399,8 +399,14 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
   return serializeTask(task);
 }
 
-/** Massimo di task restituiti da una ricerca (board, archivio, MCP). */
-const SEARCH_MAX_RESULTS = 100;
+/**
+ * Massimo di task restituiti da una ricerca (board, archivio, MCP). Gli id
+ * trovati finiscono in un `id IN (...)`: D1 accetta al massimo 100 parametri
+ * per query, e nella stessa query ci sono anche progetti, priorita' e tag.
+ * Con 100 id la board "Tutti i progetti" e il conteggio dei completati
+ * superavano il limite e fallivano.
+ */
+const SEARCH_MAX_RESULTS = 50;
 
 /**
  * Condizione Prisma della ricerca sui task, usata da board, archivio dei
@@ -418,7 +424,9 @@ async function searchWhere(
   const q = query.trim();
   if (getAiFeatures().semanticSearch) {
     try {
-      const matches = await semanticSearch({ query: q, projectIds, limit: SEARCH_MAX_RESULTS });
+      // Spazio per gli altri parametri della query (progetti, priorita', tag).
+      const limit = Math.max(10, Math.min(SEARCH_MAX_RESULTS, 85 - (projectIds?.length ?? 0)));
+      const matches = await semanticSearch({ query: q, projectIds, limit });
       return { id: { in: matches.map((m) => m.taskId) } };
     } catch (err) {
       console.error("[my-planner] ricerca semantica non riuscita, uso la ricerca testuale", err);
