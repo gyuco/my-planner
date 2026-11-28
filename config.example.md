@@ -10,7 +10,7 @@ DATABASE_URL="file:./dev.db"
 JWT_SECRET="change-me-in-production"
 
 # Opzionale: chiave per cifrare i segreti salvati in DB (password SMTP delle
-# notifiche email, vedi "Notifiche email" nella UI admin). Se assente si usa
+# notifiche email, vedi Impostazioni → Email nella UI admin). Se assente si usa
 # JWT_SECRET; con una chiave dedicata, ruotare JWT_SECRET non obbliga a
 # reinserire la password SMTP. Es. `openssl rand -hex 32`.
 SETTINGS_ENCRYPTION_KEY=
@@ -19,7 +19,7 @@ MCP_HTTP_PORT=3100
 
 # Storage allegati: "local" oppure "s3". Queste variabili sono usate solo
 # come seed/fallback finche' non esiste ancora una riga in StorageSettings
-# (tabella popolata al primo salvataggio dalla UI "Impostazioni storage",
+# (tabella popolata al primo salvataggio dalla UI Impostazioni → Storage allegati,
 # vedi API_CONTRACT.md §8) — dopo il primo salvataggio la config in DB ha
 # priorita' su queste variabili.
 ATTACHMENTS_BACKEND=local

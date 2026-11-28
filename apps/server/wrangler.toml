@@ -25,6 +25,35 @@ migrations_dir = "migrations"
 binding = "ATTACHMENTS"
 bucket_name = "my-planner-attachments"
 
+# ---- Durable Object: board in tempo reale ------------------------------------
+# Un'istanza per progetto tiene i WebSocket (Hibernation API) dei client con la
+# board aperta e inoltra gli avvisi di ogni modifica, da REST o da MCP
+# (src/cf/realtime.ts). Classe SQLite: disponibile anche sul piano gratuito.
+[[durable_objects.bindings]]
+name = "PROJECT_REALTIME"
+class_name = "ProjectRealtime"
+
+[[migrations]]
+tag = "v1-project-realtime"
+new_sqlite_classes = ["ProjectRealtime"]
+
+# ---- Workers AI + Vectorize -------------------------------------------------
+# Ricerca semantica sui task e avviso di duplicati (embedding bge-m3 + indice
+# Vectorize), trascrizione di note vocali (Whisper) e riassunto dello standup
+# (LLM). Tutto rientra nella quota gratuita giornaliera di neuroni; senza
+# questi binding le funzioni AI spariscono dalla UI.
+# L'indice va creato una volta (1024 = dimensioni di @cf/baai/bge-m3), con
+# l'indice di metadati per filtrare per progetto:
+#   npx wrangler vectorize create my-planner-tasks --dimensions=1024 --metric=cosine
+#   npx wrangler vectorize create-metadata-index my-planner-tasks --property-name=projectId --type=string
+# poi, dopo il deploy, POST /admin/reindex-search indicizza i task esistenti.
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "my-planner-tasks"
+
 # ---- Var statiche ------------------------------------------------------------
 # JWT_SECRET, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, GMAIL_USER,
 # GMAIL_APP_PASSWORD (e opzionale SETTINGS_ENCRYPTION_KEY) vanno impostate come secrets (`wrangler secret put`)

@@ -8,12 +8,8 @@ import { CreateTaskModal } from "./components/CreateTaskModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
-import { StorageSettingsModal } from "./components/StorageSettingsModal";
-import { EmailSettingsModal } from "./components/EmailSettingsModal";
-import { VoiceSettingsModal } from "./components/VoiceSettingsModal";
 import { VoiceAssistantButton } from "./components/VoiceAssistant";
 import { AssistantPage } from "./pages/AssistantPage";
-import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { TaskAiModal } from "./components/TaskAiModal";
 import {
@@ -44,13 +40,18 @@ import {
   listDoneTasks,
   listProjectStatuses,
   listProjects,
+  semanticSearchTasks,
   setUnauthorizedHandler,
   type DoneTasksQuery,
 } from "./api";
+import { useAiFeatures } from "./lib/aiFeatures";
+import { useToast } from "./lib/toast";
 import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
-import { parseRoute, projectPath } from "./lib/routes";
+import { parseRoute, projectPath, settingsPath } from "./lib/routes";
+import { SettingsPage } from "./pages/SettingsPage";
 import { syncPushSubscription } from "./lib/push";
+import { useRealtimeBoard } from "./lib/realtime";
 import {
   filtersSearch,
   parseFilters,
@@ -76,7 +77,12 @@ function getStoredSidebarCollapsed(): boolean {
   }
 }
 
-function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: string | null): Board {
+function filterBoard(
+  board: Board,
+  filters: BoardFiltersState,
+  currentUserId: string | null,
+  semanticHits: Set<string> | null,
+): Board {
   const titles = new Map<string, string>();
   const statusKeys = boardStatusKeys(board);
   for (const status of statusKeys) {
@@ -96,7 +102,10 @@ function filterBoard(board: Board, filters: BoardFiltersState, currentUserId: st
     // (nota 2026-09-23).
     // Con "Assegnati a me" le sotto-task assegnate all'utente compaiono come
     // card anche se il parent non e' suo, altrimenti resterebbero invisibili.
-    const byPerson = filters.assignedToMe || filters.assignee !== null;
+    // Ricerca semantica: restano solo i task trovati, sotto-task comprese
+    // (un match su una sotto-task non deve sparire dentro il parent).
+    if (semanticHits && !semanticHits.has(t.id)) return false;
+    const byPerson = filters.assignedToMe || filters.assignee !== null || semanticHits !== null;
     if (t.parentId && !filters.showSubtasks && !byPerson) return false;
     if (filters.assignedToMe && (!currentUserId || t.assigneeId !== currentUserId)) return false;
     if (filters.assignee === UNASSIGNED_FILTER ? t.assigneeId !== null : filters.assignee && t.assigneeId !== filters.assignee) {
@@ -136,6 +145,7 @@ function collectTags(board: Board): string[] {
 
 export function App() {
   const { t, locale } = useI18n();
+  const toast = useToast();
   const [loggedIn, setLoggedIn] = useState(hasValidToken());
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(getStoredUser());
   const [projects, setProjects] = useState<Project[]>([]);
@@ -156,14 +166,10 @@ export function App() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [showStorageSettings, setShowStorageSettings] = useState(false);
-  const [showEmailSettings, setShowEmailSettings] = useState(false);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   // Incrementato quando l'assistente vocale modifica dati: ricarica il drawer aperto.
   const [voiceDataVersion, setVoiceDataVersion] = useState(0);
   // Rimonta il pulsante microfono dopo le impostazioni (attivato/disattivato).
   const [voiceSettingsVersion, setVoiceSettingsVersion] = useState(0);
-  const [showUsers, setShowUsers] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
   // Task aperto nel drawer: l'id sta nell'URL (?task=), il progetto viene
@@ -275,6 +281,10 @@ export function App() {
       document.title = `${t.assistant.title} · My Planner`;
       return;
     }
+    if (view === "settings") {
+      document.title = `${t.settings.title} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (view === "stats" && currentProject) {
       document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
@@ -297,7 +307,6 @@ export function App() {
     setProjectsLoaded(false);
     setBoard(EMPTY_BOARD);
     setBoardFor(null);
-    setShowUsers(false);
     setResolvedTask(null);
     setRouteNotice(null);
   }, []);
@@ -370,6 +379,38 @@ export function App() {
     };
   }, [selectedProjectId, statusesVersion]);
 
+  // Ricerca semantica (Workers AI + Vectorize): attiva solo se il server la
+  // supporta, il toggle e' acceso e c'e' una query.
+  const aiFeatures = useAiFeatures();
+  const semanticQuery = aiFeatures.semanticSearch && filters.semantic ? filters.search.trim() : "";
+  const [semanticHits, setSemanticHits] = useState<Set<string> | null>(null);
+  useEffect(() => {
+    if (!semanticQuery || !selectedProjectId) {
+      setSemanticHits(null);
+      return;
+    }
+    let cancelled = false;
+    const projectIds =
+      selectedProjectId === "all" ? (aggregatedProjectIds ?? undefined) : [selectedProjectId];
+    // Pausa mentre si scrive: ogni ricerca consuma neuroni della quota giornaliera.
+    const timer = window.setTimeout(() => {
+      semanticSearchTasks(semanticQuery, projectIds)
+        .then((matches) => {
+          if (!cancelled) setSemanticHits(new Set(matches.map((m) => m.taskId)));
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setSemanticHits(new Set());
+          toast.error(t.semantic.searchError);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semanticQuery, selectedProjectId, aggregatedProjectIds]);
+
   const loadBoard = useCallback(async () => {
     if (!selectedProjectId || !boardKey) return;
     const requestId = ++boardRequestId.current;
@@ -377,7 +418,9 @@ export function App() {
       // Priorità multi-chip e "solo bloccati" filtrati lato client (il
       // contratto REST supporta un solo `priority` alla volta); la ricerca
       // testuale invece è delegata al server (`search`, vedi API_CONTRACT.md §5).
-      const boardFilters = { search: filters.search || undefined, tag: filters.tag ?? undefined };
+      // In modalita' semantica la board si carica intera e la filtra il
+      // client con gli id trovati (vedi semanticHits).
+      const boardFilters = { search: semanticQuery ? undefined : filters.search || undefined, tag: filters.tag ?? undefined };
       const data =
         selectedProjectId === "all"
           ? await getAggregatedBoard(aggregatedProjectIds ?? undefined, boardFilters)
@@ -393,11 +436,22 @@ export function App() {
       setBoardFor(boardKey);
       setLoadError(t.app.loadBoardError);
     }
-  }, [selectedProjectId, boardKey, filters.search, filters.tag, aggregatedProjectIds, t]);
+  }, [selectedProjectId, boardKey, filters.search, semanticQuery, filters.tag, aggregatedProjectIds, t]);
 
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
+
+  // Board in tempo reale: le modifiche fatte altrove (altri utenti, agenti via
+  // MCP) ricaricano la board senza reload della pagina. Sulla board aggregata
+  // si ascoltano i progetti selezionati, o tutti quelli attivi.
+  const realtimeProjectIds = useMemo(() => {
+    if (!loggedIn || !selectedProjectId) return [];
+    if (selectedProjectId !== "all") return [selectedProjectId];
+    if (aggregatedProjectIds && aggregatedProjectIds.length > 0) return aggregatedProjectIds;
+    return projects.filter((p) => !p.archived).map((p) => p.id);
+  }, [loggedIn, selectedProjectId, aggregatedProjectIds, projects]);
+  useRealtimeBoard(realtimeProjectIds, loadBoard);
 
   const currentUserId = currentUser?.id ?? null;
 
@@ -414,7 +468,7 @@ export function App() {
           : selectedProjectId
             ? [selectedProjectId]
             : undefined,
-      search: filters.search || undefined,
+      search: semanticQuery ? undefined : filters.search || undefined,
       tag: filters.tag ?? undefined,
       priorities: filters.priorities.length > 0 ? filters.priorities : undefined,
       assigneeId: filters.assignedToMe
@@ -424,7 +478,7 @@ export function App() {
           : (filters.assignee ?? undefined),
       includeSubtasks: filters.showSubtasks || byPerson,
     };
-  }, [selectedProjectId, aggregatedProjectIds, filters, currentUserId]);
+  }, [selectedProjectId, aggregatedProjectIds, filters, semanticQuery, currentUserId]);
   const doneQueryKey = JSON.stringify(doneQuery);
   const [doneCount, setDoneCount] = useState<number | null>(null);
   useEffect(() => {
@@ -444,8 +498,8 @@ export function App() {
   }, [doneQueryKey, board]);
 
   const filteredBoard = useMemo(
-    () => filterBoard(board, filters, currentUserId),
-    [board, filters, currentUserId],
+    () => filterBoard(board, filters, currentUserId, semanticHits),
+    [board, filters, currentUserId, semanticHits],
   );
   const availableTags = useMemo(() => collectTags(board), [board]);
   const availableAssignees = useMemo(() => collectAssignees(board), [board]);
@@ -455,8 +509,8 @@ export function App() {
   useEffect(() => {
     if (!loggedIn || !projectsLoaded) return;
     if (view === "profile" || view === "activity" || view === "guide") return;
-    // Assistente: solo admin (si aspetta di sapere chi e' l'utente prima di decidere).
-    if (view === "assistant" && (!currentUser || isAdmin)) return;
+    // Assistente e impostazioni: solo admin (si aspetta di sapere chi e' l'utente prima di decidere).
+    if ((view === "assistant" || view === "settings") && (!currentUser || isAdmin)) return;
     if (selectedProjectId) return;
     const target = projects[0]?.id ?? "all";
     const unknownProject = route.projectId !== null && route.projectId !== "all";
@@ -553,7 +607,10 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={view === "activity" || view === "guide" || view === "assistant" ? null : selectedProjectId}
+        selectedProjectId={
+          view === "activity" || view === "guide" || view === "assistant" || view === "settings" ? null : selectedProjectId
+        }
+        settingsActive={view === "settings"}
         activityActive={view === "activity"}
         guideActive={view === "guide"}
         assistantActive={view === "assistant"}
@@ -578,10 +635,11 @@ export function App() {
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
         onOpenArchived={() => setShowArchived(true)}
-        onOpenStorageSettings={() => setShowStorageSettings(true)}
-        onOpenEmailSettings={() => setShowEmailSettings(true)}
-        onOpenVoiceSettings={() => setShowVoiceSettings(true)}
-        onOpenUsers={() => setShowUsers(true)}
+        onOpenAppSettings={() => {
+          setRouteNotice(null);
+          navigate(settingsPath(route.settingsTab ?? "users"));
+          setSidebarOpen(false);
+        }}
         onOpenActivity={() => {
           setRouteNotice(null);
           navigate("/activity");
@@ -603,7 +661,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "assistant" ? t.assistant.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "assistant" ? t.assistant.title : view === "settings" ? t.settings.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -688,6 +746,18 @@ export function App() {
               onOpenTask: (taskId, projectId) => openTask(taskId, projectId),
             }}
           />
+        ) : view === "settings" && isAdmin && currentUser ? (
+          <SettingsPage
+            tab={route.settingsTab ?? "users"}
+            onTabChange={(tab) => navigate(settingsPath(tab), { replace: true })}
+            currentUserId={currentUser.id}
+            projects={projects}
+            onUsersChanged={() => {
+              refreshSession();
+              loadProjects();
+            }}
+            onGeminiSaved={() => setVoiceSettingsVersion((v) => v + 1)}
+          />
         ) : view === "guide" ? (
           <GuidePage />
         ) : view === "activity" ? (
@@ -746,6 +816,12 @@ export function App() {
                   selectedProjectIds={selectedProjectId === "all" ? aggregatedProjectIds : undefined}
                   onSelectedProjectIdsChange={
                     selectedProjectId === "all" ? setAggregatedProjectIds : undefined
+                  }
+                  semanticAvailable={aiFeatures.semanticSearch}
+                  semanticResultCount={
+                    semanticHits
+                      ? boardStatusKeys(filteredBoard).reduce((n, k) => n + (filteredBoard[k]?.length ?? 0), 0)
+                      : null
                   }
                 />
 
@@ -840,32 +916,6 @@ export function App() {
         <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} isAdmin={isAdmin} />
       )}
 
-      {showStorageSettings && isAdmin && (
-        <StorageSettingsModal onClose={() => setShowStorageSettings(false)} />
-      )}
-
-      {showEmailSettings && isAdmin && <EmailSettingsModal onClose={() => setShowEmailSettings(false)} />}
-
-      {showVoiceSettings && isAdmin && (
-        <VoiceSettingsModal
-          onClose={() => {
-            setShowVoiceSettings(false);
-            setVoiceSettingsVersion((v) => v + 1);
-          }}
-        />
-      )}
-
-      {showUsers && currentUser && isAdmin && (
-        <UsersModal
-          currentUserId={currentUser.id}
-          projects={projects}
-          onClose={() => setShowUsers(false)}
-          onChanged={() => {
-            refreshSession();
-            loadProjects();
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -44,6 +44,20 @@ export const boardFiltersQuerySchema = z.object({
 });
 
 /** Filtri di GET /tasks/done (archivio dei completati, a pagine). */
+/** GET /search/semantic: ricerca semantica sui task (Workers AI + Vectorize). */
+export const semanticSearchQuerySchema = z.object({
+  q: z.string().trim().min(1).max(500),
+  projectIds: z.string().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+
+/** POST /projects/:projectId/tasks/similar: possibili duplicati di un task in scrittura. */
+export const similarTasksInputSchema = z.object({
+  title: z.string().max(300),
+  description: z.string().max(20000).optional(),
+  excludeTaskId: z.string().min(1).optional(),
+});
+
 export const doneTasksQuerySchema = z.object({
   projectIds: z.string().optional(),
   search: z.string().max(200).optional(),

@@ -26,6 +26,8 @@ import type {
   VoiceStatus,
   PretriageStatus,
   PretriageResponse,
+  AiFeatures,
+  SemanticTaskMatch,
   UserAccount,
   UserRole,
   NotificationsResponse,
@@ -707,6 +709,42 @@ export function getPretriageStatus(): Promise<PretriageStatus> {
 /** Analizza il task con Gemini e aggiunge l'esito come commento (non modifica il task). */
 export function runPretriage(taskId: string): Promise<PretriageResponse> {
   return apiFetch(`/tasks/${taskId}/pretriage`, { method: "POST" });
+}
+
+// --- Workers AI: ricerca semantica, duplicati, note vocali -------------------
+
+/** Funzioni AI disponibili sul server (tutte false su Node/Docker). */
+export function getAiFeatures(): Promise<AiFeatures> {
+  return apiFetch(`/ai/features`);
+}
+
+/** Ricerca semantica sui task; senza projectIds cerca in tutti i progetti accessibili. */
+export function semanticSearchTasks(query: string, projectIds?: string[]): Promise<SemanticTaskMatch[]> {
+  const params = new URLSearchParams({ q: query });
+  if (projectIds && projectIds.length > 0) params.set("projectIds", projectIds.join(","));
+  return apiFetch(`/search/semantic?${params.toString()}`);
+}
+
+/** Possibili duplicati di un task che si sta scrivendo. */
+export function findSimilarTasks(
+  projectId: string,
+  input: { title: string; description?: string; excludeTaskId?: string },
+  signal?: AbortSignal,
+): Promise<SemanticTaskMatch[]> {
+  return apiFetch(`/projects/${projectId}/tasks/similar`, { method: "POST", body: JSON.stringify(input), signal });
+}
+
+/** Trascrive una nota vocale con Whisper e la salva come commento del task. */
+export function uploadVoiceNote(
+  taskId: string,
+  audio: Blob,
+  language?: string,
+): Promise<{ transcript: string; comment: Comment }> {
+  const formData = new FormData();
+  const ext = audio.type.includes("mp4") ? "m4a" : audio.type.includes("ogg") ? "ogg" : "webm";
+  formData.append("audio", audio, `nota-vocale.${ext}`);
+  if (language) formData.append("language", language);
+  return apiFetch(`/tasks/${taskId}/voice-notes`, { method: "POST", body: formData });
 }
 
 export function getVoiceStatus(): Promise<VoiceStatus> {

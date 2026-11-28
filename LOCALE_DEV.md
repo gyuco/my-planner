@@ -69,7 +69,7 @@ openssl rand -hex 32
   Per creare/cambiare l'utente usa lo script su DB descritto in §5.
 - **Allegati**: `ATTACHMENTS_BACKEND=local` (default) scrive in `ATTACHMENTS_LOCAL_DIR`.
   Per S3/MinIO vedi §7.
-- Al primo salvataggio dalla UI "Impostazioni storage" la configurazione finisce nella
+- Al primo salvataggio dalla UI (Impostazioni → Storage allegati) la configurazione finisce nella
   tabella `StorageSettings` e **ha priorità** sulle variabili d'ambiente.
 
 ---

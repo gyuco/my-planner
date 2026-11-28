@@ -457,6 +457,29 @@ export interface VoiceSession {
   expiresAt: string;
 }
 
+/**
+ * Funzioni basate su Workers AI e Vectorize (GET /ai/features). Disponibili
+ * solo sul Worker Cloudflare con i binding `AI` (e `VECTORIZE` per la ricerca
+ * semantica); su Node/Docker sono tutte false e la UI nasconde i controlli.
+ */
+export interface AiFeatures {
+  /** Ricerca semantica sui task e avviso di duplicati alla creazione. */
+  semanticSearch: boolean;
+  /** Trascrizione di note vocali (Whisper) salvate come commento. */
+  voiceNotes: boolean;
+  /** Riassunto in linguaggio naturale nello standup giornaliero. */
+  standupSummary: boolean;
+}
+
+/** Task trovato dalla ricerca semantica, con il punteggio di somiglianza (0..1). */
+export interface SemanticTaskMatch {
+  taskId: string;
+  projectId: string;
+  title: string;
+  status: TaskStatusKey;
+  score: number;
+}
+
 /** Dispositivo registrato per le notifiche push (GET /auth/me/push-subscriptions). */
 export interface PushDevice {
   id: string;
@@ -632,6 +655,8 @@ export type ErrorCode =
   | "PRETRIAGE_UNAVAILABLE"
   | "PRETRIAGE_QUOTA"
   | "PRETRIAGE_PROVIDER_ERROR"
+  | "AI_UNAVAILABLE"
+  | "AI_PROVIDER_ERROR"
   | "INTERNAL_ERROR";
 
 export interface ApiError {
@@ -681,6 +706,8 @@ export const HTTP_STATUS_BY_ERROR_CODE: Record<ErrorCode, number> = {
   PRETRIAGE_UNAVAILABLE: 503,
   PRETRIAGE_QUOTA: 429,
   PRETRIAGE_PROVIDER_ERROR: 502,
+  AI_UNAVAILABLE: 503,
+  AI_PROVIDER_ERROR: 502,
   INTERNAL_ERROR: 500,
 };
 

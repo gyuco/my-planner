@@ -22,6 +22,8 @@ import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { parseEventData, SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 import { emitEvent } from "./activityService.js";
 import { listCustomStatusKeys, resolveStatus } from "./statusService.js";
+import { publishBoardChange } from "../lib/realtime.js";
+import { scheduleTaskIndex, scheduleTaskRemoval } from "./semanticService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -392,6 +394,7 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
     recipientId: notifyAssignee(task.assigneeId, actor),
     data: { title: task.title, parentId: task.parentId },
   });
+  scheduleTaskIndex(task.id);
 
   return serializeTask(task);
 }
@@ -539,6 +542,10 @@ export async function updateTask(taskId: string, input: TaskUpdateInput, actor: 
     });
   }
 
+  if (existing.title !== task.title || (existing.description ?? "") !== (task.description ?? "")) {
+    scheduleTaskIndex(task.id);
+  }
+
   // Cambio assegnatario: evento a parte, che notifica il nuovo assegnatario.
   if ((existing.assigneeId ?? null) !== (task.assigneeId ?? null)) {
     await emitEvent({
@@ -655,6 +662,7 @@ export async function deleteTask(taskId: string, actor: Actor = SYSTEM_ACTOR) {
     actor,
     data: { title: existing.title, parentId: existing.parentId },
   });
+  scheduleTaskRemoval(taskId);
 
   return { id: taskId, deleted: true as const };
 }
@@ -725,6 +733,15 @@ export async function moveTask(
         from: existing.status as TaskStatusKey,
         to: status,
       },
+    });
+  } else {
+    // Niente evento di attivita', ma la board degli altri client cambia.
+    publishBoardChange({
+      type: "board.changed",
+      projectId: updated.projectId,
+      taskId: updated.id,
+      event: "task.reordered",
+      actorType: actor.type,
     });
   }
 
@@ -964,6 +981,7 @@ export async function createSubtasks(
       data: { title: task.title, parentId },
     });
   }
+  scheduleTaskIndex(created.map((t) => t.id));
 
   return created.map(serializeTask);
 }

@@ -1,4 +1,6 @@
 import { prisma } from "../lib/prisma.js";
+import type { AiBinding } from "../lib/workersAi.js";
+import { SUMMARY_MODEL } from "../services/semanticService.js";
 
 /**
  * Riepilogo giornaliero su tutti i progetti non archiviati (CF: standup via
@@ -152,6 +154,67 @@ export async function buildStandupReport(now: Date = new Date()): Promise<Standu
   };
 }
 
+// --- Riassunto in linguaggio naturale (Workers AI) ---------------------------
+
+/** Task per sezione passati al modello: oltre, conta solo il totale. */
+const SUMMARY_MAX_TASKS = 15;
+const SUMMARY_MAX_CHARS = 1500;
+
+function compactForPrompt(report: StandupReport) {
+  const pick = (tasks: StandupTask[], extra: (t: StandupTask) => Record<string, unknown>) => ({
+    count: tasks.length,
+    tasks: tasks.slice(0, SUMMARY_MAX_TASKS).map((t) => ({ title: t.title, ...extra(t) })),
+  });
+  return {
+    today: report.todayLabel,
+    yesterday: report.yesterdayLabel,
+    totals: report.totals,
+    projects: report.projects.map((p) => ({
+      name: p.name,
+      doneYesterday: pick(p.done, () => ({})),
+      inProgress: pick(p.inProgress, (t) => ({ idleDays: t.idleDays, priority: t.priority })),
+      toDo: pick(p.todo, (t) => ({
+        priority: t.priority,
+        due: t.dueDate ? isoLocalDate(t.dueDate) : null,
+      })),
+    })),
+  };
+}
+
+/**
+ * Riassunto discorsivo dello standup con un LLM di Workers AI. Best-effort:
+ * null se il binding manca, la quota e' finita o il modello non risponde, e
+ * la mail parte comunque con il solo dettaglio.
+ */
+export async function summarizeStandup(report: StandupReport, ai: AiBinding | null | undefined): Promise<string | null> {
+  if (!ai || report.projects.length === 0) return null;
+  try {
+    const out = await ai.run(SUMMARY_MODEL, {
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sei l'assistente di un project manager. Ricevi in JSON lo stato dei progetti e scrivi lo standup " +
+            "del mattino in italiano, in prosa: 3-6 frasi, tono diretto e cordiale, niente elenchi puntati, " +
+            "niente markdown, niente saluti finali. Di' cosa e' stato chiuso ieri, cosa e' in corso (segnala " +
+            "i task fermi da piu' giorni) e su cosa conviene concentrarsi oggi, privilegiando priorita' alta/" +
+            "urgente e scadenze vicine. Non inventare task che non sono nei dati.",
+        },
+        { role: "user", content: JSON.stringify(compactForPrompt(report)) },
+      ],
+      max_tokens: 400,
+      temperature: 0.4,
+    });
+    const text = String((out as { response?: unknown })?.response ?? "")
+      .replace(/[*_#`]/g, "")
+      .trim();
+    return text ? text.slice(0, SUMMARY_MAX_CHARS) : null;
+  } catch (err) {
+    console.error("[my-planner] riassunto dello standup non riuscito", err);
+    return null;
+  }
+}
+
 // --- Rendering ---------------------------------------------------------------
 
 const PRIORITY_LABEL: Record<StandupPriority, string> = {
@@ -173,10 +236,11 @@ function formatDueDate(date: Date): string {
 }
 
 /** Versione testuale, usata come fallback multipart/alternative. */
-export function renderStandupText(report: StandupReport): string {
+export function renderStandupText(report: StandupReport, summary: string | null = null): string {
   const head = [
     `Standup my-planner — ${report.todayLabel}`,
     `Fatto ieri: ${report.totals.done} · In corso: ${report.totals.inProgress} · Da fare oggi: ${report.totals.todo}`,
+    ...(summary ? ["", summary, "", "--- Dettaglio ---"] : []),
   ];
 
   if (report.projects.length === 0) {
@@ -285,8 +349,20 @@ function projectHtml(project: StandupProject): string {
 }
 
 /** Versione HTML: tabelle + stile inline, l'unico HTML affidabile nei client mail. */
-export function renderStandupHtml(report: StandupReport): string {
-  const preheader = `Fatto ieri: ${report.totals.done} · In corso: ${report.totals.inProgress} · Da fare oggi: ${report.totals.todo}`;
+export function renderStandupHtml(report: StandupReport, summary: string | null = null): string {
+  const preheader = summary
+    ? summary.slice(0, 140)
+    : `Fatto ieri: ${report.totals.done} · In corso: ${report.totals.inProgress} · Da fare oggi: ${report.totals.todo}`;
+
+  const summaryHtml = summary
+    ? `<tr><td style="padding:18px 28px 4px;">
+    <div style="background:#f9fafb;border:1px solid #eaecf0;border-left:4px solid #7a5af8;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#344054;">${escapeHtml(summary).replace(/\n+/g, "<br><br>")}</div>
+  </td></tr>`
+    : "";
+  const detailLabel =
+    summary && report.projects.length > 0
+      ? `<tr><td style="padding:18px 28px 0;font-size:12px;font-weight:700;color:#667085;text-transform:uppercase;letter-spacing:.06em;">Dettaglio</td></tr>`
+      : "";
 
   const body =
     report.projects.length === 0
@@ -311,6 +387,8 @@ export function renderStandupHtml(report: StandupReport): string {
     <div style="font-size:13px;color:#98a2b3;padding-top:4px;">${escapeHtml(report.todayLabel)}</div>
   </td></tr>
 
+  ${summaryHtml}
+
   <tr><td style="padding:18px 24px 4px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       ${statTile("Fatto ieri", report.totals.done, "#067647")}
@@ -319,6 +397,7 @@ export function renderStandupHtml(report: StandupReport): string {
     </tr></table>
   </td></tr>
 
+  ${detailLabel}
   ${body}
 
   <tr><td style="padding:8px 28px 24px;">
