@@ -83,6 +83,7 @@ Il frontend (SPA) espone URL stabili e condivisibili; il server deve servire `in
 | `/projects/:projectId/stats` | Statistiche del progetto (non esistono per `all`) |
 | `/activity` | Log attività |
 | `/profile` | Profilo utente |
+| `/settings/:tab` | Impostazioni (solo admin), tab `users`, `gemini`, `email`, `storage`; `/settings` apre `users` |
 | `<qualsiasi vista>?task=:taskId` | Apre il drawer del task sopra la vista corrente |
 
 Filtri della board nel query string (opzionali, combinabili): `assignedToMe=1`, `assignee=<userId\|__unassigned__>`, `priority=low,high`, `blocked=1`, `q=<testo>`, `tag=<tag>`, `subtasks=1`, `projects=<id,id>` (solo `/projects/all`). I filtri restano attivi cambiando progetto.
@@ -528,7 +529,7 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
 
 ### Impostazioni Gemini: assistente vocale (Gemini Live) e pre-triage
-Le impostazioni `/settings/voice*` (UI "Impostazioni Gemini") contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
+Le impostazioni `/settings/voice*` (UI: Impostazioni → Gemini) contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
 
 Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
 
