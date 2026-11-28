@@ -28,6 +28,7 @@ import {
 } from "../api";
 import { useI18n } from "../i18n";
 import { useToast } from "../lib/toast";
+import { VoiceNoteButton } from "./VoiceNoteButton";
 import { useActivityFeed } from "../lib/activity";
 import { ActivityList } from "./ActivityList";
 import { AttachmentThumb, MediaLightbox } from "./AttachmentPreview";
@@ -918,6 +919,7 @@ export function TaskDrawer({
                 />
                 <button type="submit">{t.taskDrawer.send}</button>
               </form>
+              <VoiceNoteButton taskId={taskId} onSaved={(c) => setComments((prev) => [...prev, c])} />
             </section>
 
             <CollapsibleSection {...sectionProps("attachments")} title={t.taskDrawer.attachments} count={attachments.length}>

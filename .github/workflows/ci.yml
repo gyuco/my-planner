@@ -110,6 +110,21 @@ jobs:
       - name: Migrazioni D1 (remote)
         run: npm run --workspace apps/server d1:migrate:remote
 
+      # Indice Vectorize della ricerca semantica (binding VECTORIZE in
+      # wrangler.toml): il deploy fallisce se non esiste, quindi lo si crea
+      # alla prima esecuzione (1024 = dimensioni di @cf/baai/bge-m3) insieme
+      # all'indice di metadati per filtrare per progetto. Idempotente.
+      # Il token richiede il permesso "Vectorize: Edit".
+      - name: Indice Vectorize (crea se manca)
+        working-directory: apps/server
+        run: |
+          if npx wrangler vectorize get my-planner-tasks >/dev/null 2>&1; then
+            echo "Indice my-planner-tasks gia' presente"
+          else
+            npx wrangler vectorize create my-planner-tasks --dimensions=1024 --metric=cosine
+            npx wrangler vectorize create-metadata-index my-planner-tasks --property-name=projectId --type=string
+          fi
+
       - name: Deploy Worker REST + MCP
         run: npm run --workspace apps/server cf:deploy
 

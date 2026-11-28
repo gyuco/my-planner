@@ -4,7 +4,7 @@ import type { BoardFiltersState } from "../components/FilterBar";
 /**
  * Filtri della board nel query string, cosi' un link condiviso riproduce la
  * stessa vista: assignedToMe=1, assignee=<id|__unassigned__>, priority=a,b,
- * blocked=1, q=<testo>, tag=<tag>, subtasks=1, projects=<id,id> (solo "all").
+ * blocked=1, q=<testo>, semantic=1, tag=<tag>, subtasks=1, projects=<id,id> (solo "all").
  */
 const PRIORITIES: TaskPriority[] = ["low", "medium", "high", "urgent"];
 
@@ -18,6 +18,7 @@ export function parseFilters(search: string): BoardFiltersState {
       .filter((x): x is TaskPriority => (PRIORITIES as string[]).includes(x)),
     blockedOnly: p.get("blocked") === "1",
     search: p.get("q") ?? "",
+    semantic: p.get("semantic") === "1",
     tag: p.get("tag") || null,
     showSubtasks: p.get("subtasks") === "1",
   };
@@ -39,6 +40,7 @@ export function writeFilters(p: URLSearchParams, f: BoardFiltersState): void {
   setOrDelete(p, "priority", f.priorities.length > 0 ? f.priorities.join(",") : null);
   setOrDelete(p, "blocked", f.blockedOnly ? "1" : null);
   setOrDelete(p, "q", f.search || null);
+  setOrDelete(p, "semantic", f.semantic ? "1" : null);
   setOrDelete(p, "tag", f.tag);
   setOrDelete(p, "subtasks", f.showSubtasks ? "1" : null);
 }
