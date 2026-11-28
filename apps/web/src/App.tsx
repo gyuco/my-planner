@@ -40,6 +40,7 @@ import {
   listDoneTasks,
   listProjectStatuses,
   listProjects,
+  ApiRequestError,
   semanticSearchTasks,
   setUnauthorizedHandler,
   type DoneTasksQuery,
@@ -398,10 +399,11 @@ export function App() {
         .then((matches) => {
           if (!cancelled) setSemanticHits(new Set(matches.map((m) => m.taskId)));
         })
-        .catch(() => {
+        .catch((err) => {
           if (cancelled) return;
           setSemanticHits(new Set());
-          toast.error(t.semantic.searchError);
+          // Il messaggio del server dice la causa (quota, Vectorize...).
+          toast.error(err instanceof ApiRequestError ? `${t.semantic.searchError}: ${err.message}` : t.semantic.searchError);
         });
     }, 400);
     return () => {

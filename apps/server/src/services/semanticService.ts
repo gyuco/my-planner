@@ -158,6 +158,14 @@ export interface SemanticSearchInput {
   excludeTaskId?: string;
 }
 
+/** Candidati chiesti a Vectorize quando il filtro per progetto non e' utilizzabile (max 100). */
+const UNFILTERED_TOP_K = 100;
+
+function vectorizeError(err: unknown): ApiErrorException {
+  console.error("[my-planner] query Vectorize non riuscita", err);
+  return new ApiErrorException("AI_PROVIDER_ERROR", `Vectorize: ${err instanceof Error ? err.message : String(err)}`);
+}
+
 export async function semanticSearch(input: SemanticSearchInput): Promise<SemanticTaskMatch[]> {
   const query = input.query.trim().slice(0, MAX_EMBED_CHARS);
   if (!query) return [];
@@ -168,16 +176,27 @@ export async function semanticSearch(input: SemanticSearchInput): Promise<Semant
   const minScore = input.minScore ?? SEARCH_MIN_SCORE;
   const [vector] = await embedTexts(ai, [query]);
 
+  // Uno in piu' per poter scartare il task escluso senza perdere un risultato.
+  const topK = limit + (input.excludeTaskId ? 1 : 0);
   let result: { matches: { id: string; score: number }[] };
   try {
     result = await vectorize.query(vector, {
-      // Uno in piu' per poter scartare il task escluso senza perdere un risultato.
-      topK: limit + (input.excludeTaskId ? 1 : 0),
+      topK,
       returnMetadata: "none",
       ...(input.projectIds ? { filter: { projectId: { $in: input.projectIds } } } : {}),
     });
   } catch (err) {
-    throw new ApiErrorException("AI_PROVIDER_ERROR", `Vectorize: ${err instanceof Error ? err.message : err}`);
+    if (!input.projectIds) throw vectorizeError(err);
+    // Il filtro per progetto dipende dall'indice di metadati `projectId`: se
+    // manca o non e' ancora pronto la query filtrata fallisce. Si ripiega su
+    // una query senza filtro con piu' candidati; il filtro autorevole sui
+    // progetti ammessi e' comunque quello sul DB qui sotto.
+    console.warn("[my-planner] query Vectorize filtrata non riuscita, riprovo senza filtro", err);
+    try {
+      result = await vectorize.query(vector, { topK: UNFILTERED_TOP_K, returnMetadata: "none" });
+    } catch (retryErr) {
+      throw vectorizeError(retryErr);
+    }
   }
 
   const scores = new Map<string, number>();
