@@ -13,6 +13,7 @@ import {
   listProjectStatuses,
   listProjects,
   moveTask,
+  semanticSearchTasks,
   setTaskAi,
   updateTask,
   type UpdateTaskInput,
@@ -126,9 +127,24 @@ export const VOICE_FUNCTION_DECLARATIONS = [
       properties: {
         projectId: str("Id del progetto"),
         status: str("Chiave di stato per filtrare (da list_statuses), opzionale"),
-        search: str("Testo da cercare nel titolo o nella descrizione, opzionale"),
+        search: str("Descrizione del task cercato, con le parole dell'utente: ricerca per significato, opzionale"),
       },
       required: ["projectId"],
+    },
+  },
+  {
+    name: "semantic_search",
+    description:
+      "Ricerca per significato in tutti i progetti accessibili (o in uno solo con projectId), completati inclusi: " +
+      "trova task anche se l'utente non usa le parole esatte del titolo (es. 'quello sull'accesso lento' trova " +
+      "'Login che ci mette troppo'). Usala quando l'utente non dice in quale progetto cercare, o vuole anche i completati.",
+    parameters: {
+      type: "OBJECT",
+      properties: {
+        query: str("Descrizione del task cercato, con le parole dell'utente"),
+        projectId: str("Id del progetto in cui cercare; omesso = tutti i progetti accessibili"),
+      },
+      required: ["query"],
     },
   },
   {
@@ -486,6 +502,24 @@ export async function executeVoiceTool(
       };
     }
 
+    case "semantic_search": {
+      const projectId = optionalString(args, "projectId") || undefined;
+      const matches = await semanticSearchTasks(requireString(args, "query"), projectId ? [projectId] : undefined);
+      const top = matches.slice(0, 10);
+      const labels = projectId ? await statusLabelsOf(projectId, host) : host.baseStatusLabels;
+      return {
+        total: top.length,
+        tasks: top.map((m) => ({
+          id: m.taskId,
+          projectId: m.projectId,
+          title: m.title,
+          status: m.status,
+          statusLabel: labels[m.status] ?? m.status,
+          similarity: Math.round(m.score * 100),
+        })),
+      };
+    }
+
     case "get_task": {
       const task = await getTask(requireString(args, "taskId"));
       const labels = await statusLabelsOf(task.projectId, host);
@@ -611,7 +645,7 @@ export function buildSystemInstruction(language: string, ctx: VoiceUiContext): s
       : "Nessun progetto specifico e' aperto: se serve, chiedi quale progetto o usa list_projects.",
     ctx.openTaskId ? `E' aperto il dettaglio del task con id ${ctx.openTaskId}: "questo task" si riferisce a lui.` : "",
     "Usa gli strumenti per leggere i dati: non inventare mai progetti, task, stati o persone. Gli id non vanno mai letti ad alta voce: usa titoli e nomi.",
-    "Per trovare un task nominato dall'utente usa list_tasks (anche con search); se ci sono piu' corrispondenze, chiedi quale.",
+    "Per trovare un task descritto dall'utente usa semantic_search (tutti i progetti) oppure list_tasks con search (un progetto): entrambe cercano per significato, non per parole esatte. Se ci sono piu' corrispondenze, chiedi quale.",
     "Gli stati vanno indicati con il loro nome (statusLabel); per cambiarli usa la chiave da list_statuses.",
     "Prima di ogni modifica (move_task, update_task, add_comment, create_task) riepiloga in una frase cosa farai e chiedi conferma. Chiama lo strumento con confirmed=true solo dopo un si' esplicito; se l'utente dice no o cambia idea, non farlo.",
     "Gestione AI: un task puo' essere affidato ad agenti AI con set_task_ai, scegliendo i passi (triage: da Draft a To do; coder: da To do a Testing; reviewer: da Testing a Done o rimanda in To do) e quando avvisare (alla fine, a ogni cambio di stato, mai). get_task mostra se la gestione AI e' attiva.",

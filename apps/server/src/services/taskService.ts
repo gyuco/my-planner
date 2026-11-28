@@ -23,7 +23,7 @@ import { parseEventData, SYSTEM_ACTOR, type Actor } from "./notificationService.
 import { emitEvent } from "./activityService.js";
 import { listCustomStatusKeys, resolveStatus } from "./statusService.js";
 import { publishBoardChange } from "../lib/realtime.js";
-import { scheduleTaskIndex, scheduleTaskRemoval } from "./semanticService.js";
+import { getAiFeatures, scheduleTaskIndex, scheduleTaskRemoval, semanticSearch } from "./semanticService.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -399,6 +399,34 @@ export async function createTask(projectId: string, input: TaskInput, actor: Act
   return serializeTask(task);
 }
 
+/** Massimo di task restituiti da una ricerca (board, archivio, MCP). */
+const SEARCH_MAX_RESULTS = 100;
+
+/**
+ * Condizione Prisma della ricerca sui task, usata da board, archivio dei
+ * completati, list_tasks MCP e assistente vocale. La ricerca e' semantica
+ * (Workers AI + Vectorize, per significato): restano i task trovati, nei
+ * progetti `projectIds` (undefined = tutti). Solo dove la ricerca semantica
+ * non esiste (Node/Docker) o non risponde (es. quota giornaliera esaurita)
+ * si ripiega sulla ricerca testuale su titolo e descrizione.
+ */
+async function searchWhere(
+  query: string,
+  projectIds: string[] | undefined,
+  textWhere: (q: string) => any = (q) => ({ OR: [{ title: { contains: q } }, { description: { contains: q } }] }),
+): Promise<any> {
+  const q = query.trim();
+  if (getAiFeatures().semanticSearch) {
+    try {
+      const matches = await semanticSearch({ query: q, projectIds, limit: SEARCH_MAX_RESULTS });
+      return { id: { in: matches.map((m) => m.taskId) } };
+    } catch (err) {
+      console.error("[my-planner] ricerca semantica non riuscita, uso la ricerca testuale", err);
+    }
+  }
+  return textWhere(q);
+}
+
 export async function listTasks(
   projectId: string,
   filters: { status?: string; priority?: TaskPriority; tag?: string; search?: string } & PeopleFilters
@@ -408,12 +436,7 @@ export async function listTasks(
   if (filters.status) where.status = await resolveStatus(projectId, filters.status);
   if (filters.priority) where.priority = filters.priority;
   applyPeopleFilters(where, filters);
-  if (filters.search) {
-    where.OR = [
-      { title: { contains: filters.search } },
-      { description: { contains: filters.search } },
-    ];
-  }
+  if (filters.search?.trim()) where.AND = [await searchWhere(filters.search, [projectId])];
 
   let tasks = await prisma.task.findMany({
     where,
@@ -808,16 +831,11 @@ function tagWhere(tag: string) {
   };
 }
 
-function boardWhere(base: any, filters: BoardFilters) {
+async function boardWhere(base: any, filters: BoardFilters, projectIds: string[] | undefined) {
   const where: any = { ...base };
   if (filters.priority) where.priority = filters.priority;
   applyPeopleFilters(where, filters);
-  if (filters.search) {
-    where.OR = [
-      { title: { contains: filters.search } },
-      { description: { contains: filters.search } },
-    ];
-  }
+  if (filters.search?.trim()) where.AND = [await searchWhere(filters.search, projectIds)];
   return where;
 }
 
@@ -853,12 +871,16 @@ async function buildBoard(where: any, include: any, customKeys: string[], filter
 export async function getBoard(projectId: string, filters: BoardFilters = {}) {
   await getProjectOrThrow(projectId);
   const customKeys = await listCustomStatusKeys([projectId]);
-  return buildBoard(boardWhere({ projectId }, filters), TASK_INCLUDE, customKeys, filters);
+  return buildBoard(await boardWhere({ projectId }, filters, [projectId]), TASK_INCLUDE, customKeys, filters);
 }
 
 export async function getAggregatedBoard(projectIds: string[] | undefined, filters: BoardFilters = {}) {
   const customKeys = await listCustomStatusKeys(projectIds);
-  const where = boardWhere({ project: projectIds ? { id: { in: projectIds } } : { archived: false } }, filters);
+  const where = await boardWhere(
+    { project: projectIds ? { id: { in: projectIds } } : { archived: false } },
+    filters,
+    projectIds,
+  );
   return buildBoard(where, { project: true, ...TASK_INCLUDE }, customKeys, filters);
 }
 
@@ -894,11 +916,14 @@ export async function listDoneTasks(query: DoneTasksQuery) {
   if (query.assigneeId) where.assigneeId = query.assigneeId === "none" ? null : query.assigneeId;
   if (query.priorities && query.priorities.length > 0) where.priority = { in: query.priorities };
   if (query.tag) and.push(tagWhere(query.tag));
-  if (query.search) {
-    and.push({ OR: [{ title: { contains: query.search } }, { description: { contains: query.search } }] });
-  }
-  if (query.q) {
-    and.push({ OR: [{ title: { contains: query.q } }, { project: { name: { contains: query.q } } }] });
+  if (query.search?.trim()) and.push(await searchWhere(query.search, query.projectIds));
+  if (query.q?.trim()) {
+    // Ripiego testuale dell'archivio: titolo o nome del progetto.
+    and.push(
+      await searchWhere(query.q, query.projectIds, (q) => ({
+        OR: [{ title: { contains: q } }, { project: { name: { contains: q } } }],
+      })),
+    );
   }
 
   const limit = Math.min(Math.max(query.limit ?? 50, 0), 200);

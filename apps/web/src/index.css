@@ -3574,6 +3574,7 @@ body.dnd-dragging * {
   .filter-panel .filter-chips { margin-right: 0; }
   .filter-panel .filter-select { width: 100%; min-height: 2.5rem; }
   .filter-bar .filter-projects { order: 3; }
+
 }
 
 /* -------------------------------------------------------------------------
@@ -5007,26 +5008,6 @@ body.dnd-dragging * {
 }
 
 /* --- Workers AI: ricerca semantica, duplicati, note vocali ------------------ */
-
-.filter-search-group {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-
-.filter-chip-semantic {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.filter-chip-semantic svg { width: 14px; height: 14px; }
-
-.filter-semantic-count {
-  font-size: 0.78rem;
-  color: var(--ink-500);
-}
 
 .similar-tasks {
   display: flex;
