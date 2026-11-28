@@ -47,12 +47,9 @@ export const es: Dictionary = {
     projectSettingsTitle: "Ajustes del proyecto",
     copyProjectLinkTitle: "Copiar enlace del proyecto",
     archivedProjects: "Proyectos archivados",
-    storageSettings: "Ajustes de almacenamiento",
-    emailSettings: "Notificaciones por email",
-    voiceSettings: "Ajustes de Gemini",
     assistant: "Asistente",
-    users: "Usuarios",
     activityLog: "Registro de actividad",
+    settings: "Ajustes",
   },
   filters: {
     toggle: "Filtros",
@@ -430,6 +427,13 @@ export const es: Dictionary = {
     iosInstall: "En iPhone y iPad las notificaciones solo funcionan desde la app instalada: toca Compartir → «Añadir a pantalla de inicio», abre My Planner desde el icono y actívalas aquí.",
     denied: "Bloqueaste las notificaciones de este sitio: vuelve a permitirlas en los ajustes del navegador e inténtalo de nuevo.",
     error: "No se pudieron activar las notificaciones push",
+  },
+  settings: {
+    title: "Ajustes",
+    tabUsers: "Usuarios",
+    tabGemini: "Gemini",
+    tabEmail: "Email",
+    tabStorage: "Almacenamiento de adjuntos",
   },
   guide: {
     sidebar: "Guía IA",

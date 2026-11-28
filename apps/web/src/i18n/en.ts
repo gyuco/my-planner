@@ -45,12 +45,9 @@ export const en = {
     projectSettingsTitle: "Project settings",
     copyProjectLinkTitle: "Copy project link",
     archivedProjects: "Archived projects",
-    storageSettings: "Storage settings",
-    emailSettings: "Email notifications",
-    voiceSettings: "Gemini settings",
     assistant: "Assistant",
-    users: "Users",
     activityLog: "Activity log",
+    settings: "Settings",
   },
   filters: {
     toggle: "Filters",
@@ -427,6 +424,13 @@ export const en = {
     iosInstall: "On iPhone and iPad notifications only work from the installed app: tap Share → “Add to Home Screen”, then open My Planner from the icon and enable them here.",
     denied: "You blocked notifications for this site: allow them again in the browser settings, then retry.",
     error: "Unable to enable push notifications",
+  },
+  settings: {
+    title: "Settings",
+    tabUsers: "Users",
+    tabGemini: "Gemini",
+    tabEmail: "Email",
+    tabStorage: "Attachment storage",
   },
   guide: {
     sidebar: "AI guide",

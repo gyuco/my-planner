@@ -83,6 +83,7 @@ Il frontend (SPA) espone URL stabili e condivisibili; il server deve servire `in
 | `/projects/:projectId/stats` | Statistiche del progetto (non esistono per `all`) |
 | `/activity` | Log attività |
 | `/profile` | Profilo utente |
+| `/settings/:tab` | Impostazioni (solo admin), tab `users`, `gemini`, `email`, `storage`; `/settings` apre `users` |
 | `<qualsiasi vista>?task=:taskId` | Apre il drawer del task sopra la vista corrente |
 
 Filtri della board nel query string (opzionali, combinabili): `assignedToMe=1`, `assignee=<userId\|__unassigned__>`, `priority=low,high`, `blocked=1`, `q=<testo>`, `tag=<tag>`, `subtasks=1`, `projects=<id,id>` (solo `/projects/all`). I filtri restano attivi cambiando progetto.
@@ -528,7 +529,7 @@ Stessi eventi della campanella, inviati via SMTP se configurato da `/settings/em
 - 200: `{ ok: true, to }` · 400 `VALIDATION_ERROR` se la config è incompleta · 502 `EMAIL_SEND_FAILED` con il messaggio SMTP.
 
 ### Impostazioni Gemini: assistente vocale (Gemini Live) e pre-triage
-Le impostazioni `/settings/voice*` (UI "Impostazioni Gemini") contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
+Le impostazioni `/settings/voice*` (UI: Impostazioni → Gemini) contengono la chiave Google AI Studio **condivisa** dall'assistente vocale e dal pre-triage dei task (§4, "Pre-triage"), più interruttore e modello di ciascuno: il pre-triage usa un modello di testo separato da quello Live (audio) e può essere attivo anche ad assistente vocale spento.
 
 Conversazione vocale con Gemini Live, **solo per gli admin** (vedi `apps/server/src/services/voiceService.ts` e `apps/web/src/lib/voice/`). La chiave Google AI Studio sta solo sul server, cifrata; il browser riceve un token effimero monouso (`auth_tokens`, API v1alpha, modello bloccato) e apre direttamente il WebSocket `BidiGenerateContentConstrained`. Gli strumenti che il modello chiama (leggere progetti/task, cambiare stato, modificare, commentare, creare) sono eseguiti **dal browser con le normali API REST e il JWT dell'utente**: stessi permessi dell'interfaccia. Le modifiche richiedono `confirmed: true`, che il modello passa solo dopo una conferma a voce; niente eliminazioni.
 
@@ -587,6 +588,16 @@ Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_c
 - **Nessun tool MCP** per il log (vista per utente).
 
 ---
+
+## 6quinquies. Board in tempo reale (WebSocket, solo Worker Cloudflare)
+
+`GET /realtime/projects/:projectId` con `Upgrade: websocket` (dal browser: `/api/realtime/projects/:projectId`, inoltrato dalla Pages Function).
+
+- **Auth:** il browser non può mandare l'header `Authorization` su un WebSocket, quindi il JWT viaggia come secondo sottoprotocollo: `new WebSocket(url, ["my-planner.v1", jwt])`. Il server conferma solo `my-planner.v1`. Errori dell'handshake: 426 senza upgrade, 401 token assente o non valido, 403 progetto non accessibile (manager non assegnato), 404 progetto inesistente, 503 Durable Object non configurato.
+- **Server:** un Durable Object `ProjectRealtime` per progetto (`idFromName(projectId)`, binding `PROJECT_REALTIME`) tiene i WebSocket con la Hibernation API. `emitEvent` (ogni evento di attività, da REST o da MCP) e il riordino nella stessa colonna gli inviano un avviso, in `waitUntil` dopo la risposta.
+- **Messaggi server → client:** `{"type":"board.changed","projectId","taskId","event","actorType"}`. `event` è il tipo di evento di attività (es. `task.status_changed`) oppure `task.reordered`. Nessun dato del task: il client ricarica la board via REST, che applica i permessi correnti.
+- **Keepalive:** il client manda `ping` ogni 30 s, il runtime risponde `pong` senza svegliare il Durable Object.
+- **Stack Node/Docker:** l'endpoint non esiste. Il client ritenta con attesa crescente fino a 5 minuti e la board resta utilizzabile senza aggiornamenti automatici.
 
 ## 7. Tool MCP (B14/B15)
 

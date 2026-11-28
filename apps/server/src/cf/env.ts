@@ -1,4 +1,4 @@
-import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
+import type { D1Database, DurableObjectNamespace, R2Bucket } from "@cloudflare/workers-types";
 
 /**
  * Binding del Worker Cloudflare (CF1). Passato come `env` a fetch e ai Durable
@@ -8,6 +8,9 @@ import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 export interface CfEnv {
   DB: D1Database;
   ATTACHMENTS: R2Bucket;
+  // Durable Object della board in tempo reale (un'istanza per progetto, vedi
+  // src/cf/realtime.ts). Opzionale: senza binding la board non si aggiorna da sola.
+  PROJECT_REALTIME?: DurableObjectNamespace;
   JWT_SECRET: string;
   BOOTSTRAP_EMAIL?: string;
   BOOTSTRAP_PASSWORD?: string;

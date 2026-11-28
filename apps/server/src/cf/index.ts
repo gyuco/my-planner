@@ -11,11 +11,18 @@ import { sendStandupEmail } from "./email.js";
 import { cfSmtpSocketFactory } from "./smtpSocket.js";
 import { setBackgroundRunner, setSmtpSocketFactory } from "../lib/email/provider.js";
 import { setSecretKeyProvider } from "../lib/secretBox.js";
+import { setRealtimePublisher } from "../lib/realtime.js";
+import { handleRealtimeUpgrade, matchRealtimePath, sendToProjectRealtime } from "./realtime.js";
 import type { CfEnv } from "./env.js";
+
+// Il Durable Object della board in tempo reale va esportato dall'entry point
+// (binding PROJECT_REALTIME in wrangler.toml).
+export { ProjectRealtime } from "./realtime.js";
 
 /**
  * Entry point del Worker Cloudflare (CF1/CF3).
  * Routing:
+ *   GET  /realtime/projects/:id       -> WebSocket della board in tempo reale (Durable Object)
  *   GET  /mcp/attachments/:id/download -> stream R2 autenticato col token MCP
  *   *    /mcp                         -> MCP Streamable HTTP (CF9/CF10)
  *   *    /.well-known/oauth-*, /authorize, /token, /register -> OAuth connector Claude
@@ -43,6 +50,18 @@ setSecretKeyProvider(() => {
 // interromperebbe l'invio a fine richiesta. La promise nasce dentro lo scope
 // della richiesta, quindi usa il suo client Prisma.
 setBackgroundRunner((task) => invocation.getStore()?.ctx.waitUntil(task));
+// Board in tempo reale: l'avviso al Durable Object del progetto parte dopo la
+// risposta, nello stesso waitUntil delle email.
+setRealtimePublisher((message) => {
+  const store = invocation.getStore();
+  const namespace = store?.env.PROJECT_REALTIME;
+  if (!store || !namespace) return;
+  store.ctx.waitUntil(
+    sendToProjectRealtime(namespace, message).catch((err) => {
+      console.error("[my-planner] avviso realtime non consegnato", err);
+    }),
+  );
+});
 
 // Deve restare allineato a [triggers].crons in wrangler.toml.
 const STANDUP_CRON = "0 6 * * *";
@@ -76,6 +95,8 @@ export default {
       if (oauth) return oauth;
 
       const url = new URL(request.url);
+      const realtimeProjectId = matchRealtimePath(url.pathname);
+      if (realtimeProjectId) return handleRealtimeUpgrade(request, env, realtimeProjectId);
       if (request.method === "GET" && url.pathname.startsWith("/mcp/attachments/")) {
         return handleMcpAttachmentDownload(request, env);
       }

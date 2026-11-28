@@ -16,6 +16,7 @@ import {
 import { queueTaskEventEmail } from "./emailNotificationService.js";
 import { queueTaskEventPush } from "./pushService.js";
 import { queueAiDispatch } from "./aiRoutineService.js";
+import { publishBoardChange } from "../lib/realtime.js";
 
 /**
  * Log attivita': ogni mutazione rilevante di un task scrive una riga in
@@ -23,8 +24,9 @@ import { queueAiDispatch } from "./aiRoutineService.js";
  * considerano solo `NOTIFICATION_EVENT_TYPES`; il log li espone tutti, con
  * filtri, incluse le azioni dell'utente corrente.
  *
- * Il "tempo reale" lato client e' un polling con `afterId` (stesso motivo
- * delle notifiche: niente SSE/WebSocket su Workers/D1 senza Durable Objects).
+ * Il log lato client si aggiorna con un polling con `afterId`; la board invece
+ * riceve un avviso in tempo reale a ogni evento (lib/realtime.ts, Durable
+ * Object per progetto sul Worker).
  */
 
 const NOTIFIABLE = new Set<TaskEventType>(NOTIFICATION_EVENT_TYPES);
@@ -43,6 +45,14 @@ export async function emitEvent(input: RecordTaskEventInput): Promise<void> {
     // eslint-disable-next-line no-console
     console.error("[my-planner] impossibile registrare l'evento di attivita'", err);
   }
+  // Board in tempo reale: avvisa i client con la board del progetto aperta.
+  publishBoardChange({
+    type: "board.changed",
+    projectId: input.projectId,
+    taskId: input.taskId,
+    event: input.type,
+    actorType: input.actor.type,
+  });
   try {
     // Avvio automatico dei passi AI (routine Claude Code), solo se configurata.
     await queueAiDispatch(input);

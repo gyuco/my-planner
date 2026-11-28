@@ -68,10 +68,9 @@ interface SidebarProps {
   onCreateProject: () => void;
   onOpenSettings: (projectId: string) => void;
   onOpenArchived: () => void;
-  onOpenStorageSettings: () => void;
-  onOpenEmailSettings: () => void;
-  onOpenVoiceSettings: () => void;
-  onOpenUsers: () => void;
+  /** Pagina Impostazioni (solo admin): utenti, Gemini, email, storage. */
+  onOpenAppSettings: () => void;
+  settingsActive: boolean;
   onOpenActivity: () => void;
 }
 
@@ -88,10 +87,8 @@ export function Sidebar({
   onCreateProject,
   onOpenSettings,
   onOpenArchived,
-  onOpenStorageSettings,
-  onOpenEmailSettings,
-  onOpenVoiceSettings,
-  onOpenUsers,
+  onOpenAppSettings,
+  settingsActive,
   onOpenActivity,
 }: SidebarProps) {
   const { t } = useI18n();
@@ -195,27 +192,12 @@ export function Sidebar({
             {t.guide.sidebar}
           </button>
         )}
-        {isAdmin && (
-          <button className="sidebar-item" onClick={onOpenUsers}>
-            {t.sidebar.users}
-          </button>
-        )}
         <button className="sidebar-item" onClick={onOpenArchived}>
           {t.sidebar.archivedProjects}
         </button>
         {isAdmin && (
-          <button className="sidebar-item" onClick={onOpenStorageSettings}>
-            {t.sidebar.storageSettings}
-          </button>
-        )}
-        {isAdmin && (
-          <button className="sidebar-item" onClick={onOpenEmailSettings}>
-            {t.sidebar.emailSettings}
-          </button>
-        )}
-        {isAdmin && (
-          <button className="sidebar-item" onClick={onOpenVoiceSettings}>
-            {t.sidebar.voiceSettings}
+          <button className={`sidebar-item${settingsActive ? " active" : ""}`} onClick={onOpenAppSettings}>
+            {t.sidebar.settings}
           </button>
         )}
       </div>

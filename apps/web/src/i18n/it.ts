@@ -47,12 +47,9 @@ export const it: Dictionary = {
     projectSettingsTitle: "Impostazioni progetto",
     copyProjectLinkTitle: "Copia link progetto",
     archivedProjects: "Progetti archiviati",
-    storageSettings: "Impostazioni storage",
-    emailSettings: "Notifiche email",
-    voiceSettings: "Impostazioni Gemini",
     assistant: "Assistente",
-    users: "Utenti",
     activityLog: "Log attività",
+    settings: "Impostazioni",
   },
   filters: {
     toggle: "Filtri",
@@ -429,6 +426,13 @@ export const it: Dictionary = {
     iosInstall: "Su iPhone e iPad le notifiche funzionano solo dall'app installata: tocca Condividi → «Aggiungi alla schermata Home», poi apri My Planner dall'icona e attivale da qui.",
     denied: "Hai bloccato le notifiche per questo sito: riattivale dalle impostazioni del browser, poi riprova.",
     error: "Impossibile attivare le notifiche push",
+  },
+  settings: {
+    title: "Impostazioni",
+    tabUsers: "Utenti",
+    tabGemini: "Gemini",
+    tabEmail: "Email",
+    tabStorage: "Storage allegati",
   },
   guide: {
     sidebar: "Guida AI",

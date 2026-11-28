@@ -8,12 +8,8 @@ import { CreateTaskModal } from "./components/CreateTaskModal";
 import { CreateProjectModal } from "./components/CreateProjectModal";
 import { ProjectSettingsModal } from "./components/ProjectSettingsModal";
 import { ArchivedProjectsModal } from "./components/ArchivedProjectsModal";
-import { StorageSettingsModal } from "./components/StorageSettingsModal";
-import { EmailSettingsModal } from "./components/EmailSettingsModal";
-import { VoiceSettingsModal } from "./components/VoiceSettingsModal";
 import { VoiceAssistantButton } from "./components/VoiceAssistant";
 import { AssistantPage } from "./pages/AssistantPage";
-import { UsersModal } from "./components/UsersModal";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { TaskAiModal } from "./components/TaskAiModal";
 import {
@@ -49,8 +45,10 @@ import {
 } from "./api";
 import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
-import { parseRoute, projectPath } from "./lib/routes";
+import { parseRoute, projectPath, settingsPath } from "./lib/routes";
+import { SettingsPage } from "./pages/SettingsPage";
 import { syncPushSubscription } from "./lib/push";
+import { useRealtimeBoard } from "./lib/realtime";
 import {
   filtersSearch,
   parseFilters,
@@ -156,14 +154,10 @@ export function App() {
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [showStorageSettings, setShowStorageSettings] = useState(false);
-  const [showEmailSettings, setShowEmailSettings] = useState(false);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   // Incrementato quando l'assistente vocale modifica dati: ricarica il drawer aperto.
   const [voiceDataVersion, setVoiceDataVersion] = useState(0);
   // Rimonta il pulsante microfono dopo le impostazioni (attivato/disattivato).
   const [voiceSettingsVersion, setVoiceSettingsVersion] = useState(0);
-  const [showUsers, setShowUsers] = useState(false);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
   // Task aperto nel drawer: l'id sta nell'URL (?task=), il progetto viene
@@ -275,6 +269,10 @@ export function App() {
       document.title = `${t.assistant.title} · My Planner`;
       return;
     }
+    if (view === "settings") {
+      document.title = `${t.settings.title} · My Planner`;
+      return;
+    }
     const currentProject = projects.find((p) => p.id === selectedProjectId);
     if (view === "stats" && currentProject) {
       document.title = `${t.stats.title} · ${currentProject.name} · My Planner`;
@@ -297,7 +295,6 @@ export function App() {
     setProjectsLoaded(false);
     setBoard(EMPTY_BOARD);
     setBoardFor(null);
-    setShowUsers(false);
     setResolvedTask(null);
     setRouteNotice(null);
   }, []);
@@ -399,6 +396,17 @@ export function App() {
     loadBoard();
   }, [loadBoard]);
 
+  // Board in tempo reale: le modifiche fatte altrove (altri utenti, agenti via
+  // MCP) ricaricano la board senza reload della pagina. Sulla board aggregata
+  // si ascoltano i progetti selezionati, o tutti quelli attivi.
+  const realtimeProjectIds = useMemo(() => {
+    if (!loggedIn || !selectedProjectId) return [];
+    if (selectedProjectId !== "all") return [selectedProjectId];
+    if (aggregatedProjectIds && aggregatedProjectIds.length > 0) return aggregatedProjectIds;
+    return projects.filter((p) => !p.archived).map((p) => p.id);
+  }, [loggedIn, selectedProjectId, aggregatedProjectIds, projects]);
+  useRealtimeBoard(realtimeProjectIds, loadBoard);
+
   const currentUserId = currentUser?.id ?? null;
 
   // Archivio dei completati: la board non li carica, qui si chiedono solo il
@@ -455,8 +463,8 @@ export function App() {
   useEffect(() => {
     if (!loggedIn || !projectsLoaded) return;
     if (view === "profile" || view === "activity" || view === "guide") return;
-    // Assistente: solo admin (si aspetta di sapere chi e' l'utente prima di decidere).
-    if (view === "assistant" && (!currentUser || isAdmin)) return;
+    // Assistente e impostazioni: solo admin (si aspetta di sapere chi e' l'utente prima di decidere).
+    if ((view === "assistant" || view === "settings") && (!currentUser || isAdmin)) return;
     if (selectedProjectId) return;
     const target = projects[0]?.id ?? "all";
     const unknownProject = route.projectId !== null && route.projectId !== "all";
@@ -553,7 +561,10 @@ export function App() {
       {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
       <Sidebar
         projects={projects}
-        selectedProjectId={view === "activity" || view === "guide" || view === "assistant" ? null : selectedProjectId}
+        selectedProjectId={
+          view === "activity" || view === "guide" || view === "assistant" || view === "settings" ? null : selectedProjectId
+        }
+        settingsActive={view === "settings"}
         activityActive={view === "activity"}
         guideActive={view === "guide"}
         assistantActive={view === "assistant"}
@@ -578,10 +589,11 @@ export function App() {
         onCreateProject={() => setShowCreateProject(true)}
         onOpenSettings={(projectId) => setSettingsProjectId(projectId)}
         onOpenArchived={() => setShowArchived(true)}
-        onOpenStorageSettings={() => setShowStorageSettings(true)}
-        onOpenEmailSettings={() => setShowEmailSettings(true)}
-        onOpenVoiceSettings={() => setShowVoiceSettings(true)}
-        onOpenUsers={() => setShowUsers(true)}
+        onOpenAppSettings={() => {
+          setRouteNotice(null);
+          navigate(settingsPath(route.settingsTab ?? "users"));
+          setSidebarOpen(false);
+        }}
         onOpenActivity={() => {
           setRouteNotice(null);
           navigate("/activity");
@@ -603,7 +615,7 @@ export function App() {
             >
               <MenuIcon />
             </button>
-            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "assistant" ? t.assistant.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
+            <h1>{view === "profile" ? t.profile.title : view === "activity" ? t.activity.title : view === "guide" ? t.guide.sidebar : view === "assistant" ? t.assistant.title : view === "settings" ? t.settings.title : selectedProjectId === "all" ? t.app.allProjects : currentProject?.name ?? "my-planner"}</h1>
           </div>
           <div className="topbar-actions">
             {view === "board" && currentProject && (
@@ -687,6 +699,18 @@ export function App() {
               onDataChanged: () => setVoiceDataVersion((v) => v + 1),
               onOpenTask: (taskId, projectId) => openTask(taskId, projectId),
             }}
+          />
+        ) : view === "settings" && isAdmin && currentUser ? (
+          <SettingsPage
+            tab={route.settingsTab ?? "users"}
+            onTabChange={(tab) => navigate(settingsPath(tab), { replace: true })}
+            currentUserId={currentUser.id}
+            projects={projects}
+            onUsersChanged={() => {
+              refreshSession();
+              loadProjects();
+            }}
+            onGeminiSaved={() => setVoiceSettingsVersion((v) => v + 1)}
           />
         ) : view === "guide" ? (
           <GuidePage />
@@ -840,32 +864,6 @@ export function App() {
         <ArchivedProjectsModal onClose={() => setShowArchived(false)} onChanged={loadProjects} isAdmin={isAdmin} />
       )}
 
-      {showStorageSettings && isAdmin && (
-        <StorageSettingsModal onClose={() => setShowStorageSettings(false)} />
-      )}
-
-      {showEmailSettings && isAdmin && <EmailSettingsModal onClose={() => setShowEmailSettings(false)} />}
-
-      {showVoiceSettings && isAdmin && (
-        <VoiceSettingsModal
-          onClose={() => {
-            setShowVoiceSettings(false);
-            setVoiceSettingsVersion((v) => v + 1);
-          }}
-        />
-      )}
-
-      {showUsers && currentUser && isAdmin && (
-        <UsersModal
-          currentUserId={currentUser.id}
-          projects={projects}
-          onClose={() => setShowUsers(false)}
-          onChanged={() => {
-            refreshSession();
-            loadProjects();
-          }}
-        />
-      )}
     </div>
   );
 }
