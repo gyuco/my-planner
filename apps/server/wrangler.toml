@@ -25,6 +25,18 @@ migrations_dir = "migrations"
 binding = "ATTACHMENTS"
 bucket_name = "my-planner-attachments"
 
+# ---- Durable Object: board in tempo reale ------------------------------------
+# Un'istanza per progetto tiene i WebSocket (Hibernation API) dei client con la
+# board aperta e inoltra gli avvisi di ogni modifica, da REST o da MCP
+# (src/cf/realtime.ts). Classe SQLite: disponibile anche sul piano gratuito.
+[[durable_objects.bindings]]
+name = "PROJECT_REALTIME"
+class_name = "ProjectRealtime"
+
+[[migrations]]
+tag = "v1-project-realtime"
+new_sqlite_classes = ["ProjectRealtime"]
+
 # ---- Var statiche ------------------------------------------------------------
 # JWT_SECRET, BOOTSTRAP_EMAIL, BOOTSTRAP_PASSWORD, GMAIL_USER,
 # GMAIL_APP_PASSWORD (e opzionale SETTINGS_ENCRYPTION_KEY) vanno impostate come secrets (`wrangler secret put`)

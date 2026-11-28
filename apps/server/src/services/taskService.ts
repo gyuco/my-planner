@@ -22,6 +22,7 @@ import { getAttachmentStorage } from "../lib/attachmentStorage/provider.js";
 import { parseEventData, SYSTEM_ACTOR, type Actor } from "./notificationService.js";
 import { emitEvent } from "./activityService.js";
 import { listCustomStatusKeys, resolveStatus } from "./statusService.js";
+import { publishBoardChange } from "../lib/realtime.js";
 
 /**
  * Service layer condiviso tra route REST e tool MCP.
@@ -725,6 +726,15 @@ export async function moveTask(
         from: existing.status as TaskStatusKey,
         to: status,
       },
+    });
+  } else {
+    // Niente evento di attivita', ma la board degli altri client cambia.
+    publishBoardChange({
+      type: "board.changed",
+      projectId: updated.projectId,
+      taskId: updated.id,
+      event: "task.reordered",
+      actorType: actor.type,
     });
   }
 

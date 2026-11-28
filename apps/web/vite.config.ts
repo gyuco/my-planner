@@ -14,7 +14,7 @@ export default defineConfig({
     port: devPort,
     strictPort: true,
     proxy: {
-      "/api": { target: apiProxyTarget, rewrite: (p) => p.replace(/^\/api/, "") },
+      "/api": { target: apiProxyTarget, ws: true, rewrite: (p) => p.replace(/^\/api/, "") },
     },
   },
 });

@@ -588,6 +588,16 @@ Tipi evento (`TASK_EVENT_TYPES`): `task.created`, `task.updated`, `task.status_c
 
 ---
 
+## 6quinquies. Board in tempo reale (WebSocket, solo Worker Cloudflare)
+
+`GET /realtime/projects/:projectId` con `Upgrade: websocket` (dal browser: `/api/realtime/projects/:projectId`, inoltrato dalla Pages Function).
+
+- **Auth:** il browser non può mandare l'header `Authorization` su un WebSocket, quindi il JWT viaggia come secondo sottoprotocollo: `new WebSocket(url, ["my-planner.v1", jwt])`. Il server conferma solo `my-planner.v1`. Errori dell'handshake: 426 senza upgrade, 401 token assente o non valido, 403 progetto non accessibile (manager non assegnato), 404 progetto inesistente, 503 Durable Object non configurato.
+- **Server:** un Durable Object `ProjectRealtime` per progetto (`idFromName(projectId)`, binding `PROJECT_REALTIME`) tiene i WebSocket con la Hibernation API. `emitEvent` (ogni evento di attività, da REST o da MCP) e il riordino nella stessa colonna gli inviano un avviso, in `waitUntil` dopo la risposta.
+- **Messaggi server → client:** `{"type":"board.changed","projectId","taskId","event","actorType"}`. `event` è il tipo di evento di attività (es. `task.status_changed`) oppure `task.reordered`. Nessun dato del task: il client ricarica la board via REST, che applica i permessi correnti.
+- **Keepalive:** il client manda `ping` ogni 30 s, il runtime risponde `pong` senza svegliare il Durable Object.
+- **Stack Node/Docker:** l'endpoint non esiste. Il client ritenta con attesa crescente fino a 5 minuti e la board resta utilizzabile senza aggiornamenti automatici.
+
 ## 7. Tool MCP (B14/B15)
 
 Tutti i tool sono registrati da `createProjectMcpServer(projectId)` e operano **esclusivamente** sul `projectId` risolto dal token. Nessun parametro `projectId` in input (implicito). Ogni tool richiama le stesse funzioni di `apps/server/src/services/*` usate da REST.

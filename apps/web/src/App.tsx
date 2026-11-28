@@ -51,6 +51,7 @@ import { useI18n } from "./i18n";
 import { boardStatusKeys, customStatusLabels } from "./lib/statuses";
 import { parseRoute, projectPath } from "./lib/routes";
 import { syncPushSubscription } from "./lib/push";
+import { useRealtimeBoard } from "./lib/realtime";
 import {
   filtersSearch,
   parseFilters,
@@ -398,6 +399,17 @@ export function App() {
   useEffect(() => {
     loadBoard();
   }, [loadBoard]);
+
+  // Board in tempo reale: le modifiche fatte altrove (altri utenti, agenti via
+  // MCP) ricaricano la board senza reload della pagina. Sulla board aggregata
+  // si ascoltano i progetti selezionati, o tutti quelli attivi.
+  const realtimeProjectIds = useMemo(() => {
+    if (!loggedIn || !selectedProjectId) return [];
+    if (selectedProjectId !== "all") return [selectedProjectId];
+    if (aggregatedProjectIds && aggregatedProjectIds.length > 0) return aggregatedProjectIds;
+    return projects.filter((p) => !p.archived).map((p) => p.id);
+  }, [loggedIn, selectedProjectId, aggregatedProjectIds, projects]);
+  useRealtimeBoard(realtimeProjectIds, loadBoard);
 
   const currentUserId = currentUser?.id ?? null;
 
