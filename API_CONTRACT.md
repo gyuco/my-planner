@@ -604,8 +604,8 @@ Modelli: embedding `@cf/baai/bge-m3` (multilingue, 1024 dimensioni), trascrizion
 
 ### `GET /search/semantic?q=&projectIds=a,b&limit=20` (autenticato)
 - Ricerca per significato. `projectIds` omesso = tutti i progetti accessibili (stessa regola di `GET /tasks/done`); i progetti non accessibili vengono ignorati.
-- 200: `SemanticTaskMatch[]` = `{ taskId, projectId, title, status, score }`, ordinati per `score` (coseno, 0..1) decrescente, solo con `score >= 0.45`.
-- La board, con il toggle "Semantica" acceso (`?semantic=1`), si carica senza `search` e mostra solo i task trovati, sotto-task comprese.
+- 200: `SemanticTaskMatch[]` = `{ taskId, projectId, title, status, score }`, ordinati per `score` (coseno, 0..1) decrescente, solo con `score >= 0.40`.
+- **Tutte le ricerche sui task sono semantiche**: il parametro `search` di `GET /projects/:id/board`, `GET /board`, `GET /projects/:id/tasks` (e del tool MCP `list_tasks`) e `search`/`q` di `GET /tasks/done` passano per questa ricerca (fino a 100 risultati, `score >= 0.40`) e restituiscono i task trovati per significato. Solo se la ricerca semantica non esiste (Node/Docker) o non risponde (es. quota esaurita) si ripiega sulla ricerca testuale (titolo/descrizione; per `q` titolo/nome del progetto). Con una ricerca attiva la board mostra anche le sotto-task trovate come card.
 
 ### `POST /projects/:projectId/tasks/similar` (accesso al progetto)
 - Body: `{ title, description?, excludeTaskId? }`.
