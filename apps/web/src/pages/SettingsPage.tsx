@@ -3,6 +3,7 @@ import { useI18n } from "../i18n";
 import { SETTINGS_TABS, type SettingsTab } from "../lib/routes";
 import { UsersPanel } from "../components/UsersPanel";
 import { GeminiSettingsPanel } from "../components/GeminiSettingsPanel";
+import { WorkersAiSection } from "../components/WorkersAiSection";
 import { EmailSettingsPanel } from "../components/EmailSettingsPanel";
 import { StorageSettingsPanel } from "../components/StorageSettingsPanel";
 
@@ -62,7 +63,12 @@ export function SettingsPage({
           {tab === "users" && (
             <UsersPanel currentUserId={currentUserId} projects={projects} onChanged={onUsersChanged} />
           )}
-          {tab === "gemini" && <GeminiSettingsPanel onSaved={onGeminiSaved} />}
+          {tab === "gemini" && (
+            <>
+              <GeminiSettingsPanel onSaved={onGeminiSaved} />
+              <WorkersAiSection />
+            </>
+          )}
           {tab === "email" && <EmailSettingsPanel />}
           {tab === "storage" && <StorageSettingsPanel />}
         </div>
